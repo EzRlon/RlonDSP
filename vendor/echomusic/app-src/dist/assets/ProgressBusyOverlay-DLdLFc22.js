@@ -1,0 +1,1 @@
+import{Nn as e,qr as t,rr as n}from"./inputBehaviorGuard-CKBl_yqP.js";import{zt as r}from"./style-Cdw45bbb.js";var i=t({default:()=>c}),a={},o={class:`player-progress-busy`,"aria-hidden":`true`};function s(t,r){return n(),e(`span`,o)}var c=r(a,[[`render`,s],[`__scopeId`,`data-v-43aef710`]]);export{i as n,c as t};

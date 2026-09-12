@@ -1,0 +1,1 @@
+import{Or as e,kn as t}from"./inputBehaviorGuard-CKBl_yqP.js";import{fn as n}from"./style-Cdw45bbb.js";function r(){let r=e();return{primitiveElement:r,currentElement:t(()=>[`#text`,`#comment`].includes(r.value?.$el.nodeName)?r.value?.$el.nextElementSibling:n(r))}}export{r as t};

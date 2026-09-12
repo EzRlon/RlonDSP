@@ -1,0 +1,1 @@
+import{b as e}from"./style-Cdw45bbb.js";var t=(t,n=1,r=20)=>e.get(`/youth/channel/song/list`,{params:{global_collection_id:t,page:n,pagesize:r}});export{t as getChannelSongs};

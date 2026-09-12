@@ -1,0 +1,1 @@
+import{qr as e}from"./inputBehaviorGuard-CKBl_yqP.js";var t=e({resolveExternalPlaylist:()=>n}),n=e=>window.electron.external.resolvePlaylist(e);export{n,t};

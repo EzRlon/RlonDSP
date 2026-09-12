@@ -1,0 +1,1 @@
+import{Or as e,kn as t}from"./inputBehaviorGuard-CKBl_yqP.js";import{dn as n}from"./style-Cdw45bbb.js";function r(r){let i=n({dir:e(`ltr`)});return t(()=>r?.value||i.dir?.value||`ltr`)}export{r as t};

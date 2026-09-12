@@ -1,0 +1,1 @@
+import{o as e}from"./lyric-C1TK87wx.js";var t=(t,n)=>e(t?.text??``,n.enabled,n.pattern),n=(e,n,r)=>{if(n<0||!t(e[n],r))return n;for(let i=n-1;i>=0;i--)if(!t(e[i],r))return i;return-1},r=(e,n,r)=>{for(let i=Math.max(0,n+1);i<e.length;i++)if(!t(e[i],r))return i;return-1},i=(e,n)=>e.map((e,r)=>({line:e,index:r,filtered:t(e,n)}));export{r as n,n as r,i as t};

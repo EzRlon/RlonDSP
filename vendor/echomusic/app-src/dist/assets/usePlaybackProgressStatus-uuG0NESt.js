@@ -1,0 +1,1 @@
+import{Fr as e,kn as t}from"./inputBehaviorGuard-CKBl_yqP.js";var n=e=>e===`seek`?`播放进度，定位中`:e===`buffering`?`播放进度，缓冲中`:`播放进度`,r=r=>{let i=t(()=>e(r)??null);return{busyReason:i,isBusy:t(()=>i.value!==null),ariaLabel:t(()=>n(i.value))}};export{r as t};

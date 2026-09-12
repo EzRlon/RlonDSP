@@ -1,0 +1,1 @@
+import{qr as e}from"./inputBehaviorGuard-CKBl_yqP.js";import{N as t,b as n}from"./style-Cdw45bbb.js";var r=e({recognizeAudio:()=>i});async function i(e){let r=await n.post(`/audio/match`,new Uint8Array(e),{headers:{"Content-Type":`application/octet-stream`},params:{t:Date.now()}}),i=r?.status,a=r?.data;return i===1?t(a):[]}export{r as n,i as t};

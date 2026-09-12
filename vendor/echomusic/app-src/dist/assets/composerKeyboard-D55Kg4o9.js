@@ -1,0 +1,1 @@
+function e(e,t){e.key===`Enter`&&(e.stopPropagation(),!(e.isComposing||e.keyCode===229)&&(e.shiftKey||e.ctrlKey||e.altKey||e.metaKey||(e.preventDefault(),e.repeat||t())))}export{e as t};

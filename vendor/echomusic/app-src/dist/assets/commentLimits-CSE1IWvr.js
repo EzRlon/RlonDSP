@@ -1,0 +1,1 @@
+var e=e=>Array.from(e).length;function t(t,n=!1){let r=n?100:200;if(e(t)>r)throw Error(`${n?`弹幕`:`评论`}最多 ${r} 字，请精简后再发送`)}export{e as n,t};

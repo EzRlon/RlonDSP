@@ -1,0 +1,1 @@
+import{qr as e}from"./inputBehaviorGuard-CKBl_yqP.js";import{b as t}from"./style-Cdw45bbb.js";var n=e({getPurchasedAlbum:()=>i,getPurchasedSongs:()=>r});function r(e=1,n=30){return t.get(`/user/purchased/songs`,{params:{page:e,pagesize:n}})}function i(e=1,n=30){return t.get(`/user/purchased/albums`,{params:{page:e,pagesize:n}})}export{r as n,n as r,i as t};

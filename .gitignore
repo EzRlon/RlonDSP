@@ -1,0 +1,8 @@
+release/
+vendor/echomusic/runtime/
+vendor/echomusic/app-src/node_modules/
+.pnpm-store/
+__pycache__/
+*.pyc
+/build/
+/dist/

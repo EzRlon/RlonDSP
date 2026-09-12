@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RlonDSP</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <span class="brand-name">RlonDSP</span>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="importFileBtn" title="导入文件"><span class="icon">＋</span><span data-i18n="importFiles">导入文件</span></button>
+      <button class="icon-btn" id="importFolderBtn" title="导入文件夹"><span class="icon">▣</span><span data-i18n="importFolder">导入文件夹</span></button>
+      <label class="icon-btn search-wrap">
+        <span class="icon">⌕</span>
+        <input id="playlistSearch" type="text" data-i18n-ph="searchPlaceholder" placeholder="搜索歌曲">
+      </label>
+      <button class="icon-btn" id="lyricsBtn" title="桌面歌词"><span class="icon">〝</span><span data-i18n="desktopLyrics">桌面歌词</span></button>
+      <button class="icon-btn" id="themeBtn" title="切换主题"><span class="icon">◐</span><span id="themeLabel" data-i18n="themeSystem">跟随系统</span></button>
+      <button class="icon-btn" id="langBtn" title="切换语言"><span class="icon">文</span><span>EN</span></button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="panel playlist-panel">
+      <div class="panel-head">
+        <h2 data-i18n="playlist">播放列表</h2>
+        <span id="trackCount" class="muted">0</span>
+      </div>
+      <div class="toolbar">
+        <select id="sortSelect" class="compact-select">
+          <option value="default" data-i18n="sortDefault">默认排序</option>
+          <option value="title" data-i18n="sortTitle">按标题</option>
+          <option value="artist" data-i18n="sortArtist">按歌手</option>
+          <option value="duration" data-i18n="sortDuration">按时长</option>
+        </select>
+        <button class="ghost-btn" id="clearPlaylistBtn" data-i18n="clear">清空</button>
+      </div>
+      <div class="drop-hint" id="dropHint" data-i18n="dropHint">拖入音频文件或文件夹即可导入</div>
+      <ul class="track-list" id="trackList"></ul>
+    </section>
+
+    <section class="panel now-panel">
+      <div class="now-inner">
+        <div class="cover-wrap">
+          <img id="cover" class="cover" alt="" draggable="false">
+          <div id="coverFallback" class="cover-fallback">♪</div>
+        </div>
+        <div class="now-info">
+          <h1 id="nowTitle" data-i18n="noTrack">未播放</h1>
+          <p id="nowArtist" class="muted"></p>
+          <p id="nowAlbum" class="muted small"></p>
+        </div>
+        <div class="visualizer-wrap">
+          <canvas id="visualizer" width="560" height="120"></canvas>
+          <div id="visualHint" class="visual-hint" data-i18n="visualHint">播放时显示频谱</div>
+        </div>
+        <div class="lyrics-box" id="lyricsBox">
+          <div id="lyricsLine" data-i18n="noLyrics">暂无歌词</div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel fx-panel">
+      <div class="panel-head">
+        <h2 data-i18n="soundEffects">音效</h2>
+        <button class="ghost-btn" id="resetFxBtn" data-i18n="reset">重置</button>
+      </div>
+      <div class="fx-scroll">
+        <div class="fx-section">
+          <div class="fx-section-title">
+            <span data-i18n="preset">预设</span>
+            <div class="preset-actions">
+              <button class="mini-btn" id="savePresetBtn" data-i18n="save">保存</button>
+              <button class="mini-btn" id="deletePresetBtn" data-i18n="delete">删除</button>
+              <button class="mini-btn" id="exportPresetBtn" data-i18n="export">导出</button>
+              <button class="mini-btn" id="importPresetBtn" data-i18n="import">导入</button>
+            </div>
+          </div>
+          <select id="presetSelect" class="full-select">
+            <option value="">--</option>
+          </select>
+        </div>
+
+        <div class="fx-section">
+          <div class="fx-section-title"><span data-i18n="equalizer">均衡器</span></div>
+          <div class="eq-bands" id="eqBands"></div>
+        </div>
+
+        <div class="fx-section">
+          <div class="fx-section-title"><span data-i18n="masterGain">总增益</span><span id="masterGainVal" class="value">0.0 dB</span></div>
+          <input type="range" id="masterGain" min="-120" max="120" value="0" step="1">
+        </div>
+
+        <div class="fx-section switches-grid">
+          <label class="switch"><input type="checkbox" id="fxCompressor"><span data-i18n="compressor">压缩器</span></label>
+          <label class="switch"><input type="checkbox" id="fxBass"><span data-i18n="bassBoost">低音增强</span></label>
+          <label class="switch"><input type="checkbox" id="fxStereo"><span data-i18n="stereoWide">立体声增强</span></label>
+          <label class="switch"><input type="checkbox" id="fxSurround"><span data-i18n="virtualSurround">虚拟环绕</span></label>
+          <label class="switch"><input type="checkbox" id="fxClarity"><span data-i18n="clarity">清晰度增强</span></label>
+          <label class="switch"><input type="checkbox" id="fxUltrasonic"><span data-i18n="ultrasonic">超高频净化</span></label>
+          <label class="switch"><input type="checkbox" id="fxTube"><span data-i18n="tube">胆机模拟</span></label>
+          <label class="switch"><input type="checkbox" id="fxReverb"><span data-i18n="reverb">混响</span></label>
+          <label class="switch"><input type="checkbox" id="fxNoiseGate"><span data-i18n="noiseGate">降噪</span></label>
+          <label class="switch"><input type="checkbox" id="fxLimiter"><span data-i18n="limiter">限幅</span></label>
+        </div>
+
+        <div class="fx-section" id="compressorParams">
+          <div class="fx-section-title"><span data-i18n="compressor">压缩器</span></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="compThreshold" min="-60" max="0" value="-24" step="1"><span id="compThresholdVal">-24 dB</span></div>
+          <div class="param"><label data-i18n="ratio">压缩比</label><input type="range" id="compRatio" min="1" max="12" value="4" step="0.5"><span id="compRatioVal">4.0:1</span></div>
+          <div class="param"><label data-i18n="attack">启动</label><input type="range" id="compAttack" min="1" max="50" value="10" step="1"><span id="compAttackVal">10 ms</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="compRelease" min="20" max="600" value="120" step="5"><span id="compReleaseVal">120 ms</span></div>
+        </div>
+
+        <div class="fx-section" id="bassParams">
+          <div class="fx-section-title"><span data-i18n="bassBoost">低音增强</span></div>
+          <div class="param"><label data-i18n="bassGain">增益</label><input type="range" id="bassGain" min="0" max="120" value="60" step="1"><span id="bassGainVal">+6.0 dB</span></div>
+          <div class="param"><label data-i18n="crossover">分频点</label><select id="bassCrossover" class="full-select"><option value="40">40 Hz</option><option value="60">60 Hz</option><option value="80" selected>80 Hz</option><option value="120">120 Hz</option></select></div>
+        </div>
+
+        <div class="fx-section" id="stereoParams">
+          <div class="fx-section-title"><span data-i18n="stereoWide">立体声增强</span></div>
+          <div class="param"><label data-i18n="width">宽度</label><input type="range" id="stereoWidth" min="0" max="150" value="50" step="1"><span id="stereoWidthVal">0.50</span></div>
+        </div>
+
+        <div class="fx-section" id="surroundParams">
+          <div class="fx-section-title"><span data-i18n="virtualSurround">虚拟环绕</span></div>
+          <div class="param"><label data-i18n="roomSize">空间感</label><input type="range" id="surroundRoom" min="0" max="200" value="100" step="1"><span id="surroundRoomVal">1.00</span></div>
+        </div>
+
+        <div class="fx-section" id="clarityParams">
+          <div class="fx-section-title"><span data-i18n="clarity">清晰度增强</span></div>
+          <div class="param"><label data-i18n="strength">强度</label><input type="range" id="clarityStrength" min="0" max="100" value="50" step="1"><span id="clarityStrengthVal">0.50</span></div>
+        </div>
+
+        <div class="fx-section" id="tubeParams">
+          <div class="fx-section-title"><span data-i18n="tube">胆机模拟</span></div>
+          <div class="param"><label data-i18n="drive">驱动</label><input type="range" id="tubeDrive" min="0" max="100" value="30" step="1"><span id="tubeDriveVal">0.30</span></div>
+        </div>
+
+        <div class="fx-section" id="reverbParams">
+          <div class="fx-section-title"><span data-i18n="reverb">混响</span></div>
+          <div class="param"><label data-i18n="reverbTime">混响时间</label><input type="range" id="revTime" min="10" max="500" value="260" step="1"><span id="revTimeVal">2.60 s</span></div>
+          <div class="param"><label data-i18n="damping">高频阻尼</label><input type="range" id="revDamping" min="0" max="100" value="55" step="1"><span id="revDampingVal">0.55</span></div>
+          <div class="param"><label data-i18n="wet">湿声比例</label><input type="range" id="revWet" min="0" max="100" value="32" step="1"><span id="revWetVal">0.32</span></div>
+          <div class="param"><label data-i18n="predelay">预延迟</label><input type="range" id="revPredelay" min="0" max="100" value="2" step="1"><span id="revPredelayVal">0.02 s</span></div>
+          <div class="param"><label data-i18n="roomSize">房间大小</label><input type="range" id="revRoom" min="30" max="250" value="100" step="1"><span id="revRoomVal">1.00</span></div>
+        </div>
+
+        <div class="fx-section" id="noiseGateParams">
+          <div class="fx-section-title"><span data-i18n="noiseGate">降噪</span></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="gateThreshold" min="-80" max="-20" value="-52" step="1"><span id="gateThresholdVal">-52 dB</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="gateRelease" min="20" max="500" value="180" step="5"><span id="gateReleaseVal">180 ms</span></div>
+        </div>
+
+        <div class="fx-section" id="limiterParams">
+          <div class="fx-section-title"><span data-i18n="limiter">限幅</span></div>
+          <div class="param"><label data-i18n="ceiling">上限</label><input type="range" id="limiterCeiling" min="-12" max="0" value="-1" step="0.5"><span id="limiterCeilingVal">-1.0 dB</span></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="player-bar">
+    <div class="player-left">
+      <div class="mini-cover" id="miniCover">♪</div>
+      <div class="mini-info">
+        <strong id="playerTitle" data-i18n="noTrack">未播放</strong>
+        <span id="playerArtist" class="muted"></span>
+      </div>
+    </div>
+    <div class="player-center">
+      <div class="transport">
+        <button class="round-btn" id="prevBtn" title="上一曲">⏮</button>
+        <button class="round-btn play" id="playBtn" title="播放">▶</button>
+        <button class="round-btn" id="nextBtn" title="下一曲">⏭</button>
+      </div>
+      <div class="progress-row">
+        <span id="currentTime">0:00</span>
+        <input type="range" id="progress" min="0" max="1000" value="0" step="1">
+        <span id="totalTime">0:00</span>
+      </div>
+    </div>
+    <div class="player-right">
+      <button class="icon-btn" id="modeBtn" title="播放模式">🔁</button>
+      <button class="icon-btn" id="muteBtn" title="静音">🔊</button>
+      <input type="range" id="volume" min="0" max="100" value="80" step="1">
+      <select id="deviceSelect" class="compact-select" title="输出设备"></select>
+      <button class="icon-btn" id="settingsBtn" title="设置">⚙</button>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+  <div class="settings-modal" id="settingsModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 data-i18n="settings">设置</h3>
+        <button class="icon-btn" id="closeSettingsBtn">×</button>
+      </div>
+      <div class="modal-body">
+        <label class="setting-row"><span data-i18n="theme">主题</span>
+          <select id="themeSelect" class="compact-select">
+            <option value="system" data-i18n="themeSystem">跟随系统</option>
+            <option value="light" data-i18n="themeLight">浅色</option>
+            <option value="dark" data-i18n="themeDark">深色</option>
+          </select>
+        </label>
+        <label class="setting-row"><span data-i18n="language">语言</span>
+          <select id="languageSelect" class="compact-select">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <label class="setting-row"><span data-i18n="closeToTray">关闭时最小化到托盘</span>
+          <input type="checkbox" id="closeToTray">
+        </label>
+        <label class="setting-row"><span data-i18n="minimizeToTray">最小化时到托盘</span>
+          <input type="checkbox" id="minimizeToTray">
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="primary-btn" id="saveSettingsBtn" data-i18n="save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

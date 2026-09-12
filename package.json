@@ -1,0 +1,67 @@
+{
+  "name": "rlondsp-player",
+  "version": "1.0.0",
+  "description": "Local music player with real-time audio effects",
+  "main": "main.js",
+  "author": "RlonDSP",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist:dir": "electron-builder --win dir --x64",
+    "dist:portable": "electron-builder --win portable --x64",
+    "dist:nsis": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "music-metadata": "^11.0.0"
+  },
+  "build": {
+    "appId": "com.rlondsp.player",
+    "productName": "RlonDSP",
+    "copyright": "RlonDSP",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "lyrics-preload.js",
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "RlonDSP",
+      "artifactName": "${productName}-${version}-setup-${arch}.${ext}"
+    }
+  }
+}

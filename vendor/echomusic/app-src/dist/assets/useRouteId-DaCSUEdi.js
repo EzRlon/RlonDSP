@@ -1,0 +1,1 @@
+import{Or as e,Yn as t,er as n}from"./inputBehaviorGuard-CKBl_yqP.js";import{Wt as r}from"./style-Cdw45bbb.js";function i(i=`id`){let a=r(),o=e(``),s=[],c=()=>{let e=a.params[i];return String(Array.isArray(e)?e[0]??``:e??``)};return n(()=>{o.value=c()}),t(()=>{let e=c();e&&e!==o.value&&(o.value=e,s.forEach(t=>t(e)))}),{id:o,onIdChange:e=>{s.push(e)}}}export{i as t};

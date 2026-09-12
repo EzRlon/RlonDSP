@@ -1,0 +1,1 @@
+import{Or as e,Un as t,ir as n}from"./inputBehaviorGuard-CKBl_yqP.js";var r=Symbol(`page-scroll-container`);function i(e){n(r,e)}function a(){return t(r,e(null))}export{a as n,i as t};
