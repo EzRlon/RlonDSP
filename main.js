@@ -125,7 +125,10 @@ async function readMetadata(filePath) {
       duration: Number.isFinite(meta.format?.duration) ? meta.format.duration : 0,
       cover,
       sampleRate: meta.format?.sampleRate || 0,
-      bitrate: meta.format?.bitrate || 0
+      bitrate: meta.format?.bitrate || 0,
+      channels: meta.format?.numberOfChannels || 0,
+      bitdepth: meta.format?.bitsPerSample || 0,
+      codec: meta.format?.codec || ''
     };
   } catch (error) {
     return {
@@ -136,7 +139,10 @@ async function readMetadata(filePath) {
       duration: 0,
       cover: '',
       sampleRate: 0,
-      bitrate: 0
+      bitrate: 0,
+      channels: 0,
+      bitdepth: 0,
+      codec: ''
     };
   }
 }
@@ -229,6 +235,21 @@ function createTray() {
   tray.on('double-click', () => showMainWindow());
 }
 
+function createApplicationMenu() {
+  const template = [
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'About RlonDSP',
+          click: () => mainWindow?.webContents.send('show-about')
+        }
+      ]
+    }
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 function showMainWindow() {
   if (!mainWindow) {
     createMainWindow();
@@ -292,6 +313,7 @@ app.whenReady().then(async () => {
   if (savedSettings.theme) nativeTheme.themeSource = savedSettings.theme;
   createMainWindow();
   createTray();
+  createApplicationMenu();
   registerShortcuts();
 
   app.on('activate', () => showMainWindow());
@@ -325,6 +347,17 @@ ipcMain.handle('dialog:openFolder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: '选择本地音乐文件夹',
     properties: ['openDirectory']
+  });
+  return result.canceled ? '' : result.filePaths[0] || '';
+});
+
+ipcMain.handle('dialog:openIRFile', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择 IR 脉冲响应文件',
+    properties: ['openFile'],
+    filters: [
+      { name: 'IR 音频文件', extensions: ['wav', 'wave', 'aif', 'aiff'] }
+    ]
   });
   return result.canceled ? '' : result.filePaths[0] || '';
 });

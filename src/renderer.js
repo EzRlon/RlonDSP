@@ -78,7 +78,8 @@ const I18N = {
     thirdParty: '第三方依赖',
     license: '许可证',
     viewLicense: '查看许可证',
-    thanks: '感谢所有开源项目、贡献者与社区的支持。'
+    thanks: '感谢所有开源项目、贡献者与社区的支持。',
+    enable: '启用'
   },
   en: {
     importFiles: 'Import Files',
@@ -152,7 +153,8 @@ const I18N = {
     thirdParty: 'Third-party dependencies',
     license: 'License',
     viewLicense: 'View License',
-    thanks: 'Thanks to all open-source projects, contributors, and the community.'
+    thanks: 'Thanks to all open-source projects, contributors, and the community.',
+    enable: 'Enable'
   }
 };
 
@@ -179,7 +181,8 @@ const defaultEffects = {
   tube: { drive: 0.3 },
   reverb: { roomSize: 1, t60: 2.6, damping: 0.55, wet: 0.32, predelay: 0.02 },
   gate: { threshold: -52, releaseMs: 180 },
-  limiter: { ceilingDB: -1 }
+  limiter: { ceilingDB: -1 },
+  ir: { enabled: false, filePath: '', wet: 0.35, predelay: 0.02, highpass: 20, lowpass: 20000, ab: false }
 };
 
 const state = {
@@ -201,6 +204,12 @@ const state = {
   favorites: new Set(),
   presets: [],
   effects: deepClone(defaultEffects),
+  visual: {
+    mode: 'bar',
+    fftSize: 2048,
+    infoVisible: false,
+    waterfall: []
+  },
   lyrics: [],
   lyricsIndex: -1,
   currentTrack: null,
@@ -244,7 +253,6 @@ function applyLanguage(lang) {
   document.querySelectorAll('[data-i18n-ph]').forEach((el) => {
     el.placeholder = t(el.dataset.i18nPh);
   });
-  $('langBtn').querySelector('span:last-child').textContent = state.settings.language === 'zh' ? 'EN' : '中';
   renderPlaylist();
   updateNowPlaying();
   updateLyricsDisplay();
@@ -255,7 +263,6 @@ function applyTheme(theme) {
   const isDark = resolved === 'dark' || (resolved === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
   const label = resolved === 'system' ? t('themeSystem') : resolved === 'dark' ? t('themeDark') : t('themeLight');
-  $('themeLabel').textContent = label;
   $('themeSelect').value = resolved;
 }
 
@@ -542,6 +549,16 @@ function applyEffectsToUI() {
   $('gateReleaseVal').textContent = `${fx.gate.releaseMs} ms`;
   $('limiterCeiling').value = String(fx.limiter.ceilingDB);
   $('limiterCeilingVal').textContent = `${fx.limiter.ceilingDB.toFixed(1)} dB`;
+  $('fxIR').checked = fx.ir.enabled;
+  $('irWet').value = String(Math.round(fx.ir.wet * 100));
+  $('irWetVal').textContent = fx.ir.wet.toFixed(2);
+  $('irPredelay').value = String(Math.round(fx.ir.predelay * 100));
+  $('irPredelayVal').textContent = `${fx.ir.predelay.toFixed(2)} s`;
+  $('irHighpass').value = String(fx.ir.highpass);
+  $('irHighpassVal').textContent = `${fx.ir.highpass} Hz`;
+  $('irLowpass').value = String(fx.ir.lowpass);
+  $('irLowpassVal').textContent = `${fx.ir.lowpass} Hz`;
+  $('irName').textContent = fx.ir.filePath ? fx.ir.filePath.split(/[\\/]/).pop() : (state.settings.language === 'zh' ? '未加载 IR' : 'No IR loaded');
 }
 
 function sendDSPParams() {
@@ -582,8 +599,14 @@ function updateEffectsFromUI() {
   fx.gate.threshold = Number($('gateThreshold').value);
   fx.gate.releaseMs = Number($('gateRelease').value);
   fx.limiter.ceilingDB = Number($('limiterCeiling').value);
+  fx.ir.enabled = $('fxIR').checked;
+  fx.ir.wet = Number($('irWet').value) / 100;
+  fx.ir.predelay = Number($('irPredelay').value) / 100;
+  fx.ir.highpass = Number($('irHighpass').value);
+  fx.ir.lowpass = Number($('irLowpass').value);
   applyEffectsToUI();
   sendDSPParams();
+  updateIRGraph();
 }
 
 function bindEffectInputs() {
@@ -605,7 +628,11 @@ function bindEffectInputs() {
     revRoom: () => (Number($('revRoom').value) / 100).toFixed(2),
     gateThreshold: () => `${$('gateThreshold').value} dB`,
     gateRelease: () => `${$('gateRelease').value} ms`,
-    limiterCeiling: () => `${(Number($('limiterCeiling').value)).toFixed(1)} dB`
+    limiterCeiling: () => `${(Number($('limiterCeiling').value)).toFixed(1)} dB`,
+    irWet: () => (Number($('irWet').value) / 100).toFixed(2),
+    irPredelay: () => `${(Number($('irPredelay').value) / 100).toFixed(2)} s`,
+    irHighpass: () => `${$('irHighpass').value} Hz`,
+    irLowpass: () => `${$('irLowpass').value} Hz`
   };
   Object.entries(valueBindings).forEach(([id, formatter]) => {
     const el = $(id);
@@ -613,6 +640,7 @@ function bindEffectInputs() {
     if (el && out) el.addEventListener('input', () => { out.textContent = formatter(); updateEffectsFromUI(); });
   });
   document.querySelectorAll('.switches-grid input[type="checkbox"]').forEach((el) => el.addEventListener('change', updateEffectsFromUI));
+  $('fxIR').addEventListener('change', updateEffectsFromUI);
 }
 
 function buildEQ() {
@@ -799,6 +827,12 @@ let audioContext = null;
 let sourceNode = null;
 let dspNode = null;
 let analyser = null;
+let dryGainNode = null;
+let wetGainNode = null;
+let irDelayNode = null;
+let irHighpassNode = null;
+let irLowpassNode = null;
+let convolverNode = null;
 let analyserData = null;
 let animationFrame = null;
 
@@ -814,13 +848,37 @@ async function ensureAudioGraph() {
   sourceNode = audioContext.createMediaElementSource(audioElement);
   dspNode = new AudioWorkletNode(audioContext, 'rlondsp-dsp', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
   analyser = audioContext.createAnalyser();
-  analyser.fftSize = 1024;
+  analyser.fftSize = state.visual.fftSize;
   analyser.smoothingTimeConstant = 0.78;
   analyserData = new Uint8Array(analyser.frequencyBinCount);
+
+  dryGainNode = audioContext.createGain();
+  wetGainNode = audioContext.createGain();
+  irDelayNode = audioContext.createDelay(1);
+  irHighpassNode = audioContext.createBiquadFilter();
+  irLowpassNode = audioContext.createBiquadFilter();
+  convolverNode = audioContext.createConvolver();
+
+  irHighpassNode.type = 'highpass';
+  irLowpassNode.type = 'lowpass';
+  irDelayNode.delayTime.value = state.effects.ir.predelay;
+  irHighpassNode.frequency.value = state.effects.ir.highpass;
+  irLowpassNode.frequency.value = state.effects.ir.lowpass;
+
   sourceNode.connect(dspNode);
-  dspNode.connect(analyser);
+  dspNode.connect(dryGainNode);
+  dryGainNode.connect(analyser);
+
+  dspNode.connect(irDelayNode);
+  irDelayNode.connect(irHighpassNode);
+  irHighpassNode.connect(irLowpassNode);
+  irLowpassNode.connect(convolverNode);
+  convolverNode.connect(wetGainNode);
+  wetGainNode.connect(analyser);
+
   analyser.connect(audioContext.destination);
   sendDSPParams();
+  updateIRGraph();
   applyOutputDevice(state.settings.outputDeviceId);
 
   audioElement.addEventListener('play', () => setPlayButton(true));
@@ -864,6 +922,60 @@ async function applyOutputDevice(deviceId) {
   }
 }
 
+function updateIRGraph() {
+  if (!dryGainNode || !wetGainNode || !irDelayNode || !irHighpassNode || !irLowpassNode) return;
+  const ir = state.effects.ir;
+  const hasBuffer = !!convolverNode?.buffer;
+  const active = ir.enabled && hasBuffer;
+  if (!active || ir.ab) {
+    dryGainNode.gain.value = 1;
+    wetGainNode.gain.value = 0;
+  } else {
+    dryGainNode.gain.value = Math.max(0, 1 - ir.wet);
+    wetGainNode.gain.value = ir.wet;
+  }
+  irDelayNode.delayTime.value = ir.predelay;
+  irHighpassNode.frequency.value = ir.highpass;
+  irLowpassNode.frequency.value = ir.lowpass;
+}
+
+async function loadIRFile() {
+  const filePath = await api.openIRFile();
+  if (!filePath) return;
+  try {
+    await ensureAudioGraph();
+    const response = await fetch(api.toFileUrl(filePath));
+    const arrayBuffer = await response.arrayBuffer();
+    const decoded = await audioContext.decodeAudioData(arrayBuffer);
+    convolverNode.buffer = decoded;
+    state.effects.ir.filePath = filePath;
+    state.effects.ir.enabled = true;
+    $('fxIR').checked = true;
+    applyEffectsToUI();
+    updateIRGraph();
+    showToast(state.settings.language === 'zh' ? 'IR 已加载' : 'IR loaded');
+  } catch (error) {
+    console.error(error);
+    showToast(state.settings.language === 'zh' ? 'IR 加载失败' : 'IR load failed');
+  }
+}
+
+function clearIR() {
+  if (convolverNode) convolverNode.buffer = null;
+  state.effects.ir.filePath = '';
+  state.effects.ir.enabled = false;
+  $('fxIR').checked = false;
+  applyEffectsToUI();
+  updateIRGraph();
+  showToast(state.settings.language === 'zh' ? 'IR 已清除' : 'IR cleared');
+}
+
+function toggleIRAB() {
+  state.effects.ir.ab = !state.effects.ir.ab;
+  updateIRGraph();
+  showToast(state.effects.ir.ab ? 'A/B: A' : 'A/B: B');
+}
+
 async function enumerateOutputDevices() {
   try {
     let devices = await navigator.mediaDevices.enumerateDevices();
@@ -893,6 +1005,73 @@ async function enumerateOutputDevices() {
   }
 }
 
+function getAccentColor() {
+  return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#6f92ff';
+}
+
+function getAccent2Color() {
+  return getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim() || '#9b82ff';
+}
+
+function updateAudioInfo() {
+  if (!state.visual.infoVisible) return;
+  const track = state.currentTrack;
+  const fileLines = [];
+  if (track) {
+    fileLines.push(`文件：${track.title}`);
+    fileLines.push(`路径：${track.path}`);
+    if (track.sampleRate) fileLines.push(`采样率：${track.sampleRate} Hz`);
+    if (track.bitrate) fileLines.push(`比特率：${track.bitrate} bps`);
+    if (track.channels) fileLines.push(`声道：${track.channels}`);
+    if (track.bitdepth) fileLines.push(`位深：${track.bitdepth} bit`);
+    if (track.codec) fileLines.push(`编码：${track.codec}`);
+    if (track.duration) fileLines.push(`时长：${formatTime(track.duration)}`);
+  } else {
+    fileLines.push('未加载音频');
+  }
+  $('fileInfo').innerHTML = fileLines.map((line) => `<div>${line}</div>`).join('');
+
+  if (analyser && state.isPlaying) {
+    const timeData = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(timeData);
+    let sumL = 0;
+    let sumR = 0;
+    let peakL = 0;
+    let peakR = 0;
+    for (let i = 0; i < timeData.length; i += 2) {
+      const l = timeData[i];
+      const r = timeData[i + 1] ?? l;
+      sumL += l * l;
+      sumR += r * r;
+      peakL = Math.max(peakL, Math.abs(l));
+      peakR = Math.max(peakR, Math.abs(r));
+    }
+    const rmsL = Math.sqrt(sumL / (timeData.length / 2));
+    const rmsR = Math.sqrt(sumR / (timeData.length / 2));
+    analyser.getByteFrequencyData(analyserData);
+    let dominant = 0;
+    let maxBin = 0;
+    for (let i = 0; i < analyserData.length; i++) {
+      if (analyserData[i] > maxBin) {
+        maxBin = analyserData[i];
+        dominant = i;
+      }
+    }
+    const nyquist = (audioContext?.sampleRate || 48000) / 2;
+    const dominantHz = Math.round((dominant / analyserData.length) * nyquist);
+    const db = (value) => value > 0 ? (20 * Math.log10(value)).toFixed(1) : '-∞';
+    $('liveInfo').innerHTML = [
+      `<div>L RMS：${db(rmsL)} dB</div>`,
+      `<div>R RMS：${db(rmsR)} dB</div>`,
+      `<div>L Peak：${db(peakL)} dB</div>`,
+      `<div>R Peak：${db(peakR)} dB</div>`,
+      `<div>主频：${dominantHz} Hz</div>`
+    ].join('');
+  } else {
+    $('liveInfo').innerHTML = '<div>等待播放</div>';
+  }
+}
+
 function drawVisualizer() {
   const canvas = $('visualizer');
   const ctx = canvas.getContext('2d');
@@ -906,20 +1085,95 @@ function drawVisualizer() {
   const width = canvas.width;
   const height = canvas.height;
   const hint = $('visualHint');
+  const mode = state.visual.mode;
+  const accent = getAccentColor();
+  const accent2 = getAccent2Color();
+
   if (analyser && state.isPlaying) {
     hint.style.display = 'none';
-    analyser.getByteFrequencyData(analyserData);
-    const barWidth = Math.max(2, width / analyserData.length);
-    const bars = Math.min(analyserData.length, Math.floor(width / barWidth));
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#6f92ff';
-    for (let i = 0; i < bars; i++) {
-      const value = analyserData[i] / 255;
-      const barHeight = value * height * 0.9;
-      ctx.fillStyle = accent;
-      ctx.globalAlpha = 0.35 + value * 0.65;
-      ctx.fillRect(i * barWidth, height - barHeight, barWidth - 1, barHeight);
+    if (mode === 'waveform') {
+      const timeData = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(timeData);
+      ctx.beginPath();
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = 8;
+      for (let i = 0; i < timeData.length; i++) {
+        const x = (i / timeData.length) * width;
+        const y = height / 2 + timeData[i] * height * 0.48;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    } else if (mode === 'radial') {
+      analyser.getByteFrequencyData(analyserData);
+      const cx = width / 2;
+      const cy = height / 2;
+      const maxRadius = Math.min(width, height) * 0.42;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < analyserData.length; i++) {
+        const value = analyserData[i] / 255;
+        const angle = (i / analyserData.length) * Math.PI * 2 - Math.PI / 2;
+        const r = 12 + value * maxRadius;
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = accent;
+      ctx.stroke();
+    } else if (mode === 'waterfall') {
+      analyser.getByteFrequencyData(analyserData);
+      state.visual.waterfall.unshift(Array.from(analyserData));
+      if (state.visual.waterfall.length > 120) state.visual.waterfall.pop();
+      const rows = state.visual.waterfall.length;
+      for (let y = 0; y < rows; y++) {
+        const data = state.visual.waterfall[y];
+        for (let x = 0; x < data.length; x++) {
+          const value = data[x] / 255;
+          const px = (x / data.length) * width;
+          const py = height - (y / rows) * height;
+          ctx.fillStyle = `hsla(${200 + value * 90}, 95%, ${28 + value * 52}%, 1)`;
+          ctx.fillRect(px, py, Math.max(1, width / data.length), Math.max(1, height / rows));
+        }
+      }
+    } else if (mode === 'line') {
+      analyser.getByteFrequencyData(analyserData);
+      ctx.beginPath();
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = 7;
+      for (let i = 0; i < analyserData.length; i++) {
+        const value = analyserData[i] / 255;
+        const x = (i / analyserData.length) * width;
+        const y = height - value * height;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    } else {
+      analyser.getByteFrequencyData(analyserData);
+      const barWidth = Math.max(2, width / analyserData.length);
+      const bars = Math.min(analyserData.length, Math.floor(width / barWidth));
+      for (let i = 0; i < bars; i++) {
+        const value = analyserData[i] / 255;
+        const barHeight = value * height * 0.9;
+        const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
+        gradient.addColorStop(0, accent);
+        gradient.addColorStop(1, accent2);
+        ctx.fillStyle = gradient;
+        ctx.globalAlpha = 0.55 + value * 0.45;
+        ctx.beginPath();
+        ctx.roundRect(i * barWidth, height - barHeight, barWidth - 1, barHeight, 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
+    updateAudioInfo();
   } else {
     hint.style.display = 'flex';
     ctx.beginPath();
@@ -1024,23 +1278,12 @@ function bindUI() {
   $('deletePresetBtn').addEventListener('click', deletePreset);
   $('exportPresetBtn').addEventListener('click', exportPreset);
   $('importPresetBtn').addEventListener('click', importPreset);
+  $('loadIRBtn').addEventListener('click', loadIRFile);
+  $('irClearBtn').addEventListener('click', clearIR);
+  $('irABBtn').addEventListener('click', toggleIRAB);
   $('presetSelect').addEventListener('change', () => {
     const preset = state.presets.find((item) => item.id === currentPresetId());
     if (preset) applyPreset(preset);
-  });
-  $('themeBtn').addEventListener('click', () => {
-    const order = ['system', 'light', 'dark'];
-    const next = order[(order.indexOf(state.settings.theme) + 1) % order.length];
-    state.settings.theme = next;
-    api.setSettings({ theme: next });
-    applyTheme(next);
-  });
-  $('langBtn').addEventListener('click', () => {
-    const next = state.settings.language === 'zh' ? 'en' : 'zh';
-    state.settings.language = next;
-    api.setSettings({ language: next });
-    applyLanguage(next);
-    enumerateOutputDevices();
   });
   $('lyricsBtn').addEventListener('click', toggleDesktopLyrics);
   $('settingsBtn').addEventListener('click', openSettings);
@@ -1049,6 +1292,21 @@ function bindUI() {
   $('aboutBtn').addEventListener('click', openAbout);
   $('closeAboutBtn').addEventListener('click', () => { $('aboutModal').hidden = true; });
   $('viewLicenseBtn').addEventListener('click', () => api.openLicense());
+  $('spectrumMode').addEventListener('change', (event) => {
+    state.visual.mode = event.target.value;
+    if (event.target.value !== 'waterfall') state.visual.waterfall = [];
+  });
+  $('fftSizeSelect').addEventListener('change', (event) => {
+    state.visual.fftSize = Number(event.target.value);
+    if (analyser) {
+      analyser.fftSize = state.visual.fftSize;
+      analyserData = new Uint8Array(analyser.frequencyBinCount);
+    }
+  });
+  $('toggleInfoBtn').addEventListener('click', () => {
+    state.visual.infoVisible = !state.visual.infoVisible;
+    $('audioInfo').hidden = !state.visual.infoVisible;
+  });
   window.addEventListener('resize', () => {
     // canvas resizes during animation loop
   });
@@ -1062,6 +1320,7 @@ function bindUI() {
     if (command === 'next') playNext(false);
     if (command === 'previous') playPrevious();
   });
+  api.onShowAbout(openAbout);
 }
 
 async function init() {
@@ -1075,6 +1334,9 @@ async function init() {
   updateModeButton();
   buildEQ();
   applyEffectsToUI();
+  $('spectrumMode').value = state.visual.mode;
+  $('fftSizeSelect').value = String(state.visual.fftSize);
+  $('audioInfo').hidden = !state.visual.infoVisible;
   bindUI();
   state.favorites = new Set(await api.getFavorites());
   await loadPresets();

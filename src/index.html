@@ -1,9 +1,9 @@
-<!DOCTYPE html>
 <!--
  RlonDSP
  Copyright © 2026 RlonDSP. All rights reserved.
  Based on Echomusic open-source project, modified and extended for RlonDSP.
 -->
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -12,47 +12,33 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="brand-mark" aria-hidden="true">
-        <span></span><span></span><span></span><span></span>
-      </div>
-      <span class="brand-name">RlonDSP</span>
-    </div>
-    <div class="top-actions">
-      <button class="icon-btn" id="importFileBtn" title="导入文件"><span class="icon">＋</span><span data-i18n="importFiles">导入文件</span></button>
-      <button class="icon-btn" id="importFolderBtn" title="导入文件夹"><span class="icon">▣</span><span data-i18n="importFolder">导入文件夹</span></button>
-      <label class="icon-btn search-wrap">
-        <span class="icon">⌕</span>
-        <input id="playlistSearch" type="text" data-i18n-ph="searchPlaceholder" placeholder="搜索歌曲">
-      </label>
-      <button class="icon-btn" id="lyricsBtn" title="桌面歌词"><span class="icon">〝</span><span data-i18n="desktopLyrics">桌面歌词</span></button>
-      <button class="icon-btn" id="themeBtn" title="切换主题"><span class="icon">◐</span><span id="themeLabel" data-i18n="themeSystem">跟随系统</span></button>
-      <button class="icon-btn" id="langBtn" title="切换语言"><span class="icon">文</span><span>EN</span></button>
-    </div>
-  </header>
-
-  <main class="workspace">
-    <section class="panel playlist-panel">
-      <div class="panel-head">
+  <div class="app-shell">
+    <aside class="sidebar glass">
+      <div class="sidebar-head">
         <h2 data-i18n="playlist">播放列表</h2>
         <span id="trackCount" class="muted">0</span>
       </div>
-      <div class="toolbar">
+      <div class="sidebar-search">
+        <span class="search-icon">⌕</span>
+        <input id="playlistSearch" type="text" data-i18n-ph="searchPlaceholder" placeholder="搜索歌曲">
+      </div>
+      <div class="sidebar-tools">
+        <button class="tool-btn" id="importFileBtn"><span>＋</span><span data-i18n="importFiles">导入文件</span></button>
+        <button class="tool-btn" id="importFolderBtn"><span>▣</span><span data-i18n="importFolder">导入文件夹</span></button>
         <select id="sortSelect" class="compact-select">
           <option value="default" data-i18n="sortDefault">默认排序</option>
           <option value="title" data-i18n="sortTitle">按标题</option>
           <option value="artist" data-i18n="sortArtist">按歌手</option>
           <option value="duration" data-i18n="sortDuration">按时长</option>
         </select>
-        <button class="ghost-btn" id="clearPlaylistBtn" data-i18n="clear">清空</button>
+        <button class="tool-btn" id="clearPlaylistBtn" data-i18n="clear">清空</button>
       </div>
       <div class="drop-hint" id="dropHint" data-i18n="dropHint">拖入音频文件或文件夹即可导入</div>
       <ul class="track-list" id="trackList"></ul>
-    </section>
+    </aside>
 
-    <section class="panel now-panel">
-      <div class="now-inner">
+    <main class="main-panel glass">
+      <div class="main-stage">
         <div class="cover-wrap">
           <img id="cover" class="cover" alt="" draggable="false">
           <div id="coverFallback" class="cover-fallback">♪</div>
@@ -62,17 +48,49 @@
           <p id="nowArtist" class="muted"></p>
           <p id="nowAlbum" class="muted small"></p>
         </div>
-        <div class="visualizer-wrap">
-          <canvas id="visualizer" width="560" height="120"></canvas>
+        <div class="spectrum-tools">
+          <label class="tool-label">频谱模式
+            <select id="spectrumMode" class="compact-select">
+              <option value="bar">柱状</option>
+              <option value="line">线谱</option>
+              <option value="radial">环形</option>
+              <option value="waterfall">瀑布</option>
+              <option value="waveform">波形</option>
+            </select>
+          </label>
+          <label class="tool-label">FFT
+            <select id="fftSizeSelect" class="compact-select">
+              <option value="512">512</option>
+              <option value="1024">1024</option>
+              <option value="2048" selected>2048</option>
+              <option value="4096">4096</option>
+            </select>
+          </label>
+          <button class="ghost-btn" id="toggleInfoBtn">信息面板</button>
+        </div>
+        <div class="visualizer-wrap glass">
+          <canvas id="visualizer" width="700" height="150"></canvas>
           <div id="visualHint" class="visual-hint" data-i18n="visualHint">播放时显示频谱</div>
+        </div>
+        <div class="audio-info glass" id="audioInfo" hidden>
+          <div class="info-grid">
+            <div class="info-block">
+              <div class="info-title">文件信息</div>
+              <div id="fileInfo" class="info-list"></div>
+            </div>
+            <div class="info-block">
+              <div class="info-title">实时信息</div>
+              <div id="liveInfo" class="info-list"></div>
+            </div>
+          </div>
         </div>
         <div class="lyrics-box" id="lyricsBox">
           <div id="lyricsLine" data-i18n="noLyrics">暂无歌词</div>
         </div>
       </div>
-    </section>
+    </main>
 
-    <aside class="panel fx-panel">
+    <aside class="fx-panel glass">
       <div class="panel-head">
         <h2 data-i18n="soundEffects">音效</h2>
         <button class="ghost-btn" id="resetFxBtn" data-i18n="reset">重置</button>
@@ -159,6 +177,23 @@
           <div class="param"><label data-i18n="roomSize">房间大小</label><input type="range" id="revRoom" min="30" max="250" value="100" step="1"><span id="revRoomVal">1.00</span></div>
         </div>
 
+        <div class="fx-section">
+          <div class="fx-section-title">
+            <span>IR 脉冲反馈</span>
+            <label class="switch"><input type="checkbox" id="fxIR"><span data-i18n="enable">启用</span></label>
+          </div>
+          <div class="ir-actions">
+            <button class="mini-btn" id="loadIRBtn">加载 IR</button>
+            <button class="mini-btn" id="irClearBtn">清除</button>
+            <button class="mini-btn" id="irABBtn">A/B</button>
+          </div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="irWet" min="0" max="100" value="35" step="1"><span id="irWetVal">0.35</span></div>
+          <div class="param"><label data-i18n="predelay">预延迟</label><input type="range" id="irPredelay" min="0" max="100" value="2" step="1"><span id="irPredelayVal">0.02 s</span></div>
+          <div class="param"><label>高通</label><input type="range" id="irHighpass" min="10" max="500" value="20" step="5"><span id="irHighpassVal">20 Hz</span></div>
+          <div class="param"><label>低通</label><input type="range" id="irLowpass" min="1000" max="20000" value="20000" step="100"><span id="irLowpassVal">20000 Hz</span></div>
+          <div id="irName" class="muted small">未加载 IR</div>
+        </div>
+
         <div class="fx-section" id="noiseGateParams">
           <div class="fx-section-title"><span data-i18n="noiseGate">降噪</span></div>
           <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="gateThreshold" min="-80" max="-20" value="-52" step="1"><span id="gateThresholdVal">-52 dB</span></div>
@@ -171,9 +206,9 @@
         </div>
       </div>
     </aside>
-  </main>
+  </div>
 
-  <footer class="player-bar">
+  <footer class="player-bar glass">
     <div class="player-left">
       <div class="mini-cover" id="miniCover">♪</div>
       <div class="mini-info">
@@ -194,17 +229,19 @@
       </div>
     </div>
     <div class="player-right">
-      <button class="icon-btn" id="modeBtn" title="播放模式">🔁</button>
-      <button class="icon-btn" id="muteBtn" title="静音">🔊</button>
+      <button class="round-btn" id="modeBtn" title="播放模式">🔁</button>
+      <button class="round-btn" id="lyricsBtn" title="桌面歌词">〝</button>
+      <button class="round-btn" id="muteBtn" title="静音">🔊</button>
       <input type="range" id="volume" min="0" max="100" value="80" step="1">
       <select id="deviceSelect" class="compact-select" title="输出设备"></select>
-      <button class="icon-btn" id="settingsBtn" title="设置">⚙</button>
+      <button class="round-btn" id="settingsBtn" title="设置">⚙</button>
     </div>
   </footer>
 
   <div class="toast" id="toast"></div>
+
   <div class="settings-modal" id="settingsModal" hidden>
-    <div class="modal-card">
+    <div class="modal-card glass-strong">
       <div class="modal-head">
         <h3 data-i18n="settings">设置</h3>
         <button class="icon-btn" id="closeSettingsBtn">×</button>
@@ -240,7 +277,7 @@
   </div>
 
   <div class="settings-modal" id="aboutModal" hidden>
-    <div class="modal-card about-card">
+    <div class="modal-card glass-strong about-card">
       <div class="modal-head">
         <h3 data-i18n="about">关于 RlonDSP</h3>
         <button class="icon-btn" id="closeAboutBtn">×</button>

@@ -9,6 +9,7 @@ const { pathToFileURL } = require('node:url');
 contextBridge.exposeInMainWorld('rlonDsp', {
   openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
   openFolder: () => ipcRenderer.invoke('dialog:openFolder'),
+  openIRFile: () => ipcRenderer.invoke('dialog:openIRFile'),
   scanFolder: (folderPath) => ipcRenderer.invoke('fs:scanFolder', folderPath),
   readMetadata: (filePath) => ipcRenderer.invoke('meta:read', filePath),
   getSettings: () => ipcRenderer.invoke('settings:get'),
@@ -36,5 +37,6 @@ contextBridge.exposeInMainWorld('rlonDsp', {
     ipcRenderer.on('shortcut:playpause', () => callback('playpause'));
     ipcRenderer.on('shortcut:next', () => callback('next'));
     ipcRenderer.on('shortcut:previous', () => callback('previous'));
-  }
+  },
+  onShowAbout: (callback) => ipcRenderer.on('show-about', () => callback())
 });
