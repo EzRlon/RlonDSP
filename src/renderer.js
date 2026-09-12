@@ -72,7 +72,13 @@ const I18N = {
     toastReset: '音效已重置',
     toastNoPreset: '请先选择或命名预设',
     toastNoTrack: '请先导入本地音乐',
-    toastUnsupported: '该文件格式暂不支持，可尝试转换后导入'
+    toastUnsupported: '该文件格式暂不支持，可尝试转换后导入',
+    about: '关于 RlonDSP',
+    upstreamProject: '上游项目：Echomusic',
+    thirdParty: '第三方依赖',
+    license: '许可证',
+    viewLicense: '查看许可证',
+    thanks: '感谢所有开源项目、贡献者与社区的支持。'
   },
   en: {
     importFiles: 'Import Files',
@@ -140,7 +146,13 @@ const I18N = {
     toastReset: 'Effects reset',
     toastNoPreset: 'Select or name a preset first',
     toastNoTrack: 'Import local music first',
-    toastUnsupported: 'This format is not supported, please convert it first'
+    toastUnsupported: 'This format is not supported, please convert it first',
+    about: 'About RlonDSP',
+    upstreamProject: 'Upstream: Echomusic',
+    thirdParty: 'Third-party dependencies',
+    license: 'License',
+    viewLicense: 'View License',
+    thanks: 'Thanks to all open-source projects, contributors, and the community.'
   }
 };
 
@@ -928,6 +940,27 @@ function openSettings() {
   $('settingsModal').hidden = false;
 }
 
+function renderAbout() {
+  const zh = state.settings.language === 'zh';
+  $('aboutDesc').textContent = zh
+    ? '本项目基于 Echomusic 开源项目分支改造与扩展，专注于本地实时音效处理与频谱可视化。'
+    : 'This project is a fork of the Echomusic open-source project, focused on local real-time audio effects and spectrum visualization.';
+  $('aboutUpstreamNote').textContent = zh
+    ? '核心音频播放与音效框架源自 Echomusic，在此向原项目贡献者致以诚挚感谢。'
+    : 'The core audio playback and effects framework originates from Echomusic. Sincere thanks to the original contributors.';
+  $('aboutLicense').textContent = zh
+    ? '本项目遵循 GPL-3.0-only，与上游 Echomusic 许可证保持兼容。'
+    : 'This project is licensed under GPL-3.0-only, compatible with the upstream Echomusic license.';
+  $('aboutDeps').innerHTML = zh
+    ? '<div>Electron - 桌面应用运行时 - MIT</div><div>music-metadata - 音频元数据解析 - MIT</div><div>Chromium / FFmpeg - 音频解码与媒体处理</div><div>Echomusic 原生音频模块 - 音频播放与音效 DSP - GPL-3.0-only</div>'
+    : '<div>Electron - desktop runtime - MIT</div><div>music-metadata - audio metadata parsing - MIT</div><div>Chromium / FFmpeg - audio decoding and media processing</div><div>Echomusic native audio modules - playback and effects DSP - GPL-3.0-only</div>';
+}
+
+function openAbout() {
+  renderAbout();
+  $('aboutModal').hidden = false;
+}
+
 async function saveSettings() {
   const next = {
     theme: $('themeSelect').value,
@@ -1013,6 +1046,9 @@ function bindUI() {
   $('settingsBtn').addEventListener('click', openSettings);
   $('closeSettingsBtn').addEventListener('click', () => { $('settingsModal').hidden = true; });
   $('saveSettingsBtn').addEventListener('click', saveSettings);
+  $('aboutBtn').addEventListener('click', openAbout);
+  $('closeAboutBtn').addEventListener('click', () => { $('aboutModal').hidden = true; });
+  $('viewLicenseBtn').addEventListener('click', () => api.openLicense());
   window.addEventListener('resize', () => {
     // canvas resizes during animation loop
   });

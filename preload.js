@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('rlonDsp', {
   showLyrics: () => ipcRenderer.send('lyrics:show'),
   hideLyrics: () => ipcRenderer.send('lyrics:hide'),
   updateLyrics: (payload) => ipcRenderer.send('lyrics:update', payload),
+  openLicense: () => ipcRenderer.invoke('app:open-license'),
   onShortcut: (callback) => {
     ipcRenderer.on('shortcut:playpause', () => callback('playpause'));
     ipcRenderer.on('shortcut:next', () => callback('next'));

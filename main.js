@@ -3,7 +3,7 @@
  * Copyright © 2026 RlonDSP. All rights reserved.
  * Based on Echomusic open-source project, modified and extended for RlonDSP.
  */
-const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, nativeTheme, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, nativeTheme, nativeImage, screen, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
@@ -440,4 +440,10 @@ ipcMain.on('native-theme:set', (_event, value) => {
   if (['system', 'light', 'dark'].includes(value)) {
     nativeTheme.themeSource = value;
   }
+});
+
+ipcMain.handle('app:open-license', async () => {
+  const licensePath = path.join(__dirname, 'LICENSE');
+  await shell.openPath(licensePath);
+  return true;
 });

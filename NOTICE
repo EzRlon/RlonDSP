@@ -1,0 +1,32 @@
+RlonDSP
+Copyright © 2026 RlonDSP. All rights reserved.
+
+本项目基于 Echomusic 开源项目分支改造与扩展。
+
+上游项目：Echomusic
+原作者/团队：hoowhoami
+仓库地址：https://github.com/hoowhoami/EchoMusic
+
+核心音频播放与音效框架源自 Echomusic。
+
+本项目使用的开源依赖包括但不限于：
+
+1. Electron
+   - 用途：桌面应用运行时
+   - 官网：https://www.electronjs.org
+   - 许可证：MIT
+
+2. music-metadata
+   - 用途：本地音频元数据解析
+   - 仓库：https://github.com/Borewit/music-metadata
+   - 许可证：MIT
+
+3. Chromium / FFmpeg
+   - 用途：音频解码、媒体处理
+   - 随 Electron 运行时分发，遵循相应开源许可证
+
+4. Echomusic 原生音频模块
+   - 用途：音频播放、音效 DSP、脉冲响应处理
+   - 许可证：GPL-3.0-only
+
+完整许可证信息见 LICENSE 和各依赖包内 LICENSE 文件。

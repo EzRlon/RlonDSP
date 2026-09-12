@@ -609,6 +609,74 @@ input[type="range"] {
   border-top: 1px solid var(--line);
   text-align: right;
 }
+.settings-about-row {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.about-card {
+  width: 520px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+}
+.about-body {
+  overflow-y: auto;
+  font-size: 13px;
+}
+.about-title {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+.about-version {
+  color: var(--muted);
+  margin-top: 2px;
+}
+.about-copyright {
+  margin-top: 12px;
+  color: var(--text);
+}
+.about-desc {
+  margin-top: 10px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.about-upstream,
+.about-deps,
+.about-license {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.about-label {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.about-link {
+  color: var(--accent);
+  word-break: break-all;
+}
+.about-upstream-note {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.about-deps div {
+  margin: 4px 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.about-license div {
+  color: var(--muted);
+  line-height: 1.5;
+}
+.about-thanks {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
 .primary-btn {
   height: 34px;
   padding: 0 18px;

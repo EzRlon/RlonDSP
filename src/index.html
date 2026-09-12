@@ -229,9 +229,42 @@
         <label class="setting-row"><span data-i18n="minimizeToTray">最小化时到托盘</span>
           <input type="checkbox" id="minimizeToTray">
         </label>
+        <div class="settings-about-row">
+          <button class="ghost-btn" id="aboutBtn" data-i18n="about">关于 RlonDSP</button>
+        </div>
       </div>
       <div class="modal-foot">
         <button class="primary-btn" id="saveSettingsBtn" data-i18n="save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-modal" id="aboutModal" hidden>
+    <div class="modal-card about-card">
+      <div class="modal-head">
+        <h3 data-i18n="about">关于 RlonDSP</h3>
+        <button class="icon-btn" id="closeAboutBtn">×</button>
+      </div>
+      <div class="modal-body about-body">
+        <div class="about-title">RlonDSP</div>
+        <div class="about-version" id="aboutVersion">1.0.0</div>
+        <div class="about-copyright">Copyright © 2026 RlonDSP. All rights reserved.</div>
+        <div class="about-desc" id="aboutDesc"></div>
+        <div class="about-upstream">
+          <div class="about-label" data-i18n="upstreamProject">上游项目：Echomusic</div>
+          <div class="about-link">https://github.com/hoowhoami/EchoMusic</div>
+          <div class="about-upstream-note" id="aboutUpstreamNote"></div>
+        </div>
+        <div class="about-deps">
+          <div class="about-label" data-i18n="thirdParty">第三方依赖</div>
+          <div id="aboutDeps"></div>
+        </div>
+        <div class="about-license">
+          <div class="about-label" data-i18n="license">许可证</div>
+          <div id="aboutLicense"></div>
+          <button class="ghost-btn" id="viewLicenseBtn" data-i18n="viewLicense">查看许可证</button>
+        </div>
+        <div class="about-thanks" data-i18n="thanks">感谢所有开源项目、贡献者与社区的支持。</div>
       </div>
     </div>
   </div>
