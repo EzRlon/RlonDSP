@@ -47,11 +47,21 @@ node --check src/renderer.js
 
 # 3. 运行冒烟测试
 node --test tools/tests/smoke.test.js
-
-# 4. 打包
-npm run dist:portable   # 便携版
-npm run dist:nsis       # 安装包
 ```
+
+### 打包方式
+
+RlonDSP 的正式发布包使用 **7-Zip 自解压（SFX）方案**制作，不依赖 electron-builder 的 NSIS 流程。完整的打包配方、逐步命令与验证方法见 **[tools/installer/README.md](../tools/installer/README.md)**。
+
+配方所需的全部文件已长期保存在 `tools/installer/`：
+
+| 文件 | 用途 |
+| :--- | :--- |
+| `sfx-config.bin` | 自解压外壳配置（标题、提示语、安装后运行 `setup.cmd`） |
+| `setup.cmd` / `setup.ps1` | 安装逻辑：复制到用户目录、创建快捷方式、生成卸载程序 |
+| `VersionPatcher.cs` / `VersionPatcher.exe` | 把安装包的文件属性改写为 RlonDSP |
+
+`package.json` 中仍保留 electron-builder 的配置（`npm run dist:portable` / `dist:nsis`），可作为替代打包途径，但**发布到 GitHub Release 的产物以 SFX 配方为准**。
 
 ## 四、同步发布目录
 
