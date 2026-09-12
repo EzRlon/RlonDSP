@@ -13,6 +13,12 @@
 - EchoMusic 安装包：`C:\Users\Administrator\AppData\Local\echo-music-updater\pending\EchoMusic-2.3.2-beta.3-Windows-Setup-x64.exe`
 - EchoMusic 参考源码：`vendor\echomusic\app-src`
 - EchoMusic app.asar：`vendor\echomusic\runtime\resources\app.asar`
+- EchoMusic 原生音频模块：`vendor\echomusic\runtime\resources\native`
+
+## 分支
+
+- 当前分支：`codex/rlondsp`
+- 基线提交：已导入 RlonDSP 当前源码与 EchoMusic 参考源码
 
 ## 本项目结构
 

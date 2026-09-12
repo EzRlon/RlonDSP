@@ -1,3 +1,6 @@
+# RlonDSP
+# Copyright © 2026 RlonDSP. All rights reserved.
+# Based on Echomusic open-source project, modified and extended for RlonDSP.
 import json
 import struct
 import sys

@@ -1,3 +1,6 @@
+// RlonDSP
+// Copyright © 2026 RlonDSP. All rights reserved.
+// Based on Echomusic open-source project, modified and extended for RlonDSP.
 using System;
 using System.Collections.Generic;
 using System.IO;

@@ -1,3 +1,8 @@
+/*
+ * RlonDSP
+ * Copyright © 2026 RlonDSP. All rights reserved.
+ * Based on Echomusic open-source project, modified and extended for RlonDSP.
+ */
 const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, nativeTheme, nativeImage, screen } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');

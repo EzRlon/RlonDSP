@@ -1,3 +1,8 @@
+/*
+ * RlonDSP
+ * Copyright © 2026 RlonDSP. All rights reserved.
+ * Based on Echomusic open-source project, modified and extended for RlonDSP.
+ */
 class Biquad {
   constructor() {
     this.b0 = 1;
