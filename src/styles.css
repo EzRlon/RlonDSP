@@ -358,13 +358,18 @@ button { border: 0; cursor: pointer; background: transparent; }
   direction: rtl;
   width: 20px;
   height: 138px;
-  background: transparent;
+  /* 竖条改由输入框自身居中绘制，保证与圆形滑块严格同心（滑块左边缘会贴着轨道左边缘，轨道比滑块窄时会整体偏右） */
+  background-image: linear-gradient(rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.14));
+  background-size: 4px 100%;
+  background-position: center;
+  background-repeat: no-repeat;
   accent-color: var(--accent);
 }
 .eq-band input[type="range"]::-webkit-slider-runnable-track {
-  width: 4px;
+  /* 轨道宽度设为与滑块同宽，滑块才会与轨道同心；可见的 4px 竖条由上面的输入框背景绘制 */
+  width: 14px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.14);
+  background: transparent;
 }
 .eq-band input[type="range"]::-webkit-slider-thumb {
   width: 14px;

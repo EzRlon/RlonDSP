@@ -155,7 +155,7 @@ body{
 
 /* ---------- 信号链图 ---------- */
 .chain{
-  display:flex;align-items:center;flex-wrap:wrap;gap:5px;
+  display:flex;align-items:center;flex-wrap:wrap;gap:4px;
   background:#121418;border:1px solid #0a0b0d;border-radius:5px;
   padding:8px 10px;margin-bottom:12px;
   box-shadow:inset 0 2px 5px rgba(0,0,0,.7);
@@ -459,7 +459,7 @@ select option{background:#f5f6f8;color:#1d222c;}
 .slider::-moz-range-track{height:5px;border-radius:999px;background:rgba(0,0,0,0.16);border:0;}
 .slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--lg-accent);border:2px solid rgba(255,255,255,0.85);}
 .fader-v::-webkit-slider-runnable-track{height:6px !important;border-radius:999px !important;background:rgba(0,0,0,0.16) !important;border:0 !important;box-shadow:none !important;}
-.fader-v::-webkit-slider-thumb{-webkit-appearance:none;width:20px !important;height:12px !important;margin-top:-4px !important;border-radius:6px !important;background:var(--lg-accent) !important;border:2px solid rgba(255,255,255,0.85) !important;box-shadow:0 1px 4px rgba(0,0,0,.35) !important;}
+.fader-v::-webkit-slider-thumb{-webkit-appearance:none;width:20px !important;height:12px !important;margin-top:-3px !important;border-radius:6px !important;background:var(--lg-accent) !important;border:2px solid rgba(255,255,255,0.85) !important;box-shadow:0 1px 4px rgba(0,0,0,.35) !important;}
 .fader-v::-moz-range-track{height:6px;border-radius:999px;background:rgba(0,0,0,0.16);border:0;}
 .fader-v::-moz-range-thumb{width:20px;height:12px;border-radius:6px;background:var(--lg-accent);border:2px solid rgba(255,255,255,0.85);}
 
@@ -869,7 +869,7 @@ canvas{background:transparent !important;}
       <span class="led green on"></span>
     </div>
     <div class="road">
-      <div class="ri done"><span class="rnum">P1</span><span><b>模块化重构 + Worker 渲染</b> —— 已完成：DSP 链解耦为 ES6 Class，分块异步计算</span><span class="rstat">DONE</span></div>
+      <div class="ri done"><span class="rnum">P1</span><span><b>模块化重构 + Worker 渲染</b> —— ES6 Class 解耦 + 分块渲染</span><span class="rstat">DONE</span></div>
       <div class="ri wait"><span class="rnum">P2</span><span><b>实时试听预览</b> —— Web Audio 节点网络，上传音频监听音效叠加</span><span class="rstat">PLAN</span></div>
       <div class="ri wait"><span class="rnum">P3</span><span><b>算法精度</b> —— Householder 阻尼优化 / 2x·4x 过采样抗混叠</span><span class="rstat">PLAN</span></div>
       <div class="ri wait"><span class="rnum">P4</span><span><b>UI 复刻与预设</b> —— 频响/T60 曲线、JSON 预设导入导出</span><span class="rstat">PLAN</span></div>
@@ -1981,6 +1981,10 @@ btnRender.addEventListener('click',startRender);
     'SAVE TO RLONDSP':'保存到 RlonDSP'
   };
 
+  // 按“长词优先”匹配：避免短词抢先命中，把长词组只翻译一半
+  // （例如 CHAIN 抢先匹配 SIGNAL CHAIN，结果变成 “SIGNAL 信号链”）
+  var KEYS = Object.keys(DICT).sort(function(a, b){ return b.length - a.length; });
+
   var nodes = [];
   var current = 'zh';
 
@@ -1999,7 +2003,8 @@ btnRender.addEventListener('click',startRender);
   function localize(node, orig){
     if(current !== 'zh'){ if(node.nodeValue !== orig) node.nodeValue = orig; return; }
     var s = orig;
-    for(var k in DICT){
+    for(var ki = 0; ki < KEYS.length; ki++){
+      var k = KEYS[ki];
       if(s.indexOf(k) >= 0){ s = s.split(k).join(DICT[k]); }
     }
     if(node.nodeValue !== s) node.nodeValue = s;
@@ -2027,7 +2032,8 @@ btnRender.addEventListener('click',startRender);
           if(t && t.nodeType === 3){
             var v = (t.nodeValue || '').replace(/\u00A0/g, ' ');
             if(!v.trim()) continue;
-            for(var k in DICT){
+            for(var ki = 0; ki < KEYS.length; ki++){
+              var k = KEYS[ki];
               if(v.indexOf(k) >= 0){
                 var nv = v.split(k).join(DICT[k]);
                 if(nv !== v && nv !== t.nodeValue){ t.nodeValue = nv; }
