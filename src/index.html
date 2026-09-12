@@ -68,7 +68,7 @@
     </div>
   </header>
   <div class="app-shell">
-    <aside class="sidebar glass lg-surface lg-sidebar">
+    <aside class="sidebar lg-surface lg-sidebar">
       <div class="sidebar-head">
         <h2 data-i18n="playlist">播放列表</h2>
         <span id="trackCount" class="muted">0</span>
@@ -91,40 +91,48 @@
       <ul class="track-list lg-content" id="trackList"></ul>
     </aside>
 
-    <main class="main-panel glass lg-surface lg-surface--panel">
+    <main class="main-panel lg-surface lg-surface--panel">
       <div class="viz-stage">
         <div class="viz-grid">
-          <div class="viz-card lg-surface lg-surface--panel">
-            <div class="viz-card-head"><svg class="icon viz-head-icon"><use href="#icon-eq"></use></svg><span class="viz-name">Spectrum Analyzer</span><span class="viz-unit">Hz</span></div>
+          <div class="viz-card" data-cell="a">
+            <div class="viz-card-head"><span class="viz-name" data-i18n="vizAnalyzer">频谱分析仪</span><span class="viz-unit">Hz</span></div>
             <canvas class="viz-canvas" data-viz="analyzer"></canvas>
           </div>
-          <div class="viz-card lg-surface lg-surface--panel">
-            <div class="viz-card-head"><svg class="icon viz-head-icon"><use href="#icon-wave"></use></svg><span class="viz-name">Spectrum Curve</span><span class="viz-unit">dB</span></div>
-            <canvas class="viz-canvas" data-viz="curve"></canvas>
-          </div>
-          <div class="viz-card lg-surface lg-surface--panel">
-            <div class="viz-card-head"><svg class="icon viz-head-icon"><use href="#icon-pulse"></use></svg><span class="viz-name">Oscilloscope</span><span class="viz-unit">ms</span></div>
+          <div class="viz-card" data-cell="b">
+            <div class="viz-card-head"><span class="viz-name" data-i18n="vizScope">示波器</span><span class="viz-unit">ms</span></div>
             <canvas class="viz-canvas" data-viz="scope"></canvas>
           </div>
-          <div class="viz-card lg-surface lg-surface--panel">
-            <div class="viz-card-head"><svg class="icon viz-head-icon"><use href="#icon-vector"></use></svg><span class="viz-name">Radial Spectrum</span><span class="viz-unit">Hz</span></div>
-            <canvas class="viz-canvas" data-viz="radial"></canvas>
+          <div class="viz-card" data-cell="c">
+            <div class="viz-card-head"><span class="viz-name" data-i18n="vizPolar">极坐标声场</span><span class="viz-unit">STEREO</span></div>
+            <canvas class="viz-canvas" data-viz="polar"></canvas>
           </div>
-          <div class="viz-card lg-surface lg-surface--panel">
-            <div class="viz-card-head"><svg class="icon viz-head-icon"><use href="#icon-wave"></use></svg><span class="viz-name">Wave Ribbon</span><span class="viz-unit">TIME</span></div>
-            <canvas class="viz-canvas" data-viz="ribbon"></canvas>
+          <div class="viz-card" data-cell="d">
+            <div class="viz-card-head"><span class="viz-name" data-i18n="vizLoudness">响度历史</span><span class="viz-unit">LUFS</span></div>
+            <canvas class="viz-canvas" data-viz="loudness"></canvas>
           </div>
-          <div class="viz-card lg-surface lg-surface--panel">
-            <div class="viz-card-head"><svg class="icon viz-head-icon"><use href="#icon-chart"></use></svg><span class="viz-name">Dot Spectrum</span><span class="viz-unit">Hz</span></div>
-            <canvas class="viz-canvas" data-viz="dots"></canvas>
-          </div>
-          <div class="viz-card lg-surface lg-surface--panel">
-            <div class="viz-card-head"><svg class="icon viz-head-icon"><use href="#icon-meter"></use></svg><span class="viz-name">Arc Meter</span><span class="viz-unit">dBFS</span></div>
+          <div class="viz-card" data-cell="e">
+            <div class="viz-card-head"><span class="viz-name" data-i18n="vizArc">弧形电平表</span><span class="viz-unit">dBFS</span></div>
             <canvas class="viz-canvas" data-viz="arc"></canvas>
           </div>
-          <div class="viz-card lg-surface lg-surface--panel">
-            <div class="viz-card-head"><svg class="icon viz-head-icon"><use href="#icon-effects"></use></svg><span class="viz-name">Audio Orb</span><span class="viz-unit">RMS</span></div>
-            <canvas class="viz-canvas" data-viz="orb"></canvas>
+          <div class="viz-card" data-cell="f">
+            <div class="viz-card-head"><span class="viz-name" data-i18n="vizOctave">倍频程频段</span><span class="viz-unit">dB</span></div>
+            <canvas class="viz-canvas" data-viz="octave"></canvas>
+          </div>
+          <div class="viz-card" data-cell="g">
+            <div class="viz-card-head"><span class="viz-name" data-i18n="vizPhase">相位分析</span><span class="viz-unit">PHASE</span></div>
+            <canvas class="viz-canvas" data-viz="phase"></canvas>
+          </div>
+          <div class="viz-card" data-cell="h">
+            <div class="viz-card-head"><span class="viz-name" data-i18n="vizDynamics">动态范围</span><span class="viz-unit">STATS</span></div>
+            <canvas class="viz-canvas" data-viz="stats"></canvas>
+          </div>
+          <div class="viz-card" data-cell="i">
+            <div class="viz-card-head"><span class="viz-name" data-i18n="vizCentroid">频谱质心</span><span class="viz-unit">Hz</span></div>
+            <canvas class="viz-canvas" data-viz="centroid"></canvas>
+          </div>
+          <div class="viz-card viz-card--events" data-cell="j">
+            <div class="viz-card-head"><span class="viz-name" data-i18n="vizEvents">事件检测</span><span class="viz-unit">LIVE</span></div>
+            <canvas class="viz-canvas" data-viz="events"></canvas>
           </div>
         </div>
       </div>
@@ -226,19 +234,19 @@
 
         <div class="fx-section" id="irsSection">
           <div class="fx-section-title">
-            <span>IRS 空间音效</span>
+            <span data-i18n="irsSection">IRS 空间音效</span>
             <label class="switch"><input type="checkbox" id="fxIR"><span data-i18n="enable">启用</span></label>
           </div>
           <div class="ir-actions">
-            <button class="mini-btn lg-button" id="loadIRBtn"><svg class="icon icon-sm"><use href="#icon-folder"></use></svg>加载脉冲</button>
-            <button class="mini-btn lg-button" id="irClearBtn"><svg class="icon icon-sm"><use href="#icon-close"></use></svg>清除</button>
+            <button class="mini-btn lg-button" id="loadIRBtn"><svg class="icon icon-sm"><use href="#icon-folder"></use></svg><span data-i18n="loadPulse">加载脉冲</span></button>
+            <button class="mini-btn lg-button" id="irClearBtn"><svg class="icon icon-sm"><use href="#icon-close"></use></svg><span data-i18n="pulseClear">清除</span></button>
             <button class="mini-btn lg-button" id="irABBtn"><svg class="icon icon-sm"><use href="#icon-ab"></use></svg>A/B</button>
-            <button class="mini-btn lg-button" id="auditionPulseBtn"><svg class="icon icon-sm"><use href="#icon-audition"></use></svg>试听</button>
+            <button class="mini-btn lg-button" id="auditionPulseBtn"><svg class="icon icon-sm"><use href="#icon-audition"></use></svg><span data-i18n="audition">试听</span></button>
           </div>
           <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="irWet" min="0" max="100" value="35" step="1"><span id="irWetVal">0.35</span></div>
           <div class="param"><label data-i18n="predelay">预延迟</label><input type="range" id="irPredelay" min="0" max="100" value="2" step="1"><span id="irPredelayVal">0.02 s</span></div>
-          <div class="param"><label>高通</label><input type="range" id="irHighpass" min="10" max="500" value="20" step="5"><span id="irHighpassVal">20 Hz</span></div>
-          <div class="param"><label>低通</label><input type="range" id="irLowpass" min="1000" max="20000" value="20000" step="100"><span id="irLowpassVal">20000 Hz</span></div>
+          <div class="param"><label data-i18n="highpass">高通</label><input type="range" id="irHighpass" min="10" max="500" value="20" step="5"><span id="irHighpassVal">20 Hz</span></div>
+          <div class="param"><label data-i18n="lowpass">低通</label><input type="range" id="irLowpass" min="1000" max="20000" value="20000" step="100"><span id="irLowpassVal">20000 Hz</span></div>
           <div id="irName" class="muted small">未加载脉冲</div>
           <div id="pulseList" class="pulse-list"></div>
         </div>
@@ -263,7 +271,7 @@
     </aside>
   </div>
 
-  <footer class="player-bar glass lg-surface lg-surface--control lg-player-bar">
+  <footer class="player-bar lg-surface lg-surface--control lg-player-bar">
     <button class="mini-only-btn mini-exit-btn" id="miniExitBtn"><svg class="icon"><use href="#icon-win-restore"></use></svg></button>
     <div class="player-left">
       <div class="mini-cover" id="miniCover"><svg class="icon icon-lg"><use href="#icon-note"></use></svg></div>
@@ -322,9 +330,6 @@
         </label>
         <label class="setting-row"><span data-i18n="closeToTray">关闭时最小化到托盘</span>
           <input type="checkbox" id="closeToTray">
-        </label>
-        <label class="setting-row"><span data-i18n="minimizeToTray">最小化时到托盘</span>
-          <input type="checkbox" id="minimizeToTray">
         </label>
         <div class="settings-about-row">
           <button class="ghost-btn lg-button" id="aboutBtn" data-i18n="about">关于 RlonDSP</button>

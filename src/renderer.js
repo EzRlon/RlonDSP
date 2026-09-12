@@ -10,7 +10,6 @@ const I18N = {
     importFiles: '导入文件',
     importFolder: '导入文件夹',
     searchPlaceholder: '搜索歌曲',
-    desktopLyrics: '桌面歌词',
     themeSystem: '跟随系统',
     themeLight: '浅色',
     themeDark: '深色',
@@ -20,10 +19,7 @@ const I18N = {
     sortArtist: '按歌手',
     sortDuration: '按时长',
     clear: '清空',
-    dropHint: '拖入音频文件或文件夹即可导入',
     noTrack: '未播放',
-    visualHint: '播放时显示频谱',
-    visualizer: '频谱可视化',
     noLyrics: '暂无歌词',
     soundEffects: '实时音效',
     pulseFeedback: '脉冲反馈',
@@ -65,7 +61,6 @@ const I18N = {
     language: '语言',
     outputDevice: '输出设备',
     closeToTray: '关闭时最小化到托盘',
-    minimizeToTray: '最小化时到托盘',
     toastImported: '已导入歌曲',
     toastLoading: '正在读取音乐信息…',
     toastPresetSaved: '预设已保存',
@@ -87,13 +82,48 @@ const I18N = {
     pause: '暂停',
     mute: '静音',
     unmute: '取消静音',
+    vizAnalyzer: '频谱分析仪',
+    vizScope: '示波器',
+    vizPolar: '极坐标声场',
+    vizLoudness: '响度历史',
+    vizArc: '弧形电平表',
+    vizOctave: '倍频程频段',
+    vizPhase: '相位分析',
+    vizDynamics: '动态范围',
+    vizCentroid: '频谱质心',
+    vizEvents: '事件检测',
+    irsSection: 'IRS 空间音效',
+    loadPulse: '加载脉冲',
+    pulseClear: '清除',
+    audition: '试听',
+    highpass: '高通',
+    lowpass: '低通',
+    noPulse: '未加载脉冲',
+    bandLow: '低频',
+    bandLowMid: '中低频',
+    bandMid: '中频',
+    bandHighMid: '中高频',
+    bandHigh: '高频',
+    phaseWidth: '宽度',
+    phaseOk: '相位正常',
+    phaseInv: '相位反转',
+    statInt: '整体响度',
+    statPeak: '峰值',
+    statDr: '动态',
+    statDistort: '失真',
+    toneDark: '偏暗',
+    toneBright: '偏亮',
+    evBeat: '节拍',
+    evBass: '低频',
+    evVocal: '人声',
+    evHigh: '高频',
+    evOverload: '过载',
     enable: '启用'
   },
   en: {
     importFiles: 'Import Files',
     importFolder: 'Import Folder',
     searchPlaceholder: 'Search tracks',
-    desktopLyrics: 'Desktop Lyrics',
     themeSystem: 'System',
     themeLight: 'Light',
     themeDark: 'Dark',
@@ -103,10 +133,7 @@ const I18N = {
     sortArtist: 'Artist',
     sortDuration: 'Duration',
     clear: 'Clear',
-    dropHint: 'Drop audio files or folders here',
     noTrack: 'Nothing Playing',
-    visualHint: 'Spectrum appears while playing',
-    visualizer: 'Visualizer',
     noLyrics: 'No lyrics',
     soundEffects: 'Real-time Effects',
     pulseFeedback: 'Pulse Feedback',
@@ -148,7 +175,6 @@ const I18N = {
     language: 'Language',
     outputDevice: 'Output Device',
     closeToTray: 'Close to tray',
-    minimizeToTray: 'Minimize to tray',
     toastImported: 'Tracks imported',
     toastLoading: 'Reading track info…',
     toastPresetSaved: 'Preset saved',
@@ -170,6 +196,42 @@ const I18N = {
     pause: 'Pause',
     mute: 'Mute',
     unmute: 'Unmute',
+    vizAnalyzer: 'Spectrum Analyzer',
+    vizScope: 'Oscilloscope',
+    vizPolar: 'Polar Field',
+    vizLoudness: 'Loudness History',
+    vizArc: 'Arc Meter',
+    vizOctave: 'Octave Bands',
+    vizPhase: 'Phase Analysis',
+    vizDynamics: 'Dynamics',
+    vizCentroid: 'Spectral Centroid',
+    vizEvents: 'Events',
+    irsSection: 'IRS Spatial',
+    loadPulse: 'Load Pulse',
+    pulseClear: 'Clear',
+    audition: 'Audition',
+    highpass: 'High-pass',
+    lowpass: 'Low-pass',
+    noPulse: 'No pulse loaded',
+    bandLow: 'LOW',
+    bandLowMid: 'LMID',
+    bandMid: 'MID',
+    bandHighMid: 'HMID',
+    bandHigh: 'HIGH',
+    phaseWidth: 'WIDTH',
+    phaseOk: 'PHASE OK',
+    phaseInv: 'PHASE INV',
+    statInt: 'INT',
+    statPeak: 'PEAK',
+    statDr: 'DR',
+    statDistort: 'DISTORT',
+    toneDark: 'DARK',
+    toneBright: 'BRIGHT',
+    evBeat: 'BEAT',
+    evBass: 'BASS',
+    evVocal: 'VOCAL',
+    evHigh: 'HIGH FREQ',
+    evOverload: 'OVERLOAD',
     enable: 'Enable'
   }
 };
@@ -212,7 +274,6 @@ const state = {
     theme: 'system',
     volume: 0.8,
     closeToTray: true,
-    minimizeToTray: false,
     desktopLyrics: false,
     outputDeviceId: '',
     playbackMode: 'list'
@@ -223,8 +284,7 @@ const state = {
   visual: {
     fftSize: 2048,
     logScale: true,
-    smoothing: 0.78,
-    colormap: 0
+    smoothing: 0.78
   },
   lyrics: [],
   lyricsIndex: -1,
@@ -237,8 +297,38 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+const warnedMissingIds = new Set();
+
 function $(id) {
-  return document.getElementById(id);
+  const el = document.getElementById(id);
+  if (!el && !warnedMissingIds.has(id)) {
+    warnedMissingIds.add(id);
+    console.warn('[RlonDSP] 缺少界面元素，已跳过:', id);
+  }
+  return el;
+}
+
+// 安全绑定：元素不存在时静默跳过，避免一处缺失导致整段绑定中断
+function on(id, type, handler) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(type, handler);
+}
+
+// 安全执行：单块界面同步出错时只记录提醒，不影响程序其余部分
+function safeRun(label, fn) {
+  try {
+    fn();
+  } catch (error) {
+    console.warn('[RlonDSP] 已跳过:', label, error && error.message);
+  }
+}
+
+async function safeRunAsync(label, fn) {
+  try {
+    await fn();
+  } catch (error) {
+    console.warn('[RlonDSP] 已跳过:', label, error && error.message);
+  }
 }
 
 function t(key) {
@@ -272,6 +362,7 @@ function applyLanguage(lang) {
   renderPlaylist();
   updateNowPlaying();
   updateLyricsDisplay();
+  syncStudioTheme();
 }
 
 function applyTheme(theme) {
@@ -289,7 +380,8 @@ function syncStudioTheme() {
   if (frame && frame.contentWindow) {
     frame.contentWindow.postMessage({
       type: 'rlondsp-theme',
-      theme: document.documentElement.dataset.theme || 'light'
+      theme: document.documentElement.dataset.theme || 'light',
+      lang: state.settings.language || 'zh'
     }, '*');
   }
 }
@@ -314,10 +406,6 @@ function cycleMode() {
   state.settings.playbackMode = state.mode;
   api.setSettings({ playbackMode: state.mode });
   updateModeButton();
-}
-
-function getTrackByPath(path) {
-  return state.tracks.find((track) => track.path === path);
 }
 
 function setCurrentIndex(index) {
@@ -483,6 +571,8 @@ function setPlayButton(playing) {
   const icon = $('playBtnIcon');
   if (icon) icon.setAttribute('href', playing ? '#icon-pause' : '#icon-play');
   $('playBtn').title = playing ? t('pause') || '暂停' : t('play') || '播放';
+  // 恢复播放时立即恢复频谱渲染
+  if (playing) startVisualizerLoop();
 }
 
 function seekTo(ratio) {
@@ -528,6 +618,10 @@ function collectEffects() {
 }
 
 function applyEffectsToUI() {
+  safeRun('音效面板同步', applyEffectsToUIRaw);
+}
+
+function applyEffectsToUIRaw() {
   const fx = state.effects;
   $('masterGain').value = String(Math.round(fx.masterGain * 10));
   $('masterGainVal').textContent = `${fx.masterGain.toFixed(1)} dB`;
@@ -589,7 +683,7 @@ function applyEffectsToUI() {
   $('irHighpassVal').textContent = `${fx.ir.highpass} Hz`;
   $('irLowpass').value = String(fx.ir.lowpass);
   $('irLowpassVal').textContent = `${fx.ir.lowpass} Hz`;
-  $('irName').textContent = fx.ir.filePath ? fx.ir.filePath.split(/[\\/]/).pop() : (state.settings.language === 'zh' ? '未加载脉冲' : 'No pulse loaded');
+  $('irName').textContent = fx.ir.filePath ? fx.ir.filePath.split(/[\\/]/).pop() : t('noPulse');
 }
 
 function sendDSPParams() {
@@ -599,6 +693,10 @@ function sendDSPParams() {
 }
 
 function updateEffectsFromUI() {
+  safeRun('音效参数读取', updateEffectsFromUIRaw);
+}
+
+function updateEffectsFromUIRaw() {
   const fx = state.effects;
   fx.masterGain = Number($('masterGain').value) / 10;
   fx.eqGains = Array.from(document.querySelectorAll('.eq-band input')).map((el) => Number(el.value) / 10);
@@ -641,6 +739,10 @@ function updateEffectsFromUI() {
 }
 
 function bindEffectInputs() {
+  safeRun('音效控件绑定', bindEffectInputsRaw);
+}
+
+function bindEffectInputsRaw() {
   const valueBindings = {
     masterGain: () => `${(Number($('masterGain').value) / 10).toFixed(1)} dB`,
     compThreshold: () => `${$('compThreshold').value} dB`,
@@ -835,7 +937,7 @@ function updateLyricsDisplay(currentTime = audioElement ? audioElement.currentTi
   const next = index + 1 < state.lyrics.length ? state.lyrics[index + 1].text : '';
   $('lyricsLine').textContent = current || (index < 0 && state.lyrics[0] ? state.lyrics[0].text : t('noLyrics'));
   if (state.settings.desktopLyrics) {
-    sendLyricsToDesktop({ current, next, active: index, total: state.lyrics.length });
+    sendLyricsToDesktop({ current, next, active: index, total: state.lyrics.length, lang: state.settings.language });
   }
 }
 
@@ -848,6 +950,7 @@ function toggleDesktopLyrics() {
   api.setSettings({ desktopLyrics: state.settings.desktopLyrics });
   if (state.settings.desktopLyrics) {
     api.showLyrics();
+    sendLyricsToDesktop({ lang: state.settings.language });
     updateLyricsDisplay();
   } else {
     api.hideLyrics();
@@ -867,7 +970,6 @@ let irLowpassNode = null;
 let convolverNode = null;
 
 const ANALYZER_BARS = 72;
-const COLOR_MAPS = ['Thermal', 'Rainbow', 'Ocean', 'Mono'];
 const LUFS_K = -0.691;
 
 let freqData = null;
@@ -876,9 +978,6 @@ let timeData = null;
 let monoData = null;
 let analyzerPeak = null;
 let curvePeak = null;
-let spectroBuffer = null;
-let spectroCtx = null;
-let colorLUT = null;
 
 let loudMomentary = null;
 let loudShort = null;
@@ -1068,82 +1167,11 @@ function auditionPulse() {
   }, 4000);
 }
 
-function savePulsePreset() {
-  if (!convolverNode || !convolverNode.buffer) {
-    showToast(state.settings.language === 'zh' ? '请先生成或加载脉冲' : 'Generate or load a pulse first');
-    return;
-  }
-  const fallbackName = state.settings.language === 'zh' ? '脉冲反馈' : 'Pulse Feedback';
-  const name = ($('pulseName').value || '').trim() || `${fallbackName} ${new Date().toLocaleTimeString()}`;
-  const pulse = currentPulseToWavBase64();
-  if (!pulse) return;
-  const preset = {
-    id: `pulse-${Date.now()}`,
-    name,
-    type: 'pulse',
-    createdAt: Date.now(),
-    wavBase64: pulse.base64,
-    sampleRate: pulse.sampleRate,
-    enabled: false
-  };
-  api.savePreset(preset).then((presets) => {
-    state.presets = presets;
-    renderPulseList();
-    showToast(state.settings.language === 'zh' ? '脉冲已保存' : 'Pulse saved');
-  });
-}
-
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
-}
-
 function base64ToArrayBuffer(base64) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
-}
-
-function currentPulseToWavBase64() {
-  if (!convolverNode || !convolverNode.buffer) return null;
-  const buffer = convolverNode.buffer;
-  const L = buffer.getChannelData(0);
-  const R = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : L;
-  const wav = window.IRGenerator.encodeWav(L, R, buffer.sampleRate, 16, {
-    name: 'pulse.wav',
-    comment: 'RlonDSP',
-    software: 'RlonDSP'
-  });
-  return { base64: arrayBufferToBase64(wav), sampleRate: buffer.sampleRate };
-}
-
-async function generatePulse() {
-  try {
-    await ensureAudioGraph();
-    const cfg = JSON.parse(JSON.stringify(window.IRGenerator.DEFAULT_CONFIG));
-    cfg.sampleRate = audioContext.sampleRate;
-    cfg.length = 1.5;
-    const result = window.IRGenerator.renderIR(cfg, null);
-    const decoded = await audioContext.decodeAudioData(result.wav);
-    convolverNode.buffer = decoded;
-    state.effects.ir.filePath = cfg.filename;
-    state.effects.ir.enabled = true;
-    $('fxIR').checked = true;
-    $('irName').textContent = `${cfg.filename}.wav`;
-    $('pulseName').value = '';
-    applyEffectsToUI();
-    updateIRGraph();
-    showToast(state.settings.language === 'zh' ? '脉冲已生成并应用' : 'Pulse generated and applied');
-  } catch (error) {
-    console.error(error);
-    showToast(state.settings.language === 'zh' ? '脉冲生成失败' : 'Pulse generation failed');
-  }
 }
 
 async function applyPulsePreset(preset) {
@@ -1312,23 +1340,6 @@ function getAccent2Color() {
   return cachedAccent2;
 }
 
-function buildColorLUT() {
-  const mode = ((state.visual.colormap % COLOR_MAPS.length) + COLOR_MAPS.length) % COLOR_MAPS.length;
-  const lut = new Array(256);
-  for (let i = 0; i < 256; i++) {
-    const t = i / 255;
-    let h;
-    let s = 100;
-    let l;
-    if (mode === 0) { h = 262 - t * 262; l = 8 + t * 52; }
-    else if (mode === 1) { h = 285 - t * 285; l = 10 + t * 48; }
-    else if (mode === 2) { h = 215 - t * 45; l = 10 + t * 52; }
-    else { h = 150; l = 10 + t * 52; }
-    lut[i] = `hsl(${h.toFixed(1)}, ${s}%, ${l.toFixed(1)}%)`;
-  }
-  colorLUT = lut;
-}
-
 function allocateAnalyserBuffers() {
   if (!analyser) return;
   const binCount = analyser.frequencyBinCount;
@@ -1352,7 +1363,6 @@ function allocateAnalyserBuffers() {
   loudIntegratedSum = 0;
   loudIntegratedCount = 0;
   loudTruePeak = 0;
-  buildColorLUT();
 }
 
 function setupVizCanvas(canvas) {
@@ -1381,219 +1391,269 @@ function freqToX(i, binCount, width) {
   return (i / Math.max(1, binCount - 1)) * width;
 }
 
-function drawAnalyzer(ctx, width, height) {
-  const nyquist = (audioContext?.sampleRate || 48000) / 2;
-  const minF = 20;
-  const binCount = freqData.length;
-  const gap = Math.max(1, width * 0.002);
-  const barW = Math.max(1, (width - gap * (ANALYZER_BARS - 1)) / ANALYZER_BARS);
-  const accent = getAccentColor();
-  const accent2 = getAccent2Color();
-  for (let k = 0; k < ANALYZER_BARS; k++) {
-    const fLow = minF * Math.pow(nyquist / minF, k / ANALYZER_BARS);
-    const fHigh = minF * Math.pow(nyquist / minF, (k + 1) / ANALYZER_BARS);
-    const binLow = Math.min(binCount - 1, Math.floor((fLow / nyquist) * binCount));
-    const binHigh = Math.min(binCount - 1, Math.max(binLow + 1, Math.ceil((fHigh / nyquist) * binCount)));
-    let peak = 0;
-    for (let b = binLow; b <= binHigh; b++) {
-      if (freqData[b] > peak) peak = freqData[b];
-    }
-    const v = peak / 255;
-    const barH = Math.max(0.5, v * (height - 16));
-    const x = k * (barW + gap);
-    const y = height - barH;
-    const grad = ctx.createLinearGradient(0, height, 0, y);
-    grad.addColorStop(0, accent);
-    grad.addColorStop(1, accent2);
-    ctx.fillStyle = grad;
-    ctx.globalAlpha = 0.55 + v * 0.45;
-    ctx.beginPath();
-    ctx.roundRect(x, y, barW, barH, 1.5);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  ctx.beginPath();
-  ctx.strokeStyle = '#ffb547';
-  ctx.lineWidth = 1.4;
-  ctx.shadowColor = '#ffb547';
-  ctx.shadowBlur = 4;
-  for (let k = 0; k < ANALYZER_BARS; k++) {
-    const fLow = minF * Math.pow(nyquist / minF, k / ANALYZER_BARS);
-    const fHigh = minF * Math.pow(nyquist / minF, (k + 1) / ANALYZER_BARS);
-    const binLow = Math.min(binCount - 1, Math.floor((fLow / nyquist) * binCount));
-    const binHigh = Math.min(binCount - 1, Math.max(binLow + 1, Math.ceil((fHigh / nyquist) * binCount)));
-    let peak = 0;
-    for (let b = binLow; b <= binHigh; b++) {
-      if (freqData[b] > peak) peak = freqData[b];
-    }
-    if (peak > analyzerPeak[k]) analyzerPeak[k] = peak;
-    else analyzerPeak[k] = Math.max(0, analyzerPeak[k] - 1);
-    const x = k * (barW + gap) + barW / 2;
-    const y = height - (analyzerPeak[k] / 255) * (height - 16);
-    if (k === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-}
+/* ===== 统一配色与每帧只算一次的音频指标（各卡片共用，避免重复计算/重复展示） ===== */
+const VIZ_PEAK = '#ffa63d';
+const VIZ_WARN = '#ff5b6b';
+const VIZ_BANDS = [[20, 160], [160, 500], [500, 2000], [2000, 6000], [6000, 16000]];
+const LUFS_HISTORY_MAX = 420;
+const CENTROID_MIN = 200;
+const CENTROID_MAX = 6000;
+const VIZ_MONO = '"Consolas", "SFMono-Regular", monospace';
 
-function drawCurve(ctx, width, height) {
-  const binCount = freqData.length;
-  const minDB = -120;
-  const maxDB = -20;
-  const accent = getAccentColor();
-  const accent2 = getAccent2Color();
-  const dbToY = (db) => (1 - (db - minDB) / (maxDB - minDB)) * (height - 6);
-  ctx.beginPath();
-  ctx.moveTo(freqToX(0, binCount, width), height);
-  for (let i = 0; i < binCount; i++) {
-    const db = Math.max(minDB, Math.min(maxDB, freqFloatData[i]));
-    ctx.lineTo(freqToX(i, binCount, width), dbToY(db));
-  }
-  ctx.lineTo(freqToX(binCount - 1, binCount, width), height);
-  ctx.closePath();
-  const grad = ctx.createLinearGradient(0, 0, 0, height);
-  grad.addColorStop(0, accent2);
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.beginPath();
-  for (let i = 0; i < binCount; i++) {
-    const db = Math.max(minDB, Math.min(maxDB, freqFloatData[i]));
-    const x = freqToX(i, binCount, width);
-    const y = dbToY(db);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 1.6;
-  ctx.shadowColor = accent;
-  ctx.shadowBlur = 6;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.beginPath();
-  ctx.strokeStyle = '#ffb547';
-  ctx.lineWidth = 1.2;
-  for (let i = 0; i < binCount; i++) {
-    const db = Math.max(minDB, Math.min(maxDB, freqFloatData[i]));
-    if (db > curvePeak[i]) curvePeak[i] = db;
-    else curvePeak[i] = Math.max(minDB, curvePeak[i] - 0.35);
-    const x = freqToX(i, binCount, width);
-    const y = dbToY(curvePeak[i]);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-}
+const vizMetrics = {
+  rms: 0,
+  rmsDb: -Infinity,
+  peak: 0,
+  peakDb: -Infinity,
+  balance: 0,
+  corr: 0,
+  width: 0,
+  bands: [0, 0, 0, 0, 0],
+  centroid: 0,
+  bright: 0,
+  momentary: -Infinity,
+  short: -Infinity,
+  integrated: -Infinity,
+  dr: 0,
+  distortion: 0
+};
+const vizEvents = { beat: 0, bass: 0, vocal: 0, high: 0, overload: 0 };
+let vizBeatCooldown = 0;
+let vizBassAvg = 0;
+let lufsHistory = null;
+let lufsHistoryLen = 0;
+let lufsHistoryHead = 0;
+let vizArcSmooth = 0;
 
-function drawScope(ctx, width, height) {
-  const monoCount = monoData.length;
-  if (!monoCount) return;
-  const sr = audioContext.sampleRate;
-  let trigger = 0;
-  const searchEnd = Math.floor(monoCount / 3);
-  for (let i = 1; i < searchEnd; i++) {
-    if (monoData[i - 1] <= 0 && monoData[i] > 0) { trigger = i; break; }
-  }
-  const windowSamples = Math.min(monoCount, Math.max(64, Math.floor(sr * 0.01)));
-  const accent = getAccentColor();
-  const midY = height / 2;
-  ctx.beginPath();
-  for (let k = 0; k < windowSamples; k++) {
-    const idx = (trigger + k) % monoCount;
-    const x = (k / (windowSamples - 1)) * width;
-    const y = midY - monoData[idx] * (height * 0.46);
-    if (k === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 1.8;
-  ctx.shadowColor = accent;
-  ctx.shadowBlur = 7;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-}
-
-function drawSpectrogram(ctx, width, height) {
-  if (!spectroBuffer || spectroBuffer.width !== width || spectroBuffer.height !== height) {
-    spectroBuffer = document.createElement('canvas');
-    spectroBuffer.width = width;
-    spectroBuffer.height = height;
-    spectroCtx = spectroBuffer.getContext('2d');
-  }
-  spectroCtx.globalCompositeOperation = 'destination-out';
-  spectroCtx.fillStyle = 'rgba(0, 0, 0, 0.10)';
-  spectroCtx.fillRect(0, 0, width, height);
-  spectroCtx.globalCompositeOperation = 'source-over';
-  if (width > 1) {
-    spectroCtx.drawImage(spectroBuffer, 1, 0, width - 1, height, 0, 0, width - 1, height);
-  }
-  const nyquist = (audioContext?.sampleRate || 48000) / 2;
-  const minF = 20;
-  const binCount = freqData.length;
-  const lut = colorLUT;
-  const x = width - 1;
-  for (let y = 0; y < height; y++) {
-    const t = 1 - y / (height - 1);
-    const f = minF * Math.pow(nyquist / minF, t);
-    const bin = Math.min(binCount - 1, Math.floor((f / nyquist) * binCount));
-    const v = freqData[bin] / 255;
-    spectroCtx.fillStyle = lut[Math.min(255, Math.floor(v * 255))];
-    spectroCtx.fillRect(x, y, 1, 1);
-  }
-  ctx.drawImage(spectroBuffer, 0, 0);
-}
-
-function computeCorrelation(data) {
+function computeVizMetrics() {
+  const n = timeData.length;
   let sumL = 0;
   let sumR = 0;
   let sumLL = 0;
   let sumRR = 0;
   let sumLR = 0;
-  let n = 0;
-  for (let i = 0; i < data.length; i += 2) {
-    const l = data[i];
-    const r = (i + 1 < data.length) ? data[i + 1] : l;
-    sumL += l; sumR += r; sumLL += l * l; sumRR += r * r; sumLR += l * r; n++;
+  let midE = 0;
+  let sideE = 0;
+  let peak = 0;
+  let clip = 0;
+  let cnt = 0;
+  for (let i = 0; i < n; i += 2) {
+    const l = timeData[i];
+    const r = (i + 1 < n) ? timeData[i + 1] : l;
+    const al = Math.abs(l);
+    const ar = Math.abs(r);
+    const m = (l + r) * 0.5;
+    const s = (l - r) * 0.5;
+    sumL += l; sumR += r;
+    sumLL += l * l; sumRR += r * r; sumLR += l * r;
+    midE += m * m; sideE += s * s;
+    if (al > peak) peak = al;
+    if (ar > peak) peak = ar;
+    if (al > 0.985) clip++;
+    if (ar > 0.985) clip++;
+    cnt++;
   }
-  const cov = sumLR / n - (sumL / n) * (sumR / n);
-  const varL = sumLL / n - (sumL / n) * (sumL / n);
-  const varR = sumRR / n - (sumR / n) * (sumR / n);
+  const meanL = cnt ? sumL / cnt : 0;
+  const meanR = cnt ? sumR / cnt : 0;
+  const varL = cnt ? sumLL / cnt - meanL * meanL : 0;
+  const varR = cnt ? sumRR / cnt - meanR * meanR : 0;
+  const cov = cnt ? sumLR / cnt - meanL * meanR : 0;
   const denom = Math.sqrt(Math.max(0, varL) * Math.max(0, varR));
-  return denom > 1e-9 ? cov / denom : 0;
+  vizMetrics.corr = denom > 1e-9 ? Math.max(-1, Math.min(1, cov / denom)) : 0;
+  const eTot = midE + sideE;
+  vizMetrics.width = eTot > 1e-12 ? Math.max(0, Math.min(1, (sideE / eTot) * 2)) : 0;
+  const rmsL = cnt ? Math.sqrt(sumLL / cnt) : 0;
+  const rmsR = cnt ? Math.sqrt(sumRR / cnt) : 0;
+  vizMetrics.rms = Math.sqrt((rmsL * rmsL + rmsR * rmsR) / 2);
+  vizMetrics.rmsDb = vizMetrics.rms > 1e-6 ? 20 * Math.log10(vizMetrics.rms) : -Infinity;
+  vizMetrics.peak = peak;
+  vizMetrics.peakDb = peak > 1e-6 ? 20 * Math.log10(peak) : -Infinity;
+  vizMetrics.balance = (sumL + sumR) > 1e-6 ? (sumR - sumL) / (sumR + sumL) : 0;
+  vizMetrics.distortion = cnt ? (clip / (cnt * 2)) * 100 : 0;
+
+  const nyquist = (audioContext?.sampleRate || 48000) / 2;
+  const binCount = freqData.length;
+  let wsum = 0;
+  let msum = 0;
+  for (let b = 1; b < binCount; b++) {
+    const m = freqData[b];
+    wsum += m;
+    msum += m * (b / binCount) * nyquist;
+  }
+  vizMetrics.centroid = wsum > 0 ? msum / wsum : 0;
+  const cF = Math.max(CENTROID_MIN, Math.min(CENTROID_MAX, vizMetrics.centroid || CENTROID_MIN));
+  vizMetrics.bright = Math.log(cF / CENTROID_MIN) / Math.log(CENTROID_MAX / CENTROID_MIN);
+  for (let k = 0; k < VIZ_BANDS.length; k++) {
+    const b0 = Math.max(1, Math.floor((VIZ_BANDS[k][0] / nyquist) * binCount));
+    const b1 = Math.min(binCount - 1, Math.max(b0 + 1, Math.ceil((VIZ_BANDS[k][1] / nyquist) * binCount)));
+    let s = 0;
+    let c = 0;
+    for (let b = b0; b <= b1; b++) { s += freqData[b]; c++; }
+    vizMetrics.bands[k] = c ? (s / c) / 255 : 0;
+  }
+
+  vizMetrics.momentary = loudMomentaryCount ? LUFS_K + 10 * Math.log10(loudMomentarySum / loudMomentaryCount) : -Infinity;
+  vizMetrics.short = loudShortCount ? LUFS_K + 10 * Math.log10(loudShortSum / loudShortCount) : -Infinity;
+  vizMetrics.integrated = loudIntegratedCount ? LUFS_K + 10 * Math.log10(loudIntegratedSum / loudIntegratedCount) : -Infinity;
+  vizMetrics.dr = Math.max(0, vizMetrics.peakDb - vizMetrics.rmsDb);
+
+  if (!lufsHistory) { lufsHistory = new Float32Array(LUFS_HISTORY_MAX); lufsHistory.fill(-70); }
+  lufsHistory[lufsHistoryHead] = Number.isFinite(vizMetrics.momentary) ? vizMetrics.momentary : -70;
+  lufsHistoryHead = (lufsHistoryHead + 1) % LUFS_HISTORY_MAX;
+  if (lufsHistoryLen < LUFS_HISTORY_MAX) lufsHistoryLen++;
+
+  const lowBand = vizMetrics.bands[0];
+  vizBassAvg += (lowBand - vizBassAvg) * 0.05;
+  if (vizBeatCooldown > 0) vizBeatCooldown--;
+  let beatOn = vizEvents.beat > 0.05;
+  if (vizBeatCooldown === 0 && lowBand > vizBassAvg * 1.35 + 0.08) {
+    beatOn = true;
+    vizBeatCooldown = 12;
+  }
+  const decay = (v, on) => (on ? Math.min(1, v + 0.28) : Math.max(0, v - 0.06));
+  vizEvents.beat = decay(vizEvents.beat, beatOn);
+  vizEvents.bass = decay(vizEvents.bass, lowBand > 0.45);
+  vizEvents.vocal = decay(vizEvents.vocal, vizMetrics.bands[2] > 0.34 && vizMetrics.bands[1] > 0.28);
+  vizEvents.high = decay(vizEvents.high, vizMetrics.bands[4] > 0.22);
+  vizEvents.overload = decay(vizEvents.overload, vizMetrics.peakDb > -0.8 || vizMetrics.distortion > 0.4);
 }
 
-function drawVectorscope(ctx, width, height) {
-  const cx = width / 2;
-  const cy = height / 2;
-  const radius = Math.min(width, height) * 0.46;
+// 主频谱：柱状频谱 + 平滑能量曲线 + 峰值保持线 + 频率刻度 + 低频呼吸光（唯一频域主模块）
+function drawAnalyzer(ctx, width, height) {
+  const nyquist = (audioContext?.sampleRate || 48000) / 2;
+  const binCount = freqData.length;
+  const padB = 15;
+  const plotH = Math.max(10, height - padB);
+  const bars = ANALYZER_BARS;
+  const gap = Math.max(1, width * 0.0015);
+  const barW = Math.max(1, (width - gap * (bars - 1)) / bars);
+  const accent = getAccentColor();
+  const accent2 = getAccent2Color();
+
   ctx.strokeStyle = cachedLine;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(cx - radius, cy);
-  ctx.lineTo(cx + radius, cy);
-  ctx.moveTo(cx, cy - radius);
-  ctx.lineTo(cx, cy + radius);
+  for (let g = 1; g <= 4; g++) {
+    const y = Math.round(plotH - (plotH * g) / 5) + 0.5;
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+  }
   ctx.stroke();
+
+  const lowE = vizMetrics.bands[0];
+  const glow = ctx.createLinearGradient(0, 0, width * 0.34, 0);
+  glow.addColorStop(0, `rgba(76, 125, 255, ${(0.14 + lowE * 0.28).toFixed(3)})`);
+  glow.addColorStop(1, 'rgba(76, 125, 255, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, width * 0.34, plotH);
+
+  const grad = ctx.createLinearGradient(0, plotH, 0, 0);
+  grad.addColorStop(0, accent);
+  grad.addColorStop(1, accent2);
+  ctx.fillStyle = grad;
+  for (let k = 0; k < bars; k++) {
+    const v = logBandValue(k, bars);
+    const h = Math.max(1, v * (plotH - 6));
+    ctx.globalAlpha = 0.5 + v * 0.5;
+    ctx.beginPath();
+    ctx.roundRect(k * (barW + gap), plotH - h, barW, h, Math.min(2, barW / 2));
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
   ctx.beginPath();
-  const accent = getAccentColor();
-  for (let i = 0; i < timeData.length; i += 2) {
-    const l = timeData[i];
-    const r = (i + 1 < timeData.length) ? timeData[i + 1] : l;
-    const x = cx + l * radius;
-    const y = cy + r * radius;
-    if (i === 0) ctx.moveTo(x, y);
+  for (let k = 0; k < bars; k++) {
+    const v = logBandValue(k, bars);
+    const x = k * (barW + gap) + barW / 2;
+    const y = plotH - v * (plotH - 6);
+    if (k === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 1.5;
-  ctx.shadowColor = getAccent2Color();
-  ctx.shadowBlur = 5;
+  ctx.strokeStyle = accent2;
+  ctx.lineWidth = 1.6;
   ctx.stroke();
-  ctx.shadowBlur = 0;
-  const corr = computeCorrelation(timeData);
-  const el = document.getElementById('correlationVal');
-  if (el) el.textContent = `Corr ${corr.toFixed(2)}`;
+
+  ctx.beginPath();
+  ctx.strokeStyle = VIZ_PEAK;
+  ctx.lineWidth = 1.2;
+  for (let k = 0; k < bars; k++) {
+    const v = logBandValue(k, bars) * 255;
+    if (v > analyzerPeak[k]) analyzerPeak[k] = v;
+    else analyzerPeak[k] = Math.max(0, analyzerPeak[k] - 1);
+    const x = k * (barW + gap) + barW / 2;
+    const y = plotH - (analyzerPeak[k] / 255) * (plotH - 6);
+    if (k === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.font = '9px ' + VIZ_MONO;
+  ctx.fillStyle = cachedMuted;
+  ctx.textAlign = 'left';
+  ctx.fillText('20Hz', 3, height - 3);
+  ctx.textAlign = 'center';
+  ctx.fillText('1kHz', freqToX((1000 / nyquist) * binCount, binCount, width), height - 3);
+  ctx.textAlign = 'right';
+  ctx.fillText('10kHz', Math.min(width - 3, freqToX((10000 / nyquist) * binCount, binCount, width)), height - 3);
+  ctx.textAlign = 'left';
+}
+
+function drawScope(ctx, width, height) {
+  const perChannel = timeData.length >> 1;
+  if (!perChannel) return;
+  const sr = audioContext?.sampleRate || 48000;
+  const mid = height / 2;
+  ctx.strokeStyle = cachedLine;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, Math.round(mid) + 0.5);
+  ctx.lineTo(width, Math.round(mid) + 0.5);
+  for (let g = 1; g <= 3; g++) {
+    const dy = (mid * g) / 4;
+    ctx.moveTo(0, Math.round(mid - dy) + 0.5);
+    ctx.lineTo(width, Math.round(mid - dy) + 0.5);
+    ctx.moveTo(0, Math.round(mid + dy) + 0.5);
+    ctx.lineTo(width, Math.round(mid + dy) + 0.5);
+  }
+  ctx.stroke();
+
+  // 触发对齐：以左声道上升过零点稳定波形
+  let trigger = 0;
+  const searchEnd = Math.max(2, Math.floor(perChannel / 3));
+  for (let i = 1; i < searchEnd; i++) {
+    if (timeData[(i - 1) * 2] <= 0 && timeData[i * 2] > 0) { trigger = i; break; }
+  }
+  const windowSamples = Math.max(32, Math.min(perChannel - trigger, Math.floor(sr * 0.02)));
+  const trace = (channel, color, lineWidth) => {
+    ctx.beginPath();
+    for (let k = 0; k < windowSamples; k++) {
+      const idx = trigger + k;
+      const v = timeData[idx * 2 + channel] || 0;
+      const x = (k / Math.max(1, windowSamples - 1)) * width;
+      const y = mid - v * (height * 0.42);
+      if (k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  };
+  trace(1, 'rgba(122, 92, 255, 0.55)', 1.1);
+  trace(0, getAccentColor(), 1.6);
+
+  const ms = (windowSamples / sr) * 1000;
+  ctx.font = '9px ' + VIZ_MONO;
+  ctx.fillStyle = cachedMuted;
+  ctx.textAlign = 'left';
+  ctx.fillText('0', 3, height - 3);
+  ctx.textAlign = 'center';
+  ctx.fillText((ms / 2).toFixed(0) + 'ms', width / 2, height - 3);
+  ctx.textAlign = 'right';
+  ctx.fillText(ms.toFixed(0) + 'ms', width - 3, height - 3);
+  ctx.textAlign = 'left';
 }
 
 function updateLoudness(mono, count) {
@@ -1629,178 +1689,6 @@ function updateLoudness(mono, count) {
   }
 }
 
-function drawLoudness(ctx, width, height) {
-  const rangeMin = -60;
-  const rangeMax = 0;
-  const padL = 34;
-  const padR = 8;
-  const barW = width - padL - padR;
-  const xFor = (db) => padL + ((db - rangeMin) / (rangeMax - rangeMin)) * barW;
-  const toLUFS = (sum, cnt) => (cnt > 0 ? LUFS_K + 10 * Math.log10(sum / cnt) : -Infinity);
-  const mom = toLUFS(loudMomentarySum, loudMomentaryCount);
-  const short = toLUFS(loudShortSum, loudShortCount);
-  const integ = toLUFS(loudIntegratedSum, loudIntegratedCount);
-  const truePeakDB = loudTruePeak > 0 ? 20 * Math.log10(loudTruePeak) : -Infinity;
-  ctx.strokeStyle = cachedLine;
-  ctx.fillStyle = cachedMuted;
-  ctx.font = '10px monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  for (let db = rangeMin; db <= rangeMax; db += 10) {
-    const x = xFor(db);
-    ctx.beginPath();
-    ctx.moveTo(x, 10);
-    ctx.lineTo(x, 22);
-    ctx.stroke();
-    ctx.fillText(String(db), x, 8);
-  }
-  const rows = [
-    { label: 'M', value: mom, color: '#4c8dff' },
-    { label: 'S', value: short, color: '#7a5cff' },
-    { label: 'I', value: integ, color: '#3fd6a5' }
-  ];
-  const rowArea = height - 34;
-  const rowH = rowArea / 3;
-  rows.forEach((row, idx) => {
-    const ry = 30 + idx * rowH + rowH / 2;
-    ctx.fillStyle = row.color;
-    ctx.fillText(row.label, 8, ry);
-    const v = Number.isFinite(row.value) ? Math.max(rangeMin, Math.min(rangeMax, row.value)) : rangeMin;
-    const bx = xFor(v);
-    ctx.fillRect(padL, ry - 4, Math.max(1, bx - padL), 8);
-    ctx.fillStyle = cachedText;
-    ctx.fillText(Number.isFinite(row.value) ? row.value.toFixed(1) : '-∞', padL + barW + 4, ry);
-  });
-  ctx.fillStyle = cachedText;
-  ctx.textAlign = 'right';
-  ctx.fillText(`TP ${Number.isFinite(truePeakDB) ? truePeakDB.toFixed(1) : '-∞'} dB`, width - 8, height - 8);
-  ctx.textAlign = 'left';
-}
-
-let levelPeakL = 0;
-let levelPeakR = 0;
-let vuL = 0;
-let vuR = 0;
-
-function drawLevel(ctx, width, height) {
-  let sumL = 0;
-  let sumR = 0;
-  let peakL = 0;
-  let peakR = 0;
-  let n = 0;
-  for (let i = 0; i < timeData.length; i += 2) {
-    const l = timeData[i];
-    const r = (i + 1 < timeData.length) ? timeData[i + 1] : l;
-    sumL += l * l;
-    sumR += r * r;
-    const al = Math.abs(l);
-    const ar = Math.abs(r);
-    if (al > peakL) peakL = al;
-    if (ar > peakR) peakR = ar;
-    n++;
-  }
-  const toDB = (v) => (v > 1e-6 ? 20 * Math.log10(v) : -Infinity);
-  levelPeakL = Math.max(peakL, levelPeakL - 0.006);
-  levelPeakR = Math.max(peakR, levelPeakR - 0.006);
-  const minDB = -60;
-  const dbToY = (db) => (1 - (Math.max(minDB, Math.min(0, db)) - minDB) / (0 - minDB)) * (height - 14) + 7;
-  ctx.strokeStyle = cachedLine;
-  ctx.fillStyle = cachedMuted;
-  ctx.font = '9px monospace';
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  for (let db = 0; db >= -60; db -= 12) {
-    const y = dbToY(db);
-    ctx.beginPath();
-    ctx.moveTo(26, y);
-    ctx.lineTo(width - 4, y);
-    ctx.stroke();
-    ctx.fillText(String(db), 22, y);
-  }
-  const barW = Math.max(6, Math.min(26, (width - 40) / 2 - 8));
-  const X = 30;
-  const chans = [
-    { x: X, rms: toDB(n ? Math.sqrt(sumL / n) : 0), peak: toDB(levelPeakL), color: '#4c8dff' },
-    { x: X + barW + 18, rms: toDB(n ? Math.sqrt(sumR / n) : 0), peak: toDB(levelPeakR), color: '#2fd6a0' }
-  ];
-  chans.forEach((ch) => {
-    const yRms = dbToY(Number.isFinite(ch.rms) ? ch.rms : minDB);
-    const grad = ctx.createLinearGradient(0, height, 0, 0);
-    grad.addColorStop(0, ch.color);
-    grad.addColorStop(1, '#ff5b7f');
-    ctx.fillStyle = grad;
-    ctx.globalAlpha = 0.85;
-    ctx.fillRect(ch.x, yRms, barW, Math.max(0, height - yRms - 7));
-    ctx.globalAlpha = 1;
-    if (Number.isFinite(ch.peak)) {
-      const yPeak = dbToY(ch.peak);
-      ctx.fillStyle = '#ffb547';
-      ctx.fillRect(ch.x, yPeak - 1, barW, 2);
-    }
-  });
-  ctx.textAlign = 'left';
-}
-
-function drawVu(ctx, width, height) {
-  let sumL = 0;
-  let sumR = 0;
-  let n = 0;
-  for (let i = 0; i < timeData.length; i += 2) {
-    const l = timeData[i];
-    const r = (i + 1 < timeData.length) ? timeData[i + 1] : l;
-    sumL += l * l;
-    sumR += r * r;
-    n++;
-  }
-  const rmsL = n ? Math.sqrt(sumL / n) : 0;
-  const rmsR = n ? Math.sqrt(sumR / n) : 0;
-  vuL += (Math.min(1, rmsL * 2.2) - vuL) * 0.18;
-  vuR += (Math.min(1, rmsR * 2.2) - vuR) * 0.18;
-  const cy = height - 16;
-  const radius = Math.max(10, Math.min(width * 0.22, height * 0.78));
-  const cx = width / 2;
-  const startA = Math.PI * 1.12;
-  const endA = Math.PI * 1.88;
-  const drawMeter = (offset, value, color, label) => {
-    const cxx = cx + offset;
-    ctx.beginPath();
-    ctx.arc(cxx, cy, radius, startA, endA);
-    ctx.strokeStyle = cachedLine;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.strokeStyle = cachedMuted;
-    ctx.lineWidth = 1;
-    for (let k = 0; k <= 10; k++) {
-      const a = startA + (endA - startA) * (k / 10);
-      const r1 = radius - 3;
-      const r2 = radius - (k % 5 === 0 ? 9 : 6);
-      ctx.beginPath();
-      ctx.moveTo(cxx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
-      ctx.lineTo(cxx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
-      ctx.stroke();
-    }
-    const a = startA + (endA - startA) * Math.max(0, Math.min(1, value));
-    ctx.beginPath();
-    ctx.moveTo(cxx, cy);
-    ctx.lineTo(cxx + Math.cos(a) * (radius - 6), cy + Math.sin(a) * (radius - 6));
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cxx, cy, 3, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.fillStyle = cachedMuted;
-    ctx.font = '9px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, cxx, cy + radius * 0.42);
-  };
-  drawMeter(-radius * 1.05, vuL, '#ffb547', 'L');
-  drawMeter(radius * 1.05, vuR, '#2fd6a0', 'R');
-  ctx.textAlign = 'left';
-}
-
 function logBandValue(k, count) {
   const nyquist = (audioContext?.sampleRate || 48000) / 2;
   const minF = 20;
@@ -1816,218 +1704,343 @@ function logBandValue(k, count) {
   return peak / 255;
 }
 
-function rmsLevel() {
-  let sum = 0;
-  let n = 0;
-  for (let i = 0; i < timeData.length; i++) {
-    sum += timeData[i] * timeData[i];
-    n++;
-  }
-  return n ? Math.sqrt(sum / n) : 0;
-}
-
-let arcValue = 0;
-let orbEnergy = 0;
-
-function drawRadial(ctx, width, height) {
+// 极坐标声场：声像定位 / 声场宽度 / 相位方向（唯一空间声场模块）
+function drawPolar(ctx, width, height) {
   const cx = width / 2;
   const cy = height / 2;
-  const radius = Math.min(width, height) * 0.28;
-  const maxLen = Math.min(width, height) * 0.20;
-  const bars = 64;
-  const accent = getAccentColor();
-  const accent2 = getAccent2Color();
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  const rMax = Math.min(width, height) * 0.40;
   ctx.strokeStyle = cachedLine;
   ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.lineCap = 'round';
-  for (let k = 0; k < bars; k++) {
-    const a = -Math.PI / 2 + (k / bars) * Math.PI * 2;
-    const v = logBandValue(k, bars);
-    const len = 3 + v * maxLen;
-    const x1 = cx + Math.cos(a) * radius;
-    const y1 = cy + Math.sin(a) * radius;
-    const x2 = cx + Math.cos(a) * (radius + len);
-    const y2 = cy + Math.sin(a) * (radius + len);
-    const grad = ctx.createLinearGradient(x1, y1, x2, y2);
-    grad.addColorStop(0, accent);
-    grad.addColorStop(1, accent2);
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = 3;
+  for (let ring = 1; ring <= 3; ring++) {
     ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    ctx.arc(cx, cy, (rMax * ring) / 3, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.beginPath();
-  ctx.arc(cx, cy, radius * 0.58, 0, Math.PI * 2);
-  ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.10;
+  ctx.moveTo(cx - rMax, cy);
+  ctx.lineTo(cx + rMax, cy);
+  ctx.moveTo(cx, cy - rMax);
+  ctx.lineTo(cx, cy + rMax);
+  ctx.stroke();
+
+  const w = 0.28 + vizMetrics.width * 0.72;
+  const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, rMax);
+  g.addColorStop(0, getAccent2Color());
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalAlpha = 0.16 + vizMetrics.width * 0.24;
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rMax * w, rMax * (0.55 + (1 - vizMetrics.width) * 0.35), 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
+
+  const spotX = cx + vizMetrics.balance * rMax * 0.85;
+  const spotY = cy - vizMetrics.corr * rMax * 0.5;
+  const spotR = 4 + vizMetrics.rms * 26;
+  const sg = ctx.createRadialGradient(spotX, spotY, 0, spotX, spotY, Math.max(1, spotR * 2));
+  sg.addColorStop(0, 'rgba(255,255,255,0.95)');
+  sg.addColorStop(0.35, getAccentColor());
+  sg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sg;
+  ctx.beginPath();
+  ctx.arc(spotX, spotY, spotR * 2, 0, Math.PI * 2);
+  ctx.fill();
 }
 
-function drawRibbon(ctx, width, height) {
-  const accent = getAccentColor();
-  const accent2 = getAccent2Color();
-  const layers = 3;
-  const samples = 110;
-  const mid = height / 2;
-  for (let L = 0; L < layers; L++) {
-    const amp = height * (0.30 - L * 0.06);
-    const shift = (L - 1) * (height * 0.05);
-    const color = L === 0 ? accent2 : accent;
+// 响度历史曲线：LUFS 趋势 + 整体平均线 + -14 LUFS 参考线（唯一响度趋势模块）
+function drawLoudnessHistory(ctx, width, height) {
+  const top = 14;
+  const bottom = height - 4;
+  const lo = -36;
+  const hi = -6;
+  const yFor = (v) => top + (1 - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * (bottom - top);
+  ctx.strokeStyle = cachedLine;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let g = 1; g <= 3; g++) {
+    const y = Math.round(top + ((bottom - top) * g) / 4) + 0.5;
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+  }
+  ctx.stroke();
+
+  ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = 'rgba(255, 166, 61, 0.55)';
+  ctx.beginPath();
+  ctx.moveTo(0, yFor(-14));
+  ctx.lineTo(width, yFor(-14));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  if (Number.isFinite(vizMetrics.integrated)) {
+    ctx.setLineDash([2, 3]);
+    ctx.strokeStyle = 'rgba(122, 92, 255, 0.50)';
     ctx.beginPath();
-    for (let i = 0; i <= samples; i++) {
-      const t = i / samples;
-      const idx = Math.min(timeData.length - 1, Math.floor(t * (timeData.length - 1)));
-      const v = timeData[idx] || 0;
-      const x = t * width;
-      const y = mid + v * amp + shift;
+    ctx.moveTo(0, yFor(vizMetrics.integrated));
+    ctx.lineTo(width, yFor(vizMetrics.integrated));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  const n = lufsHistoryLen;
+  if (n > 1 && lufsHistory) {
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const idx = (lufsHistoryHead - n + i + LUFS_HISTORY_MAX) % LUFS_HISTORY_MAX;
+      const x = width - ((n - 1 - i) / (LUFS_HISTORY_MAX - 1)) * width;
+      const y = yFor(lufsHistory[idx]);
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
-    ctx.lineTo(width, height);
-    ctx.lineTo(0, height);
-    ctx.closePath();
-    const g = ctx.createLinearGradient(0, 0, 0, height);
-    g.addColorStop(0, color);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.globalAlpha = 0.30 - L * 0.07;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.beginPath();
-    for (let i = 0; i <= samples; i++) {
-      const t = i / samples;
-      const idx = Math.min(timeData.length - 1, Math.floor(t * (timeData.length - 1)));
-      const v = timeData[idx] || 0;
-      const x = t * width;
-      const y = mid + v * amp + shift;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = getAccentColor();
     ctx.lineWidth = 1.6;
     ctx.stroke();
   }
-}
 
-function drawDots(ctx, width, height) {
-  const cols = 44;
-  const rows = 7;
-  const cellW = width / cols;
-  const cellH = height / rows;
-  const r = Math.min(cellW, cellH) * 0.26;
-  const accent = getAccentColor();
-  const accent2 = getAccent2Color();
-  for (let c = 0; c < cols; c++) {
-    const v = logBandValue(c, cols);
-    const lit = v * rows;
-    for (let row = 0; row < rows; row++) {
-      const fromBottom = rows - 1 - row;
-      const x = cellW * (c + 0.5);
-      const y = cellH * (row + 0.5);
-      const on = fromBottom < lit;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      if (on) {
-        ctx.fillStyle = row < rows * 0.34 ? accent2 : accent;
-        ctx.globalAlpha = 0.55 + 0.45 * v;
-      } else {
-        ctx.fillStyle = cachedLine;
-        ctx.globalAlpha = 0.7;
-      }
-      ctx.fill();
-    }
-  }
-  ctx.globalAlpha = 1;
+  ctx.font = '9px ' + VIZ_MONO;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = cachedMuted;
+  ctx.fillText('-14 LUFS', 3, 10);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = getAccentColor();
+  ctx.fillText(Number.isFinite(vizMetrics.short) ? vizMetrics.short.toFixed(1) : '-∞', width - 3, 10);
+  ctx.textAlign = 'left';
 }
 
 function drawArc(ctx, width, height) {
   const cx = width / 2;
-  const cy = height * 0.64;
-  const r = Math.max(16, Math.min(width * 0.36, height * 0.5));
-  const a0 = Math.PI * 0.8;
-  const a1 = Math.PI * 2.2;
-  const level = rmsLevel();
-  const db = level > 1e-6 ? 20 * Math.log10(level) : -Infinity;
-  const v = Math.max(0, Math.min(1, (Number.isFinite(db) ? db + 60 : 0) / 60));
-  arcValue += (v - arcValue) * 0.25;
+  const cy = height * 0.60;
+  const r = Math.max(14, Math.min(width * 0.33, height * 0.40));
+  const a0 = Math.PI * 0.82;
+  const a1 = Math.PI * 2.18;
+  const lvl = Number.isFinite(vizMetrics.rmsDb) ? vizMetrics.rmsDb : -60;
+  const v = Math.max(0, Math.min(1, (Math.max(-60, Math.min(0, lvl)) + 60) / 60));
+  vizArcSmooth += (v - vizArcSmooth) * 0.25;
   ctx.beginPath();
   ctx.arc(cx, cy, r, a0, a1);
   ctx.strokeStyle = cachedLine;
-  ctx.lineWidth = 8;
+  ctx.lineWidth = 7;
   ctx.lineCap = 'round';
   ctx.stroke();
-  const av = a0 + (a1 - a0) * arcValue;
+  const av = a0 + (a1 - a0) * vizArcSmooth;
   const grad = ctx.createLinearGradient(cx - r, cy, cx + r, cy);
   grad.addColorStop(0, getAccentColor());
   grad.addColorStop(1, getAccent2Color());
   ctx.beginPath();
   ctx.arc(cx, cy, r, a0, av);
   ctx.strokeStyle = grad;
-  ctx.lineWidth = 8;
+  ctx.lineWidth = 7;
   ctx.stroke();
-  const ex = cx + Math.cos(av) * r;
-  const ey = cy + Math.sin(av) * r;
+
+  const pk = Math.max(0, Math.min(1, ((Number.isFinite(vizMetrics.peakDb) ? vizMetrics.peakDb : -60) + 60) / 60));
+  const pa = a0 + (a1 - a0) * pk;
   ctx.beginPath();
-  ctx.arc(ex, ey, 5, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.globalAlpha = 0.9;
+  ctx.arc(cx + Math.cos(pa) * r, cy + Math.sin(pa) * r, 3.2, 0, Math.PI * 2);
+  ctx.fillStyle = VIZ_PEAK;
   ctx.fill();
-  ctx.globalAlpha = 1;
+
+  if (Number.isFinite(vizMetrics.peakDb) && vizMetrics.peakDb > -1) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 6, a0 - 0.06, a1 + 0.06);
+    ctx.strokeStyle = VIZ_WARN;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  }
+
   ctx.fillStyle = cachedText;
-  ctx.font = '600 15px system-ui, sans-serif';
+  ctx.font = '600 14px ' + VIZ_MONO;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(Number.isFinite(db) ? db.toFixed(1) : '-∞', cx, cy - r * 0.08);
+  ctx.fillText(Number.isFinite(vizMetrics.rmsDb) ? vizMetrics.rmsDb.toFixed(1) : '-∞', cx, cy - r * 0.05);
   ctx.fillStyle = cachedMuted;
-  ctx.font = '9px monospace';
-  ctx.fillText('dBFS', cx, cy + r * 0.30);
+  ctx.font = '8.5px ' + VIZ_MONO;
+  ctx.fillText('dBFS', cx, cy + r * 0.28);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
+  ctx.font = '8.5px ' + VIZ_MONO;
+  ctx.fillStyle = VIZ_PEAK;
+  ctx.fillText('PK ' + (Number.isFinite(vizMetrics.peakDb) ? vizMetrics.peakDb.toFixed(1) : '-∞'), 4, height - 4);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = cachedMuted;
+  ctx.fillText('I ' + (Number.isFinite(vizMetrics.integrated) ? vizMetrics.integrated.toFixed(1) : '-∞'), width - 4, height - 4);
+  ctx.textAlign = 'left';
 }
 
-function drawOrb(ctx, width, height) {
-  const cx = width / 2;
-  const cy = height / 2;
-  const base = Math.min(width, height) * 0.26;
-  const level = rmsLevel();
-  orbEnergy += (Math.min(1, level * 3.2) - orbEnergy) * 0.12;
-  const r = base * (0.72 + orbEnergy * 0.62);
-  const accent = getAccentColor();
-  const accent2 = getAccent2Color();
-  const glow = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r * 1.6);
-  glow.addColorStop(0, accent2);
-  glow.addColorStop(0.55, accent);
-  glow.addColorStop(1, 'rgba(0,0,0,0)');
+// 倍频程频段：低频 / 中低频 / 中频 / 中高频 / 高频 能量分布（唯一频段统计模块）
+function drawOctave(ctx, width, height) {
+  const labels = [t('bandLow'), t('bandLowMid'), t('bandMid'), t('bandHighMid'), t('bandHigh')];
+  const n = 5;
+  const gap = Math.max(4, width * 0.022);
+  const base = height - 13;
+  const maxH = Math.max(6, base - 8);
+  const bw = Math.max(3, (width - gap * (n + 1)) / n);
+  const grad = ctx.createLinearGradient(0, base, 0, 0);
+  grad.addColorStop(0, getAccentColor());
+  grad.addColorStop(1, getAccent2Color());
+  ctx.font = '8.5px ' + VIZ_MONO;
+  ctx.textAlign = 'center';
+  for (let k = 0; k < n; k++) {
+    const v = Math.max(0, Math.min(1, vizMetrics.bands[k] * 1.5));
+    const x = gap + k * (bw + gap);
+    const h = Math.max(2, v * maxH);
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = 0.55 + v * 0.45;
+    ctx.beginPath();
+    ctx.roundRect(x, base - h, bw, h, 3);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = v > 0.8 ? VIZ_PEAK : cachedMuted;
+    ctx.fillText(labels[k], x + bw / 2, height - 3);
+  }
+  ctx.textAlign = 'left';
+}
+
+// 立体声相位分析：相关度 + 立体声宽度 + 正反相指示（唯一相位分析模块）
+function drawPhase(ctx, width, height) {
+  const pad = 12;
+  const barW = Math.max(20, width - pad * 2);
+  const cx = pad + barW / 2;
+  const barY = height * 0.40;
+  ctx.fillStyle = cachedLine;
   ctx.beginPath();
-  ctx.arc(cx, cy, r * 1.6, 0, Math.PI * 2);
-  ctx.fillStyle = glow;
-  ctx.globalAlpha = 0.30;
+  ctx.roundRect(pad, barY - 4, barW, 8, 4);
   ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  const body = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-  body.addColorStop(0, accent2);
-  body.addColorStop(1, accent);
-  ctx.fillStyle = body;
-  ctx.globalAlpha = 0.88;
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.beginPath();
-  ctx.arc(cx - r * 0.3, cy - r * 0.34, r * 0.26, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cx, cy, base * 1.55, 0, Math.PI * 2);
-  ctx.strokeStyle = cachedLine;
+  ctx.strokeStyle = 'rgba(120, 130, 150, 0.45)';
   ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx, barY - 8);
+  ctx.lineTo(cx, barY + 8);
   ctx.stroke();
+  const c = Math.max(-1, Math.min(1, vizMetrics.corr));
+  const x = cx + (c * barW) / 2;
+  ctx.beginPath();
+  ctx.arc(x, barY, 5, 0, Math.PI * 2);
+  ctx.fillStyle = c < -0.05 ? VIZ_WARN : getAccentColor();
+  ctx.fill();
+  ctx.font = '600 13px ' + VIZ_MONO;
+  ctx.fillStyle = cachedText;
+  ctx.textAlign = 'center';
+  ctx.fillText((c >= 0 ? '+' : '') + c.toFixed(2), cx, barY - 16);
+  ctx.font = '8.5px ' + VIZ_MONO;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = cachedMuted;
+  ctx.fillText(t('phaseWidth') + ' ' + Math.round(vizMetrics.width * 100) + '%', pad, height - 5);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = c < -0.05 ? VIZ_WARN : cachedMuted;
+  ctx.fillText(c < -0.05 ? t('phaseInv') : t('phaseOk'), width - pad, height - 5);
+  ctx.textAlign = 'left';
+}
+
+// 动态范围统计：整体响度 / 峰值 / 动态范围 / 失真（唯一音频统计模块）
+function drawStats(ctx, width, height) {
+  const rows = [
+    [t('statInt') + ' LUFS', Number.isFinite(vizMetrics.integrated) ? vizMetrics.integrated.toFixed(1) : '-∞', false],
+    [t('statPeak') + ' dBFS', Number.isFinite(vizMetrics.peakDb) ? vizMetrics.peakDb.toFixed(1) : '-∞', Number.isFinite(vizMetrics.peakDb) && vizMetrics.peakDb > -1],
+    [t('statDr'), vizMetrics.dr.toFixed(1), false],
+    [t('statDistort'), vizMetrics.distortion.toFixed(1) + '%', vizMetrics.distortion > 0.4]
+  ];
+  const pad = 11;
+  const rowH = (height - pad) / rows.length;
+  for (let i = 0; i < rows.length; i++) {
+    const y = pad * 0.5 + i * rowH + rowH * 0.62;
+    ctx.font = '9px ' + VIZ_MONO;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = cachedMuted;
+    ctx.fillText(rows[i][0], pad, y);
+    ctx.font = '600 11px ' + VIZ_MONO;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = rows[i][2] ? VIZ_WARN : cachedText;
+    ctx.fillText(rows[i][1], width - pad, y);
+  }
+  ctx.textAlign = 'left';
+}
+
+// 频谱质心：重心频率 + 明亮度（冷暖色带，唯一音色评估模块）
+function drawCentroid(ctx, width, height) {
+  const pad = 12;
+  const bandW = Math.max(20, width - pad * 2);
+  const bandY = height - 13;
+  const g = ctx.createLinearGradient(pad, 0, pad + bandW, 0);
+  g.addColorStop(0, '#4c7dff');
+  g.addColorStop(0.5, '#8b6bff');
+  g.addColorStop(1, '#ffa63d');
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.roundRect(pad, bandY - 5, bandW, 10, 5);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  const brightness = Math.max(0, Math.min(1, vizMetrics.bright));
+  const x = pad + brightness * bandW;
+  ctx.beginPath();
+  ctx.arc(x, bandY, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(90, 100, 120, 0.45)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  const hz = vizMetrics.centroid;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = cachedText;
+  ctx.font = '600 15px ' + VIZ_MONO;
+  ctx.fillText(hz >= 1000 ? (hz / 1000).toFixed(1) + ' kHz' : Math.round(hz) + ' Hz', width / 2, height * 0.42);
+  ctx.fillStyle = cachedMuted;
+  ctx.font = '9px ' + VIZ_MONO;
+  ctx.fillText('BRIGHT ' + Math.round(brightness * 100) + '%', width / 2, height * 0.42 + 15);
+  ctx.font = '8px ' + VIZ_MONO;
+  ctx.textAlign = 'left';
+  ctx.fillText(t('toneDark'), pad, height - 3);
+  ctx.textAlign = 'right';
+  ctx.fillText(t('toneBright'), width - pad, height - 3);
+  ctx.textAlign = 'left';
+}
+
+// 音频事件检测条：Beat / Bass / Vocal / High Frequency / Overload（唯一事件模块）
+function drawEvents(ctx, width, height) {
+  const defs = [
+    [t('evBeat'), vizEvents.beat, '#4c8dff'],
+    [t('evBass'), vizEvents.bass, '#7a5cff'],
+    [t('evVocal'), vizEvents.vocal, '#2fd6a0'],
+    [t('evHigh'), vizEvents.high, '#39c9d6'],
+    [t('evOverload'), vizEvents.overload, '#ff5b6b']
+  ];
+  const n = defs.length;
+  const pad = 8;
+  const gap = 8;
+  const cellW = Math.max(40, (width - pad * 2 - gap * (n - 1)) / n);
+  const tagH = Math.max(16, Math.min(22, height - 12));
+  const y = (height - tagH) * 0.42;
+  ctx.font = '600 9.5px ' + VIZ_MONO;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < n; i++) {
+    const label = defs[i][0];
+    const level = defs[i][1];
+    const color = defs[i][2];
+    const x = pad + i * (cellW + gap);
+    ctx.globalAlpha = 0.08 + level * 0.28;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x, y, cellW, tagH, 6);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = level > 0.15 ? color : cachedLine;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x + 0.5, y + 0.5, cellW - 1, tagH - 1, 6);
+    ctx.stroke();
+    ctx.fillStyle = level > 0.15 ? cachedText : cachedMuted;
+    ctx.fillText(label, x + cellW / 2, y + tagH / 2 + 0.5);
+    const stripW = cellW * Math.max(0, Math.min(1, level));
+    if (stripW > 1) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(x, y + tagH + 3, stripW, 2.5, 2);
+      ctx.fill();
+    }
+  }
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
 }
 
 function renderVisualization() {
@@ -2049,8 +2062,9 @@ function renderVisualization() {
     }
     loudTruePeak = tp;
     updateLoudness(monoData, monoCount);
+    computeVizMetrics();
   }
-  const keys = ['analyzer', 'curve', 'scope', 'radial', 'ribbon', 'dots', 'arc', 'orb'];
+  const keys = ['analyzer', 'scope', 'polar', 'loudness', 'arc', 'octave', 'phase', 'stats', 'centroid', 'events'];
   for (const key of keys) {
     const canvas = getVizCanvas(key);
     if (!canvas) continue;
@@ -2069,14 +2083,22 @@ function renderVisualization() {
     }
     ctx.clearRect(0, 0, width, height);
     if (key === 'analyzer') drawAnalyzer(ctx, width, height);
-    else if (key === 'curve') drawCurve(ctx, width, height);
     else if (key === 'scope') drawScope(ctx, width, height);
-    else if (key === 'radial') drawRadial(ctx, width, height);
-    else if (key === 'ribbon') drawRibbon(ctx, width, height);
-    else if (key === 'dots') drawDots(ctx, width, height);
+    else if (key === 'polar') drawPolar(ctx, width, height);
+    else if (key === 'loudness') drawLoudnessHistory(ctx, width, height);
     else if (key === 'arc') drawArc(ctx, width, height);
-    else if (key === 'orb') drawOrb(ctx, width, height);
+    else if (key === 'octave') drawOctave(ctx, width, height);
+    else if (key === 'phase') drawPhase(ctx, width, height);
+    else if (key === 'stats') drawStats(ctx, width, height);
+    else if (key === 'centroid') drawCentroid(ctx, width, height);
+    else if (key === 'events') drawEvents(ctx, width, height);
   }
+}
+
+// 渲染循环开关：已经在跑就不重复排队
+function startVisualizerLoop() {
+  if (animationFrame) return;
+  animationFrame = requestAnimationFrame(drawVisualizer);
 }
 
 function drawVisualizer() {
@@ -2085,20 +2107,22 @@ function drawVisualizer() {
     return;
   }
   if (analyser && freqData) renderVisualization();
-  animationFrame = requestAnimationFrame(drawVisualizer);
+  if (state.isPlaying) {
+    animationFrame = requestAnimationFrame(drawVisualizer);
+  } else {
+    // 暂停时停笔：保留最后一帧画面，不再空转重画
+    animationFrame = null;
+  }
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && !animationFrame) {
-    animationFrame = requestAnimationFrame(drawVisualizer);
-  }
+  if (!document.hidden && state.isPlaying) startVisualizerLoop();
 });
 
 function openSettings() {
   $('themeSelect').value = state.settings.theme;
   $('languageSelect').value = state.settings.language;
   $('closeToTray').checked = state.settings.closeToTray;
-  $('minimizeToTray').checked = state.settings.minimizeToTray;
   $('settingsModal').hidden = false;
 }
 
@@ -2127,8 +2151,7 @@ async function saveSettings() {
   const next = {
     theme: $('themeSelect').value,
     language: $('languageSelect').value,
-    closeToTray: $('closeToTray').checked,
-    minimizeToTray: $('minimizeToTray').checked
+    closeToTray: $('closeToTray').checked
   };
   state.settings = { ...state.settings, ...next };
   state.settings = await api.setSettings(next);
@@ -2156,58 +2179,60 @@ function handleDragDrop() {
 }
 
 function bindUI() {
-  $('importFileBtn').addEventListener('click', importFiles);
-  $('importFolderBtn').addEventListener('click', importFolder);
-  $('playlistSearch').addEventListener('input', renderPlaylist);
-  $('sortSelect').addEventListener('change', sortPlaylist);
-  $('clearPlaylistBtn').addEventListener('click', clearPlaylist);
-  $('trackList').addEventListener('click', (event) => {
+  on('importFileBtn', 'click', importFiles);
+  on('importFolderBtn', 'click', importFolder);
+  on('playlistSearch', 'input', renderPlaylist);
+  on('sortSelect', 'change', sortPlaylist);
+  on('clearPlaylistBtn', 'click', clearPlaylist);
+  on('trackList', 'click', (event) => {
     const heart = event.target.closest('.track-heart');
     if (heart) {
       toggleFavorite(Number(heart.dataset.index));
     }
   });
-  $('playBtn').addEventListener('click', togglePlay);
-  $('prevBtn').addEventListener('click', playPrevious);
-  $('nextBtn').addEventListener('click', () => playNext(false));
-  $('progress').addEventListener('input', (event) => seekTo(Number(event.target.value) / 1000));
-  $('volume').addEventListener('input', (event) => setVolume(Number(event.target.value) / 100));
-  $('deviceSelect').addEventListener('change', (event) => {
+  on('playBtn', 'click', togglePlay);
+  on('prevBtn', 'click', playPrevious);
+  on('nextBtn', 'click', () => playNext(false));
+  on('progress', 'input', (event) => seekTo(Number(event.target.value) / 1000));
+  on('volume', 'input', (event) => setVolume(Number(event.target.value) / 100));
+  on('deviceSelect', 'change', (event) => {
     api.setSettings({ outputDeviceId: event.target.value });
     applyOutputDevice(event.target.value);
   });
-  $('effectsBtn').addEventListener('click', () => {
-    $('effectsModal').hidden = false;
+  on('effectsBtn', 'click', () => {
+    const modal = $('effectsModal');
+    if (modal) modal.hidden = false;
   });
-  $('closeEffectsBtn').addEventListener('click', () => {
-    $('effectsModal').hidden = true;
+  on('closeEffectsBtn', 'click', () => {
+    const modal = $('effectsModal');
+    if (modal) modal.hidden = true;
   });
-  $('resetFxBtn').addEventListener('click', resetEffects);
-  $('savePresetBtn').addEventListener('click', savePreset);
-  $('deletePresetBtn').addEventListener('click', deletePreset);
-  $('exportPresetBtn').addEventListener('click', exportPreset);
-  $('importPresetBtn').addEventListener('click', importPreset);
-  $('loadIRBtn').addEventListener('click', loadIRFile);
-  $('irClearBtn').addEventListener('click', clearIR);
-  $('irABBtn').addEventListener('click', toggleIRAB);
-  $('auditionPulseBtn').addEventListener('click', auditionPulse);
+  on('resetFxBtn', 'click', resetEffects);
+  on('savePresetBtn', 'click', savePreset);
+  on('deletePresetBtn', 'click', deletePreset);
+  on('exportPresetBtn', 'click', exportPreset);
+  on('importPresetBtn', 'click', importPreset);
+  on('loadIRBtn', 'click', loadIRFile);
+  on('irClearBtn', 'click', clearIR);
+  on('irABBtn', 'click', toggleIRAB);
+  on('auditionPulseBtn', 'click', auditionPulse);
   document.querySelectorAll('.fx-tab').forEach((tab) => {
     tab.addEventListener('click', () => selectFxTab(tab.dataset.fxTab));
   });
   window.addEventListener('message', handleStudioMessage);
   const studioFrame = document.getElementById('irStudioFrame');
   if (studioFrame) studioFrame.addEventListener('load', syncStudioTheme);
-  $('presetSelect').addEventListener('change', () => {
+  on('presetSelect', 'change', () => {
     const preset = state.presets.find((item) => item.id === currentPresetId());
     if (preset) applyPreset(preset);
   });
-  $('settingsBtn').addEventListener('click', openSettings);
-  $('winMinBtn').addEventListener('click', () => api.minimize());
-  $('winMaxBtn').addEventListener('click', () => api.maximize());
-  $('winCloseBtn').addEventListener('click', () => api.close());
-  $('winMiniBtn').addEventListener('click', toggleMiniMode);
-  $('miniExitBtn').addEventListener('click', toggleMiniMode);
-  $('miniCloseBtn').addEventListener('click', () => api.close());
+  on('settingsBtn', 'click', openSettings);
+  on('winMinBtn', 'click', () => api.minimize());
+  on('winMaxBtn', 'click', () => api.maximize());
+  on('winCloseBtn', 'click', () => api.close());
+  on('winMiniBtn', 'click', toggleMiniMode);
+  on('miniExitBtn', 'click', toggleMiniMode);
+  on('miniCloseBtn', 'click', () => api.close());
   if (api.onMiniState) {
     api.onMiniState((value) => {
       document.body.classList.toggle('mini-mode', value);
@@ -2223,14 +2248,20 @@ function bindUI() {
       if (btn) btn.title = value ? '还原' : '最大化';
     });
   }
-  $('closeSettingsBtn').addEventListener('click', () => { $('settingsModal').hidden = true; });
-  $('saveSettingsBtn').addEventListener('click', saveSettings);
-  $('aboutBtn').addEventListener('click', openAbout);
-  $('closeAboutBtn').addEventListener('click', () => { $('aboutModal').hidden = true; });
-  $('viewLicenseBtn').addEventListener('click', () => api.openLicense());
-  $('muteBtn').addEventListener('click', toggleMute);
-  $('modeBtn').addEventListener('click', cycleMode);
-  $('lyricsBtn').addEventListener('click', toggleDesktopLyrics);
+  on('closeSettingsBtn', 'click', () => {
+    const modal = $('settingsModal');
+    if (modal) modal.hidden = true;
+  });
+  on('saveSettingsBtn', 'click', saveSettings);
+  on('aboutBtn', 'click', openAbout);
+  on('closeAboutBtn', 'click', () => {
+    const modal = $('aboutModal');
+    if (modal) modal.hidden = true;
+  });
+  on('viewLicenseBtn', 'click', () => api.openLicense());
+  on('muteBtn', 'click', toggleMute);
+  on('modeBtn', 'click', cycleMode);
+  on('lyricsBtn', 'click', toggleDesktopLyrics);
   window.addEventListener('resize', () => {
     // canvas resizes during animation loop
   });
@@ -2251,19 +2282,25 @@ async function init() {
   state.settings = { ...state.settings, ...(await api.getSettings()) };
   state.volume = state.settings.volume;
   state.mode = state.settings.playbackMode || 'list';
-  $('volume').value = String(Math.round(state.volume * 100));
-  $('deviceSelect').innerHTML = `<option value="">${state.settings.language === 'zh' ? '默认输出' : 'System Default'}</option>`;
-  applyLanguage(state.settings.language);
-  applyTheme(state.settings.theme);
-  updateModeButton();
-  buildEQ();
+  safeRun('音量滑块初始化', () => {
+    const volume = $('volume');
+    if (volume) volume.value = String(Math.round(state.volume * 100));
+  });
+  safeRun('输出设备下拉初始化', () => {
+    const select = $('deviceSelect');
+    if (select) select.innerHTML = `<option value="">${state.settings.language === 'zh' ? '默认输出' : 'System Default'}</option>`;
+  });
+  safeRun('语言应用', () => applyLanguage(state.settings.language));
+  safeRun('主题应用', () => applyTheme(state.settings.theme));
+  safeRun('播放模式按钮同步', updateModeButton);
+  safeRun('均衡器构建', buildEQ);
   applyEffectsToUI();
   bindUI();
   state.favorites = new Set(await api.getFavorites());
   await loadPresets();
-  renderPlaylist();
-  updateNowPlaying();
-  await enumerateOutputDevices();
+  safeRun('播放列表渲染', renderPlaylist);
+  safeRun('正在播放信息同步', updateNowPlaying);
+  await safeRunAsync('输出设备枚举', enumerateOutputDevices);
   if (state.settings.outputDeviceId) applyOutputDevice(state.settings.outputDeviceId);
   drawVisualizer();
 }

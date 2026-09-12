@@ -1861,7 +1861,7 @@ btnRender.addEventListener('click',startRender);
 </script>
 
 <script>
-/* RlonDSP theme bridge — UI only */
+/* RlonDSP theme + language bridge — UI only */
 (function(){
   try{
     if(!document.documentElement.getAttribute('data-theme')){
@@ -1872,8 +1872,177 @@ btnRender.addEventListener('click',startRender);
     var d=e.data;
     if(d && d.type==='rlondsp-theme'){
       document.documentElement.setAttribute('data-theme', d.theme==='dark'?'dark':'light');
+      if(d.lang && window.__rlondspApplyLang){ window.__rlondspApplyLang(d.lang==='zh'?'zh':'en'); }
     }
   });
+})();
+</script>
+
+<script>
+/* RlonDSP 界面文字双语化（只替换显示文字，不涉及任何功能/DSP 逻辑） */
+(function(){
+  var DICT = {
+    'IMPULSE RESPONSE PROCESSOR':'脉冲响应处理器',
+    'MODEL 1200':'型号 1200',
+    'PROJ RATE':'采样率',
+    'LENGTH':'长度',
+    'CHAIN':'信号链',
+    'STAGES READY':'级就绪',
+    'READY':'就绪',
+    'RENDER IR':'渲染脉冲',
+    'SIGNAL CHAIN':'信号链',
+    'IMPULSE INPUT':'脉冲输入',
+    'SAMPLE RATE':'采样率',
+    'BIT DEPTH':'位深度',
+    'IR LENGTH':'脉冲长度',
+    'AMP':'幅度',
+    'UNIT IMPULSE':'单位脉冲',
+    'GRAPHIC EQ':'图示均衡',
+    '9-BAND RBJ PEAKING':'9 段 RBJ 峰值',
+    'BYPASS':'旁通',
+    'AUTO TRIM':'自动增益补偿',
+    'SERIES':'串联',
+    'COMPRESSOR':'压缩器',
+    'THRESH':'阈值',
+    'RATIO':'压缩比',
+    'ATTACK':'启动',
+    'RELEASE':'释放',
+    'KNEE':'拐点',
+    'MAKEUP':'补偿',
+    'SOFT CLIP':'软限幅',
+    'TANH LIMIT':'双曲限幅',
+    'SUPER BASS':'超级低音',
+    'X-OVER':'分频点',
+    'DRIVE':'驱动',
+    'MODE':'模式',
+    'MIX':'混合',
+    'ENV TRK':'包络跟踪',
+    '2ND-ORDER X-OVER':'二阶分频',
+    'SURROUND 3D':'3D 环绕',
+    'WIDTH':'宽度',
+    'DECORR':'去相关',
+    'ALLPASS':'全通',
+    'OUTPUT':'输出',
+    'MONO → L/R':'单声道 → 左右',
+    'HP SURROUND':'耳机环绕',
+    'CROSSFEED 网络':'交叉馈送网络',
+    'IR 卷积':'脉冲卷积',
+    'AMOUNT':'强度',
+    'FREQ':'频率',
+    'DELAY':'延迟',
+    'ENGINE':'引擎',
+    'X-FEED + LP + DELAY':'交叉馈送 + 低通 + 延迟',
+    'CLARITY':'清晰度',
+    'CUTOFF':'截止频率',
+    'ORDER':'阶数',
+    'PURPOSE':'用途',
+    '4TH BUTTERWORTH':'四阶巴特沃斯',
+    'ANTI-ALIAS':'抗混叠',
+    'TUBE SIM':'胆机模拟',
+    'BIAS':'偏置',
+    'TANH 2-STAGE':'双曲两级',
+    'FDN REVERB':'FDN 混响',
+    '8-CH HOUSEHOLDER':'8 通道 Householder',
+    'PREDELAY':'预延迟',
+    'SIZE':'尺寸',
+    'DAMPING':'阻尼',
+    'WET':'湿声',
+    'LINES':'延迟线',
+    'PRIME DELAYS':'素数延迟',
+    'NORMALIZE':'归一化',
+    'TARGET':'目标',
+    'STATE':'状态',
+    'JOINT PEAK':'联合峰值',
+    'ARMED':'已就绪',
+    'WATERMARK':'水印',
+    'MESSAGE':'信息',
+    'DEPTH':'深度',
+    'CHIP RATE':'码片率',
+    'CODE':'编码',
+    'BUILD STATUS':'构建状态',
+    'OUTPUT FILE':'输出文件',
+    'FORMAT':'格式',
+    'PEAK':'峰值',
+    'DUR':'时长',
+    'DOWNLOAD':'下载',
+    'PLAY':'试听',
+    'IR WAVEFORM':'脉冲波形',
+    'MAGNITUDE SPECTRUM':'幅度频谱',
+    'STANDBY':'待机',
+    'INITIALIZING DSP CHAIN':'正在初始化 DSP 链',
+    'RENDERING MONO STAGE':'正在渲染单声道段',
+    'RENDERING STEREO STAGE':'正在渲染立体声段',
+    'ENCODING + WATERMARK':'编码 + 水印',
+    'RENDER COMPLETE':'渲染完成',
+    'PLAYBACK':'试听',
+    'PLAY ERROR':'试听失败',
+    'SAVE ERROR':'保存失败',
+    'PULSE NAME':'脉冲名称',
+    'SAVE TO RLONDSP':'保存到 RlonDSP'
+  };
+
+  var nodes = [];
+  var current = 'zh';
+
+  function collect(){
+    nodes = [];
+    var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+    var n;
+    while((n = w.nextNode())){
+      var v = (n.nodeValue || '').replace(/\u00A0/g, ' ');
+      if(!v.trim()) continue;
+      if(!/[A-Za-z]/.test(v) && !/\u4e00-\u9fa5/.test(v)) continue;
+      nodes.push({ node: n, orig: v });
+    }
+  }
+
+  function localize(node, orig){
+    if(current !== 'zh'){ if(node.nodeValue !== orig) node.nodeValue = orig; return; }
+    var s = orig;
+    for(var k in DICT){
+      if(s.indexOf(k) >= 0){ s = s.split(k).join(DICT[k]); }
+    }
+    if(node.nodeValue !== s) node.nodeValue = s;
+  }
+
+  function apply(){
+    for(var i = 0; i < nodes.length; i++){ localize(nodes[i].node, nodes[i].orig); }
+  }
+
+  window.__rlondspApplyLang = function(lang){
+    current = (lang === 'zh') ? 'zh' : 'en';
+    if(!nodes.length) collect();
+    apply();
+  };
+
+  function boot(){
+    collect();
+    apply();
+    // 运行中动态改写的提示文字（如渲染进度）也跟随语言
+    try{
+      var obs = new MutationObserver(function(muts){
+        if(current !== 'zh') return;
+        for(var i = 0; i < muts.length; i++){
+          var t = muts[i].target;
+          if(t && t.nodeType === 3){
+            var v = (t.nodeValue || '').replace(/\u00A0/g, ' ');
+            if(!v.trim()) continue;
+            for(var k in DICT){
+              if(v.indexOf(k) >= 0){
+                var nv = v.split(k).join(DICT[k]);
+                if(nv !== v && nv !== t.nodeValue){ t.nodeValue = nv; }
+                break;
+              }
+            }
+          }
+        }
+      });
+      obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+    }catch(e){}
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
 </script>
 </body>

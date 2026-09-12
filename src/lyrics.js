@@ -12,6 +12,9 @@ window.lyricsApi.onUpdate((payload) => {
     nextLine.textContent = '';
     return;
   }
-  currentLine.textContent = payload.current || 'RlonDSP';
-  nextLine.textContent = payload.next || '';
+  if (payload.lang === 'zh' || payload.lang === 'en') {
+    document.title = payload.lang === 'zh' ? '桌面歌词' : 'Desktop Lyrics';
+  }
+  if (payload.current !== undefined) currentLine.textContent = payload.current || 'RlonDSP';
+  if (payload.next !== undefined) nextLine.textContent = payload.next || '';
 });
