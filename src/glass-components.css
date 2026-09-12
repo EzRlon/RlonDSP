@@ -1,0 +1,373 @@
+/*
+ * RlonDSP
+ * Copyright © 2026 RlonDSP. All rights reserved.
+ * Based on Echomusic open-source project, modified and extended for RlonDSP.
+ *
+ * Liquid Glass component classes.
+ * Stage 2: static, reusable, composable. No SVG displacement or pointer tracking.
+ */
+
+.lg-surface {
+  background: var(--lg-bg);
+  border: 1px solid var(--lg-border);
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  box-shadow: var(--lg-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-lg);
+  transition: background var(--lg-duration) var(--lg-ease),
+    border-color var(--lg-duration) var(--lg-ease),
+    box-shadow var(--lg-duration) var(--lg-ease);
+}
+
+.lg-surface--control {
+  background: var(--lg-control-bg);
+  border-color: var(--lg-control-border);
+  backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
+  box-shadow: var(--lg-control-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-md);
+}
+
+.lg-surface--strong {
+  background: var(--lg-strong-bg);
+  border-color: var(--lg-strong-border);
+  backdrop-filter: blur(var(--lg-strong-blur)) saturate(var(--lg-strong-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-strong-blur)) saturate(var(--lg-strong-saturate));
+  box-shadow: var(--lg-strong-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-lg);
+}
+
+.lg-surface--light {
+  background: var(--lg-light-bg);
+  border-color: var(--lg-light-border);
+  backdrop-filter: blur(var(--lg-light-blur)) saturate(var(--lg-light-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-light-blur)) saturate(var(--lg-light-saturate));
+  box-shadow: var(--lg-light-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-sm);
+}
+
+.lg-surface--micro {
+  background: var(--lg-micro-bg);
+  border-color: var(--lg-micro-border);
+  backdrop-filter: blur(var(--lg-micro-blur)) saturate(var(--lg-micro-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-micro-blur)) saturate(var(--lg-micro-saturate));
+  box-shadow: var(--lg-micro-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-sm);
+}
+
+.lg-button,
+.lg-navbar,
+.lg-sidebar,
+.lg-modal,
+.lg-menu,
+.lg-fab,
+.lg-player-bar,
+.lg-toast {
+  position: relative;
+}
+
+.lg-button {
+  background: var(--lg-micro-bg);
+  border: 1px solid var(--lg-micro-border);
+  backdrop-filter: blur(var(--lg-micro-blur)) saturate(var(--lg-micro-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-micro-blur)) saturate(var(--lg-micro-saturate));
+  box-shadow: var(--lg-micro-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-sm);
+  transition: transform var(--lg-duration) var(--lg-ease),
+    background var(--lg-duration) var(--lg-ease),
+    box-shadow var(--lg-duration) var(--lg-ease);
+}
+
+.lg-navbar {
+  background: var(--lg-control-bg);
+  border: 1px solid var(--lg-control-border);
+  backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
+  box-shadow: var(--lg-control-shadow), var(--lg-highlight);
+}
+
+.lg-sidebar {
+  background: var(--lg-core-bg);
+  border: 1px solid var(--lg-core-border);
+  backdrop-filter: blur(var(--lg-core-blur)) saturate(var(--lg-core-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-core-blur)) saturate(var(--lg-core-saturate));
+  box-shadow: var(--lg-core-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-lg);
+}
+
+.lg-modal {
+  background: var(--lg-strong-bg);
+  border: 1px solid var(--lg-strong-border);
+  backdrop-filter: blur(var(--lg-strong-blur)) saturate(var(--lg-strong-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-strong-blur)) saturate(var(--lg-strong-saturate));
+  box-shadow: var(--lg-strong-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-lg);
+}
+
+.lg-menu {
+  background: var(--lg-control-bg);
+  border: 1px solid var(--lg-control-border);
+  backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
+  box-shadow: var(--lg-control-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-md);
+}
+
+.lg-fab {
+  background: var(--lg-light-bg);
+  border: 1px solid var(--lg-light-border);
+  backdrop-filter: blur(var(--lg-light-blur)) saturate(var(--lg-light-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-light-blur)) saturate(var(--lg-light-saturate));
+  box-shadow: var(--lg-light-shadow), var(--lg-highlight);
+  border-radius: 999px;
+}
+
+.lg-player-bar {
+  background: var(--lg-control-bg);
+  border: 1px solid var(--lg-control-border);
+  backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
+  box-shadow: var(--lg-control-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-md);
+}
+
+.lg-toast {
+  background: var(--lg-light-bg);
+  border: 1px solid var(--lg-light-border);
+  backdrop-filter: blur(var(--lg-light-blur)) saturate(var(--lg-light-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-light-blur)) saturate(var(--lg-light-saturate));
+  box-shadow: var(--lg-light-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-sm);
+}
+
+/*
+ * Stage 3: dynamic player-bar prototype.
+ * No SVG displacement. Uses highlight, edge glow and micro intensity.
+ */
+
+:root {
+  --lg-motion: 1;
+}
+
+.lg-player-bar {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.lg-player-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at
+      calc(var(--lg-highlight-x, 0.5) * 100%)
+      calc(var(--lg-highlight-y, 0.5) * 100%),
+    rgba(255, 255, 255, 0.28),
+    transparent 46%
+  );
+  opacity: var(--lg-motion);
+  mix-blend-mode: screen;
+  transform: translateZ(0);
+  transition: opacity 180ms var(--lg-ease);
+  z-index: 1;
+}
+
+.lg-player-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.22),
+    transparent 18%,
+    transparent 82%,
+    rgba(255, 255, 255, 0.08)
+  );
+  opacity: var(--lg-motion);
+  mix-blend-mode: screen;
+  transform: translateZ(0);
+  z-index: 1;
+}
+
+.lg-player-bar--pulse {
+  animation: lg-player-pulse 720ms var(--lg-ease);
+}
+
+@keyframes lg-player-pulse {
+  0% { box-shadow: var(--lg-control-shadow), 0 0 0 1px rgba(255, 255, 255, 0.14); }
+  45% { box-shadow: 0 0 28px rgba(110, 140, 255, 0.26), var(--lg-highlight); }
+  100% { box-shadow: var(--lg-control-shadow), var(--lg-highlight); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --lg-motion: 0;
+  }
+  .lg-player-bar::before,
+  .lg-player-bar::after {
+    opacity: 0;
+  }
+  .lg-player-bar--pulse {
+    animation: none;
+  }
+}
+
+/* Stage 4: global layered glass */
+
+.lg-app-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: var(--lg-bg-overlay);
+  backdrop-filter: blur(2px) saturate(1.05);
+  -webkit-backdrop-filter: blur(2px) saturate(1.05);
+  z-index: 0;
+  transition: filter var(--lg-duration) var(--lg-ease),
+    background var(--lg-duration) var(--lg-ease);
+}
+
+[data-theme="light"] .lg-app-bg::before {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(76, 125, 255, 0.18), transparent 38%),
+    radial-gradient(circle at 86% 12%, rgba(122, 92, 255, 0.14), transparent 34%),
+    rgba(255, 255, 255, 0.18);
+  background-blend-mode: soft-light, soft-light, normal;
+  filter: brightness(0.95) saturate(1.5);
+}
+
+[data-theme="dark"] .lg-app-bg::before {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(76, 125, 255, 0.18), transparent 38%),
+    radial-gradient(circle at 86% 12%, rgba(122, 92, 255, 0.14), transparent 34%),
+    rgba(0, 0, 0, 0.45);
+  background-blend-mode: screen, screen, normal;
+  filter: brightness(0.55) saturate(1.2);
+}
+
+.lg-surface--panel {
+  background: var(--lg-bg-panel);
+  border-color: var(--lg-border);
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  box-shadow: var(--lg-shadow), var(--lg-highlight);
+  border-radius: var(--lg-radius-lg);
+}
+
+.lg-surface--content {
+  background: var(--lg-bg-content);
+  border-color: var(--lg-content-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  border-radius: var(--lg-radius-sm);
+}
+
+/* iOS 27-style glass variants */
+.lg-surface--clear {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px) saturate(1.25);
+  -webkit-backdrop-filter: blur(6px) saturate(1.25);
+  box-shadow: var(--lg-highlight);
+}
+
+[data-theme="dark"] .lg-surface--clear {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.lg-surface--identity {
+  background: transparent;
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+/* GlassEffectContainer: one shared blur for a group of glass children */
+.lg-glass-container {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--lg-radius-lg);
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  overflow: hidden;
+}
+
+.lg-glass-container > * {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.lg-content {
+  background: var(--lg-bg-content);
+  border: 1px solid var(--lg-content-border);
+  box-shadow: none;
+}
+
+.fx-section,
+.setting-row,
+.about-body {
+  background: var(--lg-bg-content);
+  border: 1px solid var(--lg-content-border);
+  border-radius: var(--lg-radius-sm);
+  padding: 10px;
+}
+
+.fx-section {
+  margin-bottom: 8px;
+}
+
+.setting-row {
+  margin: 10px 0;
+  padding: 10px 12px;
+}
+
+.about-body {
+  padding: 12px;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lg-surface,
+  .lg-button,
+  .lg-navbar,
+  .lg-sidebar,
+  .lg-modal,
+  .lg-menu,
+  .lg-fab,
+  .lg-player-bar,
+  .lg-toast {
+    background: var(--lg-fallback-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .lg-surface,
+  .lg-button,
+  .lg-navbar,
+  .lg-sidebar,
+  .lg-modal,
+  .lg-menu,
+  .lg-fab,
+  .lg-player-bar,
+  .lg-toast {
+    background: var(--lg-fallback-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-surface,
+  .lg-button {
+    transition-duration: 0.01ms;
+  }
+}

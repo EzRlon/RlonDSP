@@ -1,0 +1,125 @@
+/*
+ * RlonDSP
+ * Copyright © 2026 RlonDSP. All rights reserved.
+ * Based on Echomusic open-source project, modified and extended for RlonDSP.
+ *
+ * Liquid Glass Design Tokens
+ * Stage 1 only. This file is not imported into index.html yet.
+ */
+
+:root {
+  /* Global glass tokens */
+  --lg-bg: rgba(255, 255, 255, 0.12);
+  --lg-border: rgba(255, 255, 255, 0.25);
+  --lg-blur: 14px;
+  --lg-saturate: 1.6;
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  --lg-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+
+  --lg-radius-lg: 28px;
+  --lg-radius-md: 18px;
+  --lg-radius-sm: 12px;
+
+  --lg-duration: 240ms;
+  --lg-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Dynamic liquid glass inputs */
+  --lg-displacement-scale: 8;
+  --lg-chroma: 0.015;
+  --lg-highlight-x: 0.5;
+  --lg-highlight-y: 0.5;
+  --lg-fallback-bg: rgba(255, 255, 255, 0.72);
+  --lg-bg-overlay: rgba(255, 255, 255, 0.05);
+  --lg-bg-panel: rgba(255, 255, 255, 0.27);
+  --lg-bg-control: rgba(255, 255, 255, 0.23);
+  --lg-bg-content: rgba(255, 255, 255, 0.72);
+
+  /* Core glass: sidebar, primary navigation */
+  --lg-core-bg: rgba(255, 255, 255, 0.14);
+  --lg-core-border: rgba(255, 255, 255, 0.28);
+  --lg-core-blur: 16px;
+  --lg-core-saturate: 1.65;
+  --lg-core-shadow: 0 12px 40px rgba(0, 0, 0, 0.20);
+
+  /* Control glass: player bar, effect panel, menus */
+  --lg-control-bg: rgba(255, 255, 255, 0.20);
+  --lg-control-border: rgba(255, 255, 255, 0.32);
+  --lg-control-blur: 14px;
+  --lg-control-saturate: 1.70;
+  --lg-control-shadow: 0 8px 26px rgba(0, 0, 0, 0.16);
+
+  /* Strong glass: modal surfaces that still need readability */
+  --lg-strong-bg: rgba(255, 255, 255, 0.72);
+  --lg-strong-border: rgba(255, 255, 255, 0.48);
+  --lg-strong-blur: 20px;
+  --lg-strong-saturate: 1.80;
+  --lg-strong-shadow: 0 18px 50px rgba(0, 0, 0, 0.20);
+
+  /* Light glass: FAB, floating indicators */
+  --lg-light-bg: rgba(255, 255, 255, 0.08);
+  --lg-light-border: rgba(255, 255, 255, 0.20);
+  --lg-light-blur: 10px;
+  --lg-light-saturate: 1.40;
+  --lg-light-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Micro glass: buttons, chips, compact controls */
+  --lg-micro-bg: rgba(255, 255, 255, 0.05);
+  --lg-micro-border: rgba(255, 255, 255, 0.14);
+  --lg-micro-blur: 6px;
+  --lg-micro-saturate: 1.25;
+  --lg-micro-shadow: none;
+
+  /* Content layer: not glass. Use for readable lists, forms, text blocks. */
+  --lg-content-bg: rgba(255, 255, 255, 0.92);
+  --lg-content-border: rgba(0, 0, 0, 0.08);
+  --lg-content-blur: 0px;
+  --lg-content-saturate: 1;
+  --lg-content-shadow: none;
+}
+
+[data-theme="dark"] {
+  --lg-bg: rgba(20, 20, 20, 0.35);
+  --lg-border: rgba(255, 255, 255, 0.18);
+  --lg-blur: 14px;
+  --lg-saturate: 1.5;
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --lg-shadow: 0 8px 32px rgba(0, 0, 0, 0.38);
+  --lg-fallback-bg: rgba(24, 28, 36, 0.82);
+  --lg-bg-overlay: rgba(0, 0, 0, 0.10);
+  --lg-bg-panel: rgba(20, 20, 20, 0.34);
+  --lg-bg-control: rgba(20, 20, 20, 0.30);
+  --lg-bg-content: rgba(25, 29, 38, 0.88);
+
+  --lg-core-bg: rgba(20, 20, 20, 0.42);
+  --lg-core-border: rgba(255, 255, 255, 0.16);
+  --lg-core-blur: 16px;
+  --lg-core-saturate: 1.55;
+  --lg-core-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
+
+  --lg-control-bg: rgba(20, 20, 20, 0.48);
+  --lg-control-border: rgba(255, 255, 255, 0.20);
+  --lg-control-blur: 14px;
+  --lg-control-saturate: 1.60;
+  --lg-control-shadow: 0 8px 26px rgba(0, 0, 0, 0.36);
+
+  --lg-strong-bg: rgba(25, 29, 38, 0.82);
+  --lg-strong-border: rgba(255, 255, 255, 0.20);
+  --lg-strong-blur: 20px;
+  --lg-strong-saturate: 1.70;
+  --lg-strong-shadow: 0 18px 50px rgba(0, 0, 0, 0.46);
+
+  --lg-light-bg: rgba(20, 20, 20, 0.28);
+  --lg-light-border: rgba(255, 255, 255, 0.13);
+  --lg-light-blur: 10px;
+  --lg-light-saturate: 1.30;
+  --lg-light-shadow: 0 4px 16px rgba(0, 0, 0, 0.26);
+
+  --lg-micro-bg: rgba(255, 255, 255, 0.05);
+  --lg-micro-border: rgba(255, 255, 255, 0.10);
+  --lg-micro-blur: 6px;
+  --lg-micro-saturate: 1.15;
+  --lg-micro-shadow: none;
+
+  --lg-content-bg: rgba(25, 29, 38, 0.94);
+  --lg-content-border: rgba(255, 255, 255, 0.09);
+}

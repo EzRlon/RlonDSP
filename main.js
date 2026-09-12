@@ -155,6 +155,7 @@ function createMainWindow() {
     minHeight: 680,
     title: 'RlonDSP',
     show: false,
+    frame: false,
     backgroundColor: '#0f1115',
     autoHideMenuBar: true,
     icon: path.join(__dirname, 'assets', 'icon.png'),
@@ -169,6 +170,13 @@ function createMainWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
+
+  mainWindow.on('maximize', () => mainWindow?.webContents.send('window:maximized', true));
+  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:maximized', false));
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow?.webContents.send('window:mini-state', miniMode);
+    mainWindow?.webContents.send('window:maximized', !!mainWindow?.isMaximized());
+  });
 
   mainWindow.on('close', (event) => {
     const settings = getSettingsSync();
@@ -460,6 +468,32 @@ ipcMain.on('window:maximize', () => {
   else mainWindow.maximize();
 });
 ipcMain.on('window:close', () => mainWindow?.close());
+
+let miniMode = false;
+let miniPrevBounds = null;
+ipcMain.on('window:toggle-mini', () => {
+  if (!mainWindow) return;
+  if (!miniMode) {
+    miniPrevBounds = mainWindow.getBounds();
+    miniMode = true;
+    mainWindow.setMinimumSize(320, 64);
+    mainWindow.setResizable(false);
+    const b = mainWindow.getBounds();
+    mainWindow.setBounds({
+      x: b.x + Math.round((b.width - 360) / 2),
+      y: b.y,
+      width: 360,
+      height: 64
+    });
+    mainWindow.webContents.send('window:mini-state', true);
+  } else {
+    miniMode = false;
+    mainWindow.setResizable(true);
+    mainWindow.setMinimumSize(1020, 680);
+    if (miniPrevBounds) mainWindow.setBounds(miniPrevBounds);
+    mainWindow.webContents.send('window:mini-state', false);
+  }
+});
 
 ipcMain.on('lyrics:show', () => createLyricsWindow());
 ipcMain.on('lyrics:hide', () => {

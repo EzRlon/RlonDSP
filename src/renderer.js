@@ -23,8 +23,10 @@ const I18N = {
     dropHint: '拖入音频文件或文件夹即可导入',
     noTrack: '未播放',
     visualHint: '播放时显示频谱',
+    visualizer: '频谱可视化',
     noLyrics: '暂无歌词',
-    soundEffects: '音效',
+    soundEffects: '实时音效',
+    pulseFeedback: '脉冲反馈',
     reset: '重置',
     preset: '预设',
     save: '保存',
@@ -61,6 +63,7 @@ const I18N = {
     settings: '设置',
     theme: '主题',
     language: '语言',
+    outputDevice: '输出设备',
     closeToTray: '关闭时最小化到托盘',
     minimizeToTray: '最小化时到托盘',
     toastImported: '已导入歌曲',
@@ -79,6 +82,11 @@ const I18N = {
     license: '许可证',
     viewLicense: '查看许可证',
     thanks: '感谢所有开源项目、贡献者与社区的支持。',
+    playbackMode: '播放模式',
+    play: '播放',
+    pause: '暂停',
+    mute: '静音',
+    unmute: '取消静音',
     enable: '启用'
   },
   en: {
@@ -98,8 +106,10 @@ const I18N = {
     dropHint: 'Drop audio files or folders here',
     noTrack: 'Nothing Playing',
     visualHint: 'Spectrum appears while playing',
+    visualizer: 'Visualizer',
     noLyrics: 'No lyrics',
-    soundEffects: 'Effects',
+    soundEffects: 'Real-time Effects',
+    pulseFeedback: 'Pulse Feedback',
     reset: 'Reset',
     preset: 'Presets',
     save: 'Save',
@@ -136,6 +146,7 @@ const I18N = {
     settings: 'Settings',
     theme: 'Theme',
     language: 'Language',
+    outputDevice: 'Output Device',
     closeToTray: 'Close to tray',
     minimizeToTray: 'Minimize to tray',
     toastImported: 'Tracks imported',
@@ -154,6 +165,11 @@ const I18N = {
     license: 'License',
     viewLicense: 'View License',
     thanks: 'Thanks to all open-source projects, contributors, and the community.',
+    playbackMode: 'Playback Mode',
+    play: 'Play',
+    pause: 'Pause',
+    mute: 'Mute',
+    unmute: 'Unmute',
     enable: 'Enable'
   }
 };
@@ -205,10 +221,10 @@ const state = {
   presets: [],
   effects: deepClone(defaultEffects),
   visual: {
-    mode: 'bar',
     fftSize: 2048,
-    infoVisible: false,
-    waterfall: []
+    logScale: true,
+    smoothing: 0.78,
+    colormap: 0
   },
   lyrics: [],
   lyricsIndex: -1,
@@ -262,14 +278,33 @@ function applyTheme(theme) {
   const resolved = theme || state.settings.theme;
   const isDark = resolved === 'dark' || (resolved === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+  refreshAccent();
+  syncStudioTheme();
   const label = resolved === 'system' ? t('themeSystem') : resolved === 'dark' ? t('themeDark') : t('themeLight');
   $('themeSelect').value = resolved;
 }
 
+function syncStudioTheme() {
+  const frame = document.getElementById('irStudioFrame');
+  if (frame && frame.contentWindow) {
+    frame.contentWindow.postMessage({
+      type: 'rlondsp-theme',
+      theme: document.documentElement.dataset.theme || 'light'
+    }, '*');
+  }
+}
+
+function toggleMiniMode() {
+  document.body.classList.toggle('mini-mode');
+  api.toggleMini();
+}
+
 function updateModeButton() {
-  const map = { list: '🔁', single: '🔂', random: '🔀' };
-  $('modeBtn').textContent = map[state.mode] || '🔁';
-  $('modeBtn').title = t('playbackMode') || 'Playback mode';
+  const icon = $('modeBtnIcon');
+  if (!icon) return;
+  const map = { list: '#icon-loop-list', single: '#icon-loop-single', random: '#icon-loop-random' };
+  icon.setAttribute('href', map[state.mode] || '#icon-loop-list');
+  $('modeBtn').title = t('playbackMode');
 }
 
 function cycleMode() {
@@ -298,20 +333,13 @@ function setCurrentIndex(index) {
 
 function updateNowPlaying() {
   const track = state.currentTrack;
-  $('nowTitle').textContent = track ? track.title : t('noTrack');
-  $('nowArtist').textContent = track ? (track.artist || '') : '';
-  $('nowAlbum').textContent = track ? (track.album || '') : '';
   $('playerTitle').textContent = track ? track.title : t('noTrack');
   $('playerArtist').textContent = track ? (track.artist || '') : '';
   $('totalTime').textContent = track && track.duration ? formatTime(track.duration) : '0:00';
   if (track && track.cover) {
-    $('cover').src = track.cover;
-    $('cover').classList.add('visible');
     $('miniCover').innerHTML = `<img alt="" src="${track.cover}">`;
   } else {
-    $('cover').classList.remove('visible');
-    $('cover').removeAttribute('src');
-    $('miniCover').textContent = '♪';
+    $('miniCover').innerHTML = `<svg class="icon icon-lg"><use href="#icon-note"></use></svg>`;
   }
 }
 
@@ -452,8 +480,9 @@ function togglePlay() {
 
 function setPlayButton(playing) {
   state.isPlaying = playing;
-  $('playBtn').textContent = playing ? '⏸' : '▶';
-  $('playBtn').title = playing ? '暂停' : '播放';
+  const icon = $('playBtnIcon');
+  if (icon) icon.setAttribute('href', playing ? '#icon-pause' : '#icon-play');
+  $('playBtn').title = playing ? t('pause') || '暂停' : t('play') || '播放';
 }
 
 function seekTo(ratio) {
@@ -471,7 +500,9 @@ function setVolume(value) {
 function toggleMute() {
   state.muted = !state.muted;
   if (audioElement) audioElement.muted = state.muted;
-  $('muteBtn').textContent = state.muted ? '🔇' : '🔊';
+  const icon = $('muteBtnIcon');
+  if (icon) icon.setAttribute('href', state.muted ? '#icon-mute' : '#icon-volume');
+  $('muteBtn').title = state.muted ? t('unmute') || '取消静音' : t('mute') || '静音';
 }
 
 function clearPlaylist() {
@@ -558,7 +589,7 @@ function applyEffectsToUI() {
   $('irHighpassVal').textContent = `${fx.ir.highpass} Hz`;
   $('irLowpass').value = String(fx.ir.lowpass);
   $('irLowpassVal').textContent = `${fx.ir.lowpass} Hz`;
-  $('irName').textContent = fx.ir.filePath ? fx.ir.filePath.split(/[\\/]/).pop() : (state.settings.language === 'zh' ? '未加载 IR' : 'No IR loaded');
+  $('irName').textContent = fx.ir.filePath ? fx.ir.filePath.split(/[\\/]/).pop() : (state.settings.language === 'zh' ? '未加载脉冲' : 'No pulse loaded');
 }
 
 function sendDSPParams() {
@@ -686,12 +717,13 @@ async function loadPresets() {
 function renderPresets() {
   const select = $('presetSelect');
   select.innerHTML = '<option value="">--</option>';
-  state.presets.forEach((preset) => {
+  state.presets.filter((preset) => preset.type !== 'pulse').forEach((preset) => {
     const option = document.createElement('option');
     option.value = preset.id;
     option.textContent = preset.name || preset.id;
     select.appendChild(option);
   });
+  renderPulseList();
 }
 
 function currentPresetId() {
@@ -833,7 +865,38 @@ let irDelayNode = null;
 let irHighpassNode = null;
 let irLowpassNode = null;
 let convolverNode = null;
-let analyserData = null;
+
+const ANALYZER_BARS = 72;
+const COLOR_MAPS = ['Thermal', 'Rainbow', 'Ocean', 'Mono'];
+const LUFS_K = -0.691;
+
+let freqData = null;
+let freqFloatData = null;
+let timeData = null;
+let monoData = null;
+let analyzerPeak = null;
+let curvePeak = null;
+let spectroBuffer = null;
+let spectroCtx = null;
+let colorLUT = null;
+
+let loudMomentary = null;
+let loudShort = null;
+let loudMomentarySum = 0;
+let loudShortSum = 0;
+let loudMomentaryCount = 0;
+let loudShortCount = 0;
+let loudMomentaryHead = 0;
+let loudShortHead = 0;
+let loudIntegratedSum = 0;
+let loudIntegratedCount = 0;
+let loudTruePeak = 0;
+
+let cachedAccent = '#6f92ff';
+let cachedAccent2 = '#9b82ff';
+let cachedText = '#1d222c';
+let cachedMuted = '#6d7483';
+let cachedLine = 'rgba(0, 0, 0, 0.08)';
 let animationFrame = null;
 
 async function ensureAudioGraph() {
@@ -849,8 +912,10 @@ async function ensureAudioGraph() {
   dspNode = new AudioWorkletNode(audioContext, 'rlondsp-dsp', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
   analyser = audioContext.createAnalyser();
   analyser.fftSize = state.visual.fftSize;
-  analyser.smoothingTimeConstant = 0.78;
-  analyserData = new Uint8Array(analyser.frequencyBinCount);
+  analyser.smoothingTimeConstant = state.visual.smoothing;
+  analyser.minDecibels = -120;
+  analyser.maxDecibels = -20;
+  allocateAnalyserBuffers();
 
   dryGainNode = audioContext.createGain();
   wetGainNode = audioContext.createGain();
@@ -976,6 +1041,222 @@ function toggleIRAB() {
   showToast(state.effects.ir.ab ? 'A/B: A' : 'A/B: B');
 }
 
+let pulseAuditionTimer = null;
+
+function auditionPulse() {
+  if (!state.currentTrack || !audioElement) {
+    showToast(t('toastNoTrack'));
+    return;
+  }
+  if (!convolverNode || !convolverNode.buffer) {
+    showToast(state.settings.language === 'zh' ? '请先加载脉冲文件' : 'Load a pulse file first');
+    return;
+  }
+  const previousEnabled = state.effects.ir.enabled;
+  const previousWet = state.effects.ir.wet;
+  state.effects.ir.enabled = true;
+  state.effects.ir.wet = Math.max(state.effects.ir.wet, 0.55);
+  $('fxIR').checked = true;
+  updateEffectsFromUI();
+  showToast(state.settings.language === 'zh' ? '脉冲试听中' : 'Pulse audition playing');
+  window.clearTimeout(pulseAuditionTimer);
+  pulseAuditionTimer = window.setTimeout(() => {
+    state.effects.ir.enabled = previousEnabled;
+    state.effects.ir.wet = previousWet;
+    updateEffectsFromUI();
+    showToast(state.settings.language === 'zh' ? '试听结束' : 'Audition ended');
+  }, 4000);
+}
+
+function savePulsePreset() {
+  if (!convolverNode || !convolverNode.buffer) {
+    showToast(state.settings.language === 'zh' ? '请先生成或加载脉冲' : 'Generate or load a pulse first');
+    return;
+  }
+  const fallbackName = state.settings.language === 'zh' ? '脉冲反馈' : 'Pulse Feedback';
+  const name = ($('pulseName').value || '').trim() || `${fallbackName} ${new Date().toLocaleTimeString()}`;
+  const pulse = currentPulseToWavBase64();
+  if (!pulse) return;
+  const preset = {
+    id: `pulse-${Date.now()}`,
+    name,
+    type: 'pulse',
+    createdAt: Date.now(),
+    wavBase64: pulse.base64,
+    sampleRate: pulse.sampleRate,
+    enabled: false
+  };
+  api.savePreset(preset).then((presets) => {
+    state.presets = presets;
+    renderPulseList();
+    showToast(state.settings.language === 'zh' ? '脉冲已保存' : 'Pulse saved');
+  });
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function currentPulseToWavBase64() {
+  if (!convolverNode || !convolverNode.buffer) return null;
+  const buffer = convolverNode.buffer;
+  const L = buffer.getChannelData(0);
+  const R = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : L;
+  const wav = window.IRGenerator.encodeWav(L, R, buffer.sampleRate, 16, {
+    name: 'pulse.wav',
+    comment: 'RlonDSP',
+    software: 'RlonDSP'
+  });
+  return { base64: arrayBufferToBase64(wav), sampleRate: buffer.sampleRate };
+}
+
+async function generatePulse() {
+  try {
+    await ensureAudioGraph();
+    const cfg = JSON.parse(JSON.stringify(window.IRGenerator.DEFAULT_CONFIG));
+    cfg.sampleRate = audioContext.sampleRate;
+    cfg.length = 1.5;
+    const result = window.IRGenerator.renderIR(cfg, null);
+    const decoded = await audioContext.decodeAudioData(result.wav);
+    convolverNode.buffer = decoded;
+    state.effects.ir.filePath = cfg.filename;
+    state.effects.ir.enabled = true;
+    $('fxIR').checked = true;
+    $('irName').textContent = `${cfg.filename}.wav`;
+    $('pulseName').value = '';
+    applyEffectsToUI();
+    updateIRGraph();
+    showToast(state.settings.language === 'zh' ? '脉冲已生成并应用' : 'Pulse generated and applied');
+  } catch (error) {
+    console.error(error);
+    showToast(state.settings.language === 'zh' ? '脉冲生成失败' : 'Pulse generation failed');
+  }
+}
+
+async function applyPulsePreset(preset) {
+  try {
+    await ensureAudioGraph();
+    const arrayBuffer = base64ToArrayBuffer(preset.wavBase64);
+    const decoded = await audioContext.decodeAudioData(arrayBuffer);
+    convolverNode.buffer = decoded;
+    state.effects.ir.filePath = preset.name;
+    state.effects.ir.enabled = preset.enabled !== false;
+    $('fxIR').checked = state.effects.ir.enabled;
+    $('irName').textContent = preset.name;
+    applyEffectsToUI();
+    updateIRGraph();
+    renderPulseList();
+  } catch (error) {
+    console.error(error);
+    showToast(state.settings.language === 'zh' ? '脉冲加载失败' : 'Pulse load failed');
+  }
+}
+
+function deletePulsePreset(id) {
+  api.deletePreset(id).then((presets) => {
+    state.presets = presets;
+    renderPulseList();
+  });
+}
+
+async function renamePulsePreset(id) {
+  const preset = state.presets.find((p) => p.id === id);
+  if (!preset) return;
+  const next = prompt(state.settings.language === 'zh' ? '输入新的脉冲名称' : 'Enter new pulse name', preset.name);
+  if (!next || !next.trim()) return;
+  preset.name = next.trim();
+  state.presets = await api.savePreset(preset);
+  renderPulseList();
+}
+
+function selectFxTab(tabName) {
+  document.querySelectorAll('.fx-tab').forEach((tab) => {
+    tab.classList.toggle('active', tab.dataset.fxTab === tabName);
+  });
+  document.querySelectorAll('.fx-tab-panel').forEach((panel) => {
+    panel.hidden = panel.dataset.fxPanel !== tabName;
+  });
+  const card = document.querySelector('.effects-card');
+  if (card) card.classList.toggle('pulse-mode', tabName === 'pulse');
+  if (tabName === 'pulse') syncStudioTheme();
+}
+
+function handleStudioMessage(event) {
+  const data = event.data;
+  if (!data || data.type !== 'rlondsp-pulse-save') return;
+  const name = (data.name || '').trim() || `脉冲反馈 ${new Date().toLocaleTimeString()}`;
+  const preset = {
+    id: `pulse-${Date.now()}`,
+    name,
+    type: 'pulse',
+    createdAt: Date.now(),
+    wavBase64: data.wavBase64,
+    sampleRate: data.sampleRate || 48000,
+    enabled: false
+  };
+  api.savePreset(preset).then((presets) => {
+    state.presets = presets;
+    renderPulseList();
+    showToast(state.settings.language === 'zh' ? `脉冲已保存：${name}` : `Pulse saved: ${name}`);
+  });
+}
+
+function renderPulseList() {
+  const list = $('pulseList');
+  if (!list) return;
+  const pulses = state.presets.filter((preset) => preset.type === 'pulse');
+  list.innerHTML = '';
+  pulses.forEach((preset) => {
+    const item = document.createElement('div');
+    item.className = 'pulse-item' + (state.effects.ir.filePath === preset.name ? ' active' : '');
+    item.innerHTML = `
+      <span class="pulse-name"></span>
+      <span class="pulse-time">${new Date(preset.createdAt).toLocaleTimeString()}</span>
+      <label class="switch"><input type="checkbox" data-pulse-toggle="${preset.id}" ${preset.enabled ? 'checked' : ''}><span></span></label>
+      <button data-pulse-load="${preset.id}">加载</button>
+      <button data-pulse-rename="${preset.id}">重命名</button>
+      <button data-pulse-del="${preset.id}">删除</button>
+    `;
+    item.querySelector('.pulse-name').textContent = preset.name;
+    list.appendChild(item);
+  });
+  list.querySelectorAll('[data-pulse-toggle]').forEach((toggle) => {
+    toggle.addEventListener('change', async (event) => {
+      const preset = state.presets.find((p) => p.id === event.target.dataset.pulseToggle);
+      if (!preset) return;
+      preset.enabled = event.target.checked;
+      await api.savePreset(preset);
+      if (preset.enabled) await applyPulsePreset(preset);
+      else clearIR();
+    });
+  });
+  list.querySelectorAll('[data-pulse-load]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const preset = state.presets.find((p) => p.id === btn.dataset.pulseLoad);
+      if (preset) await applyPulsePreset({ ...preset, enabled: true });
+    });
+  });
+  list.querySelectorAll('[data-pulse-del]').forEach((btn) => {
+    btn.addEventListener('click', () => deletePulsePreset(btn.dataset.pulseDel));
+  });
+  list.querySelectorAll('[data-pulse-rename]').forEach((btn) => {
+    btn.addEventListener('click', () => renamePulsePreset(btn.dataset.pulseRename));
+  });
+}
+
 async function enumerateOutputDevices() {
   try {
     let devices = await navigator.mediaDevices.enumerateDevices();
@@ -994,7 +1275,7 @@ async function enumerateOutputDevices() {
     outputs.forEach((device, index) => {
       const option = document.createElement('option');
       option.value = device.deviceId;
-      option.textContent = device.label || `${state.settings.language === 'zh' ? '输出设备' : 'Output'} ${index + 1}`;
+      option.textContent = normalizeDeviceLabel(device.label, index);
       select.appendChild(option);
     });
     if (state.settings.outputDeviceId) {
@@ -1005,186 +1286,813 @@ async function enumerateOutputDevices() {
   }
 }
 
+function normalizeDeviceLabel(label, index) {
+  const isZh = state.settings.language === 'zh';
+  const fallback = isZh ? '默认设备' : 'Default Device';
+  if (!label) return index === 0 ? fallback : (isZh ? `设备 ${index + 1}` : `Device ${index + 1}`);
+  const cleaned = label.trim();
+  if (/^(default|默认)[\s\-—:：]*/i.test(cleaned)) return fallback;
+  return cleaned;
+}
+
+function refreshAccent() {
+  const style = getComputedStyle(document.documentElement);
+  cachedAccent = style.getPropertyValue('--accent').trim() || '#6f92ff';
+  cachedAccent2 = style.getPropertyValue('--accent-2').trim() || '#9b82ff';
+  cachedText = style.getPropertyValue('--text').trim() || '#1d222c';
+  cachedMuted = style.getPropertyValue('--muted').trim() || '#6d7483';
+  cachedLine = style.getPropertyValue('--line').trim() || 'rgba(0, 0, 0, 0.08)';
+}
+
 function getAccentColor() {
-  return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#6f92ff';
+  return cachedAccent;
 }
 
 function getAccent2Color() {
-  return getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim() || '#9b82ff';
+  return cachedAccent2;
 }
 
-function updateAudioInfo() {
-  if (!state.visual.infoVisible) return;
-  const track = state.currentTrack;
-  const fileLines = [];
-  if (track) {
-    fileLines.push(`文件：${track.title}`);
-    fileLines.push(`路径：${track.path}`);
-    if (track.sampleRate) fileLines.push(`采样率：${track.sampleRate} Hz`);
-    if (track.bitrate) fileLines.push(`比特率：${track.bitrate} bps`);
-    if (track.channels) fileLines.push(`声道：${track.channels}`);
-    if (track.bitdepth) fileLines.push(`位深：${track.bitdepth} bit`);
-    if (track.codec) fileLines.push(`编码：${track.codec}`);
-    if (track.duration) fileLines.push(`时长：${formatTime(track.duration)}`);
-  } else {
-    fileLines.push('未加载音频');
+function buildColorLUT() {
+  const mode = ((state.visual.colormap % COLOR_MAPS.length) + COLOR_MAPS.length) % COLOR_MAPS.length;
+  const lut = new Array(256);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255;
+    let h;
+    let s = 100;
+    let l;
+    if (mode === 0) { h = 262 - t * 262; l = 8 + t * 52; }
+    else if (mode === 1) { h = 285 - t * 285; l = 10 + t * 48; }
+    else if (mode === 2) { h = 215 - t * 45; l = 10 + t * 52; }
+    else { h = 150; l = 10 + t * 52; }
+    lut[i] = `hsl(${h.toFixed(1)}, ${s}%, ${l.toFixed(1)}%)`;
   }
-  $('fileInfo').innerHTML = fileLines.map((line) => `<div>${line}</div>`).join('');
+  colorLUT = lut;
+}
 
-  if (analyser && state.isPlaying) {
-    const timeData = new Float32Array(analyser.fftSize);
-    analyser.getFloatTimeDomainData(timeData);
-    let sumL = 0;
-    let sumR = 0;
-    let peakL = 0;
-    let peakR = 0;
-    for (let i = 0; i < timeData.length; i += 2) {
-      const l = timeData[i];
-      const r = timeData[i + 1] ?? l;
-      sumL += l * l;
-      sumR += r * r;
-      peakL = Math.max(peakL, Math.abs(l));
-      peakR = Math.max(peakR, Math.abs(r));
-    }
-    const rmsL = Math.sqrt(sumL / (timeData.length / 2));
-    const rmsR = Math.sqrt(sumR / (timeData.length / 2));
-    analyser.getByteFrequencyData(analyserData);
-    let dominant = 0;
-    let maxBin = 0;
-    for (let i = 0; i < analyserData.length; i++) {
-      if (analyserData[i] > maxBin) {
-        maxBin = analyserData[i];
-        dominant = i;
-      }
-    }
+function allocateAnalyserBuffers() {
+  if (!analyser) return;
+  const binCount = analyser.frequencyBinCount;
+  const fftSize = analyser.fftSize;
+  freqData = new Uint8Array(binCount);
+  freqFloatData = new Float32Array(binCount);
+  timeData = new Float32Array(fftSize);
+  monoData = new Float32Array(Math.max(1, Math.floor(fftSize / 2)));
+  analyzerPeak = new Uint8Array(ANALYZER_BARS);
+  curvePeak = new Float32Array(binCount);
+  curvePeak.fill(-140);
+  const sr = audioContext.sampleRate;
+  loudMomentary = new Float32Array(Math.max(1, Math.floor(sr * 0.4)));
+  loudShort = new Float32Array(Math.max(1, Math.floor(sr * 3.0)));
+  loudMomentarySum = 0;
+  loudShortSum = 0;
+  loudMomentaryCount = 0;
+  loudShortCount = 0;
+  loudMomentaryHead = 0;
+  loudShortHead = 0;
+  loudIntegratedSum = 0;
+  loudIntegratedCount = 0;
+  loudTruePeak = 0;
+  buildColorLUT();
+}
+
+function setupVizCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(rect.width * dpr));
+  const h = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+  return canvas.getContext('2d');
+}
+
+function getVizCanvas(key) {
+  return document.querySelector(`[data-viz="${key}"]`);
+}
+
+function freqToX(i, binCount, width) {
+  if (state.visual.logScale && binCount > 1) {
     const nyquist = (audioContext?.sampleRate || 48000) / 2;
-    const dominantHz = Math.round((dominant / analyserData.length) * nyquist);
-    const db = (value) => value > 0 ? (20 * Math.log10(value)).toFixed(1) : '-∞';
-    $('liveInfo').innerHTML = [
-      `<div>L RMS：${db(rmsL)} dB</div>`,
-      `<div>R RMS：${db(rmsR)} dB</div>`,
-      `<div>L Peak：${db(peakL)} dB</div>`,
-      `<div>R Peak：${db(peakR)} dB</div>`,
-      `<div>主频：${dominantHz} Hz</div>`
-    ].join('');
-  } else {
-    $('liveInfo').innerHTML = '<div>等待播放</div>';
+    const minF = 20;
+    const f = Math.max(minF, (i / (binCount - 1)) * nyquist);
+    return (Math.log(f / minF) / Math.log(nyquist / minF)) * width;
+  }
+  return (i / Math.max(1, binCount - 1)) * width;
+}
+
+function drawAnalyzer(ctx, width, height) {
+  const nyquist = (audioContext?.sampleRate || 48000) / 2;
+  const minF = 20;
+  const binCount = freqData.length;
+  const gap = Math.max(1, width * 0.002);
+  const barW = Math.max(1, (width - gap * (ANALYZER_BARS - 1)) / ANALYZER_BARS);
+  const accent = getAccentColor();
+  const accent2 = getAccent2Color();
+  for (let k = 0; k < ANALYZER_BARS; k++) {
+    const fLow = minF * Math.pow(nyquist / minF, k / ANALYZER_BARS);
+    const fHigh = minF * Math.pow(nyquist / minF, (k + 1) / ANALYZER_BARS);
+    const binLow = Math.min(binCount - 1, Math.floor((fLow / nyquist) * binCount));
+    const binHigh = Math.min(binCount - 1, Math.max(binLow + 1, Math.ceil((fHigh / nyquist) * binCount)));
+    let peak = 0;
+    for (let b = binLow; b <= binHigh; b++) {
+      if (freqData[b] > peak) peak = freqData[b];
+    }
+    const v = peak / 255;
+    const barH = Math.max(0.5, v * (height - 16));
+    const x = k * (barW + gap);
+    const y = height - barH;
+    const grad = ctx.createLinearGradient(0, height, 0, y);
+    grad.addColorStop(0, accent);
+    grad.addColorStop(1, accent2);
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = 0.55 + v * 0.45;
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, 1.5);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.strokeStyle = '#ffb547';
+  ctx.lineWidth = 1.4;
+  ctx.shadowColor = '#ffb547';
+  ctx.shadowBlur = 4;
+  for (let k = 0; k < ANALYZER_BARS; k++) {
+    const fLow = minF * Math.pow(nyquist / minF, k / ANALYZER_BARS);
+    const fHigh = minF * Math.pow(nyquist / minF, (k + 1) / ANALYZER_BARS);
+    const binLow = Math.min(binCount - 1, Math.floor((fLow / nyquist) * binCount));
+    const binHigh = Math.min(binCount - 1, Math.max(binLow + 1, Math.ceil((fHigh / nyquist) * binCount)));
+    let peak = 0;
+    for (let b = binLow; b <= binHigh; b++) {
+      if (freqData[b] > peak) peak = freqData[b];
+    }
+    if (peak > analyzerPeak[k]) analyzerPeak[k] = peak;
+    else analyzerPeak[k] = Math.max(0, analyzerPeak[k] - 1);
+    const x = k * (barW + gap) + barW / 2;
+    const y = height - (analyzerPeak[k] / 255) * (height - 16);
+    if (k === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawCurve(ctx, width, height) {
+  const binCount = freqData.length;
+  const minDB = -120;
+  const maxDB = -20;
+  const accent = getAccentColor();
+  const accent2 = getAccent2Color();
+  const dbToY = (db) => (1 - (db - minDB) / (maxDB - minDB)) * (height - 6);
+  ctx.beginPath();
+  ctx.moveTo(freqToX(0, binCount, width), height);
+  for (let i = 0; i < binCount; i++) {
+    const db = Math.max(minDB, Math.min(maxDB, freqFloatData[i]));
+    ctx.lineTo(freqToX(i, binCount, width), dbToY(db));
+  }
+  ctx.lineTo(freqToX(binCount - 1, binCount, width), height);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, accent2);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.beginPath();
+  for (let i = 0; i < binCount; i++) {
+    const db = Math.max(minDB, Math.min(maxDB, freqFloatData[i]));
+    const x = freqToX(i, binCount, width);
+    const y = dbToY(db);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.6;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 6;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.strokeStyle = '#ffb547';
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < binCount; i++) {
+    const db = Math.max(minDB, Math.min(maxDB, freqFloatData[i]));
+    if (db > curvePeak[i]) curvePeak[i] = db;
+    else curvePeak[i] = Math.max(minDB, curvePeak[i] - 0.35);
+    const x = freqToX(i, binCount, width);
+    const y = dbToY(curvePeak[i]);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+function drawScope(ctx, width, height) {
+  const monoCount = monoData.length;
+  if (!monoCount) return;
+  const sr = audioContext.sampleRate;
+  let trigger = 0;
+  const searchEnd = Math.floor(monoCount / 3);
+  for (let i = 1; i < searchEnd; i++) {
+    if (monoData[i - 1] <= 0 && monoData[i] > 0) { trigger = i; break; }
+  }
+  const windowSamples = Math.min(monoCount, Math.max(64, Math.floor(sr * 0.01)));
+  const accent = getAccentColor();
+  const midY = height / 2;
+  ctx.beginPath();
+  for (let k = 0; k < windowSamples; k++) {
+    const idx = (trigger + k) % monoCount;
+    const x = (k / (windowSamples - 1)) * width;
+    const y = midY - monoData[idx] * (height * 0.46);
+    if (k === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.8;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 7;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawSpectrogram(ctx, width, height) {
+  if (!spectroBuffer || spectroBuffer.width !== width || spectroBuffer.height !== height) {
+    spectroBuffer = document.createElement('canvas');
+    spectroBuffer.width = width;
+    spectroBuffer.height = height;
+    spectroCtx = spectroBuffer.getContext('2d');
+  }
+  spectroCtx.globalCompositeOperation = 'destination-out';
+  spectroCtx.fillStyle = 'rgba(0, 0, 0, 0.10)';
+  spectroCtx.fillRect(0, 0, width, height);
+  spectroCtx.globalCompositeOperation = 'source-over';
+  if (width > 1) {
+    spectroCtx.drawImage(spectroBuffer, 1, 0, width - 1, height, 0, 0, width - 1, height);
+  }
+  const nyquist = (audioContext?.sampleRate || 48000) / 2;
+  const minF = 20;
+  const binCount = freqData.length;
+  const lut = colorLUT;
+  const x = width - 1;
+  for (let y = 0; y < height; y++) {
+    const t = 1 - y / (height - 1);
+    const f = minF * Math.pow(nyquist / minF, t);
+    const bin = Math.min(binCount - 1, Math.floor((f / nyquist) * binCount));
+    const v = freqData[bin] / 255;
+    spectroCtx.fillStyle = lut[Math.min(255, Math.floor(v * 255))];
+    spectroCtx.fillRect(x, y, 1, 1);
+  }
+  ctx.drawImage(spectroBuffer, 0, 0);
+}
+
+function computeCorrelation(data) {
+  let sumL = 0;
+  let sumR = 0;
+  let sumLL = 0;
+  let sumRR = 0;
+  let sumLR = 0;
+  let n = 0;
+  for (let i = 0; i < data.length; i += 2) {
+    const l = data[i];
+    const r = (i + 1 < data.length) ? data[i + 1] : l;
+    sumL += l; sumR += r; sumLL += l * l; sumRR += r * r; sumLR += l * r; n++;
+  }
+  const cov = sumLR / n - (sumL / n) * (sumR / n);
+  const varL = sumLL / n - (sumL / n) * (sumL / n);
+  const varR = sumRR / n - (sumR / n) * (sumR / n);
+  const denom = Math.sqrt(Math.max(0, varL) * Math.max(0, varR));
+  return denom > 1e-9 ? cov / denom : 0;
+}
+
+function drawVectorscope(ctx, width, height) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.min(width, height) * 0.46;
+  ctx.strokeStyle = cachedLine;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - radius, cy);
+  ctx.lineTo(cx + radius, cy);
+  ctx.moveTo(cx, cy - radius);
+  ctx.lineTo(cx, cy + radius);
+  ctx.stroke();
+  ctx.beginPath();
+  const accent = getAccentColor();
+  for (let i = 0; i < timeData.length; i += 2) {
+    const l = timeData[i];
+    const r = (i + 1 < timeData.length) ? timeData[i + 1] : l;
+    const x = cx + l * radius;
+    const y = cy + r * radius;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = getAccent2Color();
+  ctx.shadowBlur = 5;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  const corr = computeCorrelation(timeData);
+  const el = document.getElementById('correlationVal');
+  if (el) el.textContent = `Corr ${corr.toFixed(2)}`;
+}
+
+function updateLoudness(mono, count) {
+  const momCap = loudMomentary.length;
+  const shortCap = loudShort.length;
+  let frameSum = 0;
+  for (let i = 0; i < count; i++) {
+    const sq = mono[i] * mono[i];
+    frameSum += sq;
+    if (loudMomentaryCount < momCap) {
+      loudMomentary[loudMomentaryCount++] = sq;
+      loudMomentarySum += sq;
+    } else {
+      const idx = loudMomentaryHead % momCap;
+      loudMomentarySum += sq - loudMomentary[idx];
+      loudMomentary[idx] = sq;
+      loudMomentaryHead++;
+    }
+    if (loudShortCount < shortCap) {
+      loudShort[loudShortCount++] = sq;
+      loudShortSum += sq;
+    } else {
+      const idx = loudShortHead % shortCap;
+      loudShortSum += sq - loudShort[idx];
+      loudShort[idx] = sq;
+      loudShortHead++;
+    }
+  }
+  const frameLUFS = count > 0 ? LUFS_K + 10 * Math.log10(frameSum / count) : -Infinity;
+  if (frameLUFS > -70) {
+    loudIntegratedSum += frameSum;
+    loudIntegratedCount += count;
+  }
+}
+
+function drawLoudness(ctx, width, height) {
+  const rangeMin = -60;
+  const rangeMax = 0;
+  const padL = 34;
+  const padR = 8;
+  const barW = width - padL - padR;
+  const xFor = (db) => padL + ((db - rangeMin) / (rangeMax - rangeMin)) * barW;
+  const toLUFS = (sum, cnt) => (cnt > 0 ? LUFS_K + 10 * Math.log10(sum / cnt) : -Infinity);
+  const mom = toLUFS(loudMomentarySum, loudMomentaryCount);
+  const short = toLUFS(loudShortSum, loudShortCount);
+  const integ = toLUFS(loudIntegratedSum, loudIntegratedCount);
+  const truePeakDB = loudTruePeak > 0 ? 20 * Math.log10(loudTruePeak) : -Infinity;
+  ctx.strokeStyle = cachedLine;
+  ctx.fillStyle = cachedMuted;
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  for (let db = rangeMin; db <= rangeMax; db += 10) {
+    const x = xFor(db);
+    ctx.beginPath();
+    ctx.moveTo(x, 10);
+    ctx.lineTo(x, 22);
+    ctx.stroke();
+    ctx.fillText(String(db), x, 8);
+  }
+  const rows = [
+    { label: 'M', value: mom, color: '#4c8dff' },
+    { label: 'S', value: short, color: '#7a5cff' },
+    { label: 'I', value: integ, color: '#3fd6a5' }
+  ];
+  const rowArea = height - 34;
+  const rowH = rowArea / 3;
+  rows.forEach((row, idx) => {
+    const ry = 30 + idx * rowH + rowH / 2;
+    ctx.fillStyle = row.color;
+    ctx.fillText(row.label, 8, ry);
+    const v = Number.isFinite(row.value) ? Math.max(rangeMin, Math.min(rangeMax, row.value)) : rangeMin;
+    const bx = xFor(v);
+    ctx.fillRect(padL, ry - 4, Math.max(1, bx - padL), 8);
+    ctx.fillStyle = cachedText;
+    ctx.fillText(Number.isFinite(row.value) ? row.value.toFixed(1) : '-∞', padL + barW + 4, ry);
+  });
+  ctx.fillStyle = cachedText;
+  ctx.textAlign = 'right';
+  ctx.fillText(`TP ${Number.isFinite(truePeakDB) ? truePeakDB.toFixed(1) : '-∞'} dB`, width - 8, height - 8);
+  ctx.textAlign = 'left';
+}
+
+let levelPeakL = 0;
+let levelPeakR = 0;
+let vuL = 0;
+let vuR = 0;
+
+function drawLevel(ctx, width, height) {
+  let sumL = 0;
+  let sumR = 0;
+  let peakL = 0;
+  let peakR = 0;
+  let n = 0;
+  for (let i = 0; i < timeData.length; i += 2) {
+    const l = timeData[i];
+    const r = (i + 1 < timeData.length) ? timeData[i + 1] : l;
+    sumL += l * l;
+    sumR += r * r;
+    const al = Math.abs(l);
+    const ar = Math.abs(r);
+    if (al > peakL) peakL = al;
+    if (ar > peakR) peakR = ar;
+    n++;
+  }
+  const toDB = (v) => (v > 1e-6 ? 20 * Math.log10(v) : -Infinity);
+  levelPeakL = Math.max(peakL, levelPeakL - 0.006);
+  levelPeakR = Math.max(peakR, levelPeakR - 0.006);
+  const minDB = -60;
+  const dbToY = (db) => (1 - (Math.max(minDB, Math.min(0, db)) - minDB) / (0 - minDB)) * (height - 14) + 7;
+  ctx.strokeStyle = cachedLine;
+  ctx.fillStyle = cachedMuted;
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let db = 0; db >= -60; db -= 12) {
+    const y = dbToY(db);
+    ctx.beginPath();
+    ctx.moveTo(26, y);
+    ctx.lineTo(width - 4, y);
+    ctx.stroke();
+    ctx.fillText(String(db), 22, y);
+  }
+  const barW = Math.max(6, Math.min(26, (width - 40) / 2 - 8));
+  const X = 30;
+  const chans = [
+    { x: X, rms: toDB(n ? Math.sqrt(sumL / n) : 0), peak: toDB(levelPeakL), color: '#4c8dff' },
+    { x: X + barW + 18, rms: toDB(n ? Math.sqrt(sumR / n) : 0), peak: toDB(levelPeakR), color: '#2fd6a0' }
+  ];
+  chans.forEach((ch) => {
+    const yRms = dbToY(Number.isFinite(ch.rms) ? ch.rms : minDB);
+    const grad = ctx.createLinearGradient(0, height, 0, 0);
+    grad.addColorStop(0, ch.color);
+    grad.addColorStop(1, '#ff5b7f');
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(ch.x, yRms, barW, Math.max(0, height - yRms - 7));
+    ctx.globalAlpha = 1;
+    if (Number.isFinite(ch.peak)) {
+      const yPeak = dbToY(ch.peak);
+      ctx.fillStyle = '#ffb547';
+      ctx.fillRect(ch.x, yPeak - 1, barW, 2);
+    }
+  });
+  ctx.textAlign = 'left';
+}
+
+function drawVu(ctx, width, height) {
+  let sumL = 0;
+  let sumR = 0;
+  let n = 0;
+  for (let i = 0; i < timeData.length; i += 2) {
+    const l = timeData[i];
+    const r = (i + 1 < timeData.length) ? timeData[i + 1] : l;
+    sumL += l * l;
+    sumR += r * r;
+    n++;
+  }
+  const rmsL = n ? Math.sqrt(sumL / n) : 0;
+  const rmsR = n ? Math.sqrt(sumR / n) : 0;
+  vuL += (Math.min(1, rmsL * 2.2) - vuL) * 0.18;
+  vuR += (Math.min(1, rmsR * 2.2) - vuR) * 0.18;
+  const cy = height - 16;
+  const radius = Math.max(10, Math.min(width * 0.22, height * 0.78));
+  const cx = width / 2;
+  const startA = Math.PI * 1.12;
+  const endA = Math.PI * 1.88;
+  const drawMeter = (offset, value, color, label) => {
+    const cxx = cx + offset;
+    ctx.beginPath();
+    ctx.arc(cxx, cy, radius, startA, endA);
+    ctx.strokeStyle = cachedLine;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = cachedMuted;
+    ctx.lineWidth = 1;
+    for (let k = 0; k <= 10; k++) {
+      const a = startA + (endA - startA) * (k / 10);
+      const r1 = radius - 3;
+      const r2 = radius - (k % 5 === 0 ? 9 : 6);
+      ctx.beginPath();
+      ctx.moveTo(cxx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+      ctx.lineTo(cxx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+      ctx.stroke();
+    }
+    const a = startA + (endA - startA) * Math.max(0, Math.min(1, value));
+    ctx.beginPath();
+    ctx.moveTo(cxx, cy);
+    ctx.lineTo(cxx + Math.cos(a) * (radius - 6), cy + Math.sin(a) * (radius - 6));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cxx, cy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.fillStyle = cachedMuted;
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, cxx, cy + radius * 0.42);
+  };
+  drawMeter(-radius * 1.05, vuL, '#ffb547', 'L');
+  drawMeter(radius * 1.05, vuR, '#2fd6a0', 'R');
+  ctx.textAlign = 'left';
+}
+
+function logBandValue(k, count) {
+  const nyquist = (audioContext?.sampleRate || 48000) / 2;
+  const minF = 20;
+  const binCount = freqData.length;
+  const fLow = minF * Math.pow(nyquist / minF, k / count);
+  const fHigh = minF * Math.pow(nyquist / minF, (k + 1) / count);
+  const bLow = Math.min(binCount - 1, Math.floor((fLow / nyquist) * binCount));
+  const bHigh = Math.min(binCount - 1, Math.max(bLow + 1, Math.ceil((fHigh / nyquist) * binCount)));
+  let peak = 0;
+  for (let b = bLow; b <= bHigh; b++) {
+    if (freqData[b] > peak) peak = freqData[b];
+  }
+  return peak / 255;
+}
+
+function rmsLevel() {
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < timeData.length; i++) {
+    sum += timeData[i] * timeData[i];
+    n++;
+  }
+  return n ? Math.sqrt(sum / n) : 0;
+}
+
+let arcValue = 0;
+let orbEnergy = 0;
+
+function drawRadial(ctx, width, height) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.min(width, height) * 0.28;
+  const maxLen = Math.min(width, height) * 0.20;
+  const bars = 64;
+  const accent = getAccentColor();
+  const accent2 = getAccent2Color();
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = cachedLine;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.lineCap = 'round';
+  for (let k = 0; k < bars; k++) {
+    const a = -Math.PI / 2 + (k / bars) * Math.PI * 2;
+    const v = logBandValue(k, bars);
+    const len = 3 + v * maxLen;
+    const x1 = cx + Math.cos(a) * radius;
+    const y1 = cy + Math.sin(a) * radius;
+    const x2 = cx + Math.cos(a) * (radius + len);
+    const y2 = cy + Math.sin(a) * (radius + len);
+    const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+    grad.addColorStop(0, accent);
+    grad.addColorStop(1, accent2);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius * 0.58, 0, Math.PI * 2);
+  ctx.fillStyle = accent;
+  ctx.globalAlpha = 0.10;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawRibbon(ctx, width, height) {
+  const accent = getAccentColor();
+  const accent2 = getAccent2Color();
+  const layers = 3;
+  const samples = 110;
+  const mid = height / 2;
+  for (let L = 0; L < layers; L++) {
+    const amp = height * (0.30 - L * 0.06);
+    const shift = (L - 1) * (height * 0.05);
+    const color = L === 0 ? accent2 : accent;
+    ctx.beginPath();
+    for (let i = 0; i <= samples; i++) {
+      const t = i / samples;
+      const idx = Math.min(timeData.length - 1, Math.floor(t * (timeData.length - 1)));
+      const v = timeData[idx] || 0;
+      const x = t * width;
+      const y = mid + v * amp + shift;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.lineTo(width, height);
+    ctx.lineTo(0, height);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, 0, 0, height);
+    g.addColorStop(0, color);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.globalAlpha = 0.30 - L * 0.07;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= samples; i++) {
+      const t = i / samples;
+      const idx = Math.min(timeData.length - 1, Math.floor(t * (timeData.length - 1)));
+      const v = timeData[idx] || 0;
+      const x = t * width;
+      const y = mid + v * amp + shift;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+  }
+}
+
+function drawDots(ctx, width, height) {
+  const cols = 44;
+  const rows = 7;
+  const cellW = width / cols;
+  const cellH = height / rows;
+  const r = Math.min(cellW, cellH) * 0.26;
+  const accent = getAccentColor();
+  const accent2 = getAccent2Color();
+  for (let c = 0; c < cols; c++) {
+    const v = logBandValue(c, cols);
+    const lit = v * rows;
+    for (let row = 0; row < rows; row++) {
+      const fromBottom = rows - 1 - row;
+      const x = cellW * (c + 0.5);
+      const y = cellH * (row + 0.5);
+      const on = fromBottom < lit;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      if (on) {
+        ctx.fillStyle = row < rows * 0.34 ? accent2 : accent;
+        ctx.globalAlpha = 0.55 + 0.45 * v;
+      } else {
+        ctx.fillStyle = cachedLine;
+        ctx.globalAlpha = 0.7;
+      }
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawArc(ctx, width, height) {
+  const cx = width / 2;
+  const cy = height * 0.64;
+  const r = Math.max(16, Math.min(width * 0.36, height * 0.5));
+  const a0 = Math.PI * 0.8;
+  const a1 = Math.PI * 2.2;
+  const level = rmsLevel();
+  const db = level > 1e-6 ? 20 * Math.log10(level) : -Infinity;
+  const v = Math.max(0, Math.min(1, (Number.isFinite(db) ? db + 60 : 0) / 60));
+  arcValue += (v - arcValue) * 0.25;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, a0, a1);
+  ctx.strokeStyle = cachedLine;
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  const av = a0 + (a1 - a0) * arcValue;
+  const grad = ctx.createLinearGradient(cx - r, cy, cx + r, cy);
+  grad.addColorStop(0, getAccentColor());
+  grad.addColorStop(1, getAccent2Color());
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, a0, av);
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 8;
+  ctx.stroke();
+  const ex = cx + Math.cos(av) * r;
+  const ey = cy + Math.sin(av) * r;
+  ctx.beginPath();
+  ctx.arc(ex, ey, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.globalAlpha = 0.9;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = cachedText;
+  ctx.font = '600 15px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(Number.isFinite(db) ? db.toFixed(1) : '-∞', cx, cy - r * 0.08);
+  ctx.fillStyle = cachedMuted;
+  ctx.font = '9px monospace';
+  ctx.fillText('dBFS', cx, cy + r * 0.30);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawOrb(ctx, width, height) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const base = Math.min(width, height) * 0.26;
+  const level = rmsLevel();
+  orbEnergy += (Math.min(1, level * 3.2) - orbEnergy) * 0.12;
+  const r = base * (0.72 + orbEnergy * 0.62);
+  const accent = getAccentColor();
+  const accent2 = getAccent2Color();
+  const glow = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r * 1.6);
+  glow.addColorStop(0, accent2);
+  glow.addColorStop(0.55, accent);
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 1.6, 0, Math.PI * 2);
+  ctx.fillStyle = glow;
+  ctx.globalAlpha = 0.30;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  const body = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+  body.addColorStop(0, accent2);
+  body.addColorStop(1, accent);
+  ctx.fillStyle = body;
+  ctx.globalAlpha = 0.88;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.3, cy - r * 0.34, r * 0.26, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, base * 1.55, 0, Math.PI * 2);
+  ctx.strokeStyle = cachedLine;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function renderVisualization() {
+  const hasSignal = analyser && state.isPlaying;
+  if (hasSignal) {
+    analyser.getByteFrequencyData(freqData);
+    analyser.getFloatFrequencyData(freqFloatData);
+    analyser.getFloatTimeDomainData(timeData);
+    const monoCount = monoData.length;
+    for (let i = 0; i < monoCount; i++) {
+      const l = timeData[i * 2];
+      const r = (i * 2 + 1 < timeData.length) ? timeData[i * 2 + 1] : l;
+      monoData[i] = (l + r) * 0.5;
+    }
+    let tp = 0;
+    for (let i = 0; i < timeData.length; i++) {
+      const a = Math.abs(timeData[i]);
+      if (a > tp) tp = a;
+    }
+    loudTruePeak = tp;
+    updateLoudness(monoData, monoCount);
+  }
+  const keys = ['analyzer', 'curve', 'scope', 'radial', 'ribbon', 'dots', 'arc', 'orb'];
+  for (const key of keys) {
+    const canvas = getVizCanvas(key);
+    if (!canvas) continue;
+    const ctx = setupVizCanvas(canvas);
+    const width = canvas.width;
+    const height = canvas.height;
+    if (!hasSignal) {
+      ctx.clearRect(0, 0, width, height);
+      ctx.strokeStyle = cachedLine;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
+      continue;
+    }
+    ctx.clearRect(0, 0, width, height);
+    if (key === 'analyzer') drawAnalyzer(ctx, width, height);
+    else if (key === 'curve') drawCurve(ctx, width, height);
+    else if (key === 'scope') drawScope(ctx, width, height);
+    else if (key === 'radial') drawRadial(ctx, width, height);
+    else if (key === 'ribbon') drawRibbon(ctx, width, height);
+    else if (key === 'dots') drawDots(ctx, width, height);
+    else if (key === 'arc') drawArc(ctx, width, height);
+    else if (key === 'orb') drawOrb(ctx, width, height);
   }
 }
 
 function drawVisualizer() {
-  const canvas = $('visualizer');
-  const ctx = canvas.getContext('2d');
-  const rect = canvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  if (canvas.width !== Math.round(rect.width * dpr) || canvas.height !== Math.round(rect.height * dpr)) {
-    canvas.width = Math.round(rect.width * dpr);
-    canvas.height = Math.round(rect.height * dpr);
+  if (document.hidden) {
+    animationFrame = null;
+    return;
   }
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const width = canvas.width;
-  const height = canvas.height;
-  const hint = $('visualHint');
-  const mode = state.visual.mode;
-  const accent = getAccentColor();
-  const accent2 = getAccent2Color();
-
-  if (analyser && state.isPlaying) {
-    hint.style.display = 'none';
-    if (mode === 'waveform') {
-      const timeData = new Float32Array(analyser.fftSize);
-      analyser.getFloatTimeDomainData(timeData);
-      ctx.beginPath();
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 2;
-      ctx.shadowColor = accent;
-      ctx.shadowBlur = 8;
-      for (let i = 0; i < timeData.length; i++) {
-        const x = (i / timeData.length) * width;
-        const y = height / 2 + timeData[i] * height * 0.48;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    } else if (mode === 'radial') {
-      analyser.getByteFrequencyData(analyserData);
-      const cx = width / 2;
-      const cy = height / 2;
-      const maxRadius = Math.min(width, height) * 0.42;
-      ctx.lineWidth = 2;
-      for (let i = 0; i < analyserData.length; i++) {
-        const value = analyserData[i] / 255;
-        const angle = (i / analyserData.length) * Math.PI * 2 - Math.PI / 2;
-        const r = 12 + value * maxRadius;
-        const x = cx + Math.cos(angle) * r;
-        const y = cy + Math.sin(angle) * r;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = accent;
-      ctx.stroke();
-    } else if (mode === 'waterfall') {
-      analyser.getByteFrequencyData(analyserData);
-      state.visual.waterfall.unshift(Array.from(analyserData));
-      if (state.visual.waterfall.length > 120) state.visual.waterfall.pop();
-      const rows = state.visual.waterfall.length;
-      for (let y = 0; y < rows; y++) {
-        const data = state.visual.waterfall[y];
-        for (let x = 0; x < data.length; x++) {
-          const value = data[x] / 255;
-          const px = (x / data.length) * width;
-          const py = height - (y / rows) * height;
-          ctx.fillStyle = `hsla(${200 + value * 90}, 95%, ${28 + value * 52}%, 1)`;
-          ctx.fillRect(px, py, Math.max(1, width / data.length), Math.max(1, height / rows));
-        }
-      }
-    } else if (mode === 'line') {
-      analyser.getByteFrequencyData(analyserData);
-      ctx.beginPath();
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 2;
-      ctx.shadowColor = accent;
-      ctx.shadowBlur = 7;
-      for (let i = 0; i < analyserData.length; i++) {
-        const value = analyserData[i] / 255;
-        const x = (i / analyserData.length) * width;
-        const y = height - value * height;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    } else {
-      analyser.getByteFrequencyData(analyserData);
-      const barWidth = Math.max(2, width / analyserData.length);
-      const bars = Math.min(analyserData.length, Math.floor(width / barWidth));
-      for (let i = 0; i < bars; i++) {
-        const value = analyserData[i] / 255;
-        const barHeight = value * height * 0.9;
-        const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
-        gradient.addColorStop(0, accent);
-        gradient.addColorStop(1, accent2);
-        ctx.fillStyle = gradient;
-        ctx.globalAlpha = 0.55 + value * 0.45;
-        ctx.beginPath();
-        ctx.roundRect(i * barWidth, height - barHeight, barWidth - 1, barHeight, 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
-    updateAudioInfo();
-  } else {
-    hint.style.display = 'flex';
-    ctx.beginPath();
-    ctx.moveTo(0, height / 2);
-    ctx.lineTo(width, height / 2);
-    ctx.strokeStyle = 'rgba(120,130,150,0.25)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
+  if (analyser && freqData) renderVisualization();
   animationFrame = requestAnimationFrame(drawVisualizer);
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !animationFrame) {
+    animationFrame = requestAnimationFrame(drawVisualizer);
+  }
+});
 
 function openSettings() {
   $('themeSelect').value = state.settings.theme;
@@ -1232,15 +2140,12 @@ async function saveSettings() {
 function handleDragDrop() {
   document.addEventListener('dragover', (event) => {
     event.preventDefault();
-    $('dropHint').style.borderColor = 'var(--accent)';
   });
   document.addEventListener('dragleave', (event) => {
     event.preventDefault();
-    $('dropHint').style.borderColor = '';
   });
   document.addEventListener('drop', async (event) => {
     event.preventDefault();
-    $('dropHint').style.borderColor = '';
     const files = [];
     for (const file of event.dataTransfer.files) {
       const path = api.getPathForFile(file);
@@ -1267,11 +2172,15 @@ function bindUI() {
   $('nextBtn').addEventListener('click', () => playNext(false));
   $('progress').addEventListener('input', (event) => seekTo(Number(event.target.value) / 1000));
   $('volume').addEventListener('input', (event) => setVolume(Number(event.target.value) / 100));
-  $('muteBtn').addEventListener('click', toggleMute);
-  $('modeBtn').addEventListener('click', cycleMode);
   $('deviceSelect').addEventListener('change', (event) => {
     api.setSettings({ outputDeviceId: event.target.value });
     applyOutputDevice(event.target.value);
+  });
+  $('effectsBtn').addEventListener('click', () => {
+    $('effectsModal').hidden = false;
+  });
+  $('closeEffectsBtn').addEventListener('click', () => {
+    $('effectsModal').hidden = true;
   });
   $('resetFxBtn').addEventListener('click', resetEffects);
   $('savePresetBtn').addEventListener('click', savePreset);
@@ -1281,32 +2190,47 @@ function bindUI() {
   $('loadIRBtn').addEventListener('click', loadIRFile);
   $('irClearBtn').addEventListener('click', clearIR);
   $('irABBtn').addEventListener('click', toggleIRAB);
+  $('auditionPulseBtn').addEventListener('click', auditionPulse);
+  document.querySelectorAll('.fx-tab').forEach((tab) => {
+    tab.addEventListener('click', () => selectFxTab(tab.dataset.fxTab));
+  });
+  window.addEventListener('message', handleStudioMessage);
+  const studioFrame = document.getElementById('irStudioFrame');
+  if (studioFrame) studioFrame.addEventListener('load', syncStudioTheme);
   $('presetSelect').addEventListener('change', () => {
     const preset = state.presets.find((item) => item.id === currentPresetId());
     if (preset) applyPreset(preset);
   });
-  $('lyricsBtn').addEventListener('click', toggleDesktopLyrics);
   $('settingsBtn').addEventListener('click', openSettings);
+  $('winMinBtn').addEventListener('click', () => api.minimize());
+  $('winMaxBtn').addEventListener('click', () => api.maximize());
+  $('winCloseBtn').addEventListener('click', () => api.close());
+  $('winMiniBtn').addEventListener('click', toggleMiniMode);
+  $('miniExitBtn').addEventListener('click', toggleMiniMode);
+  $('miniCloseBtn').addEventListener('click', () => api.close());
+  if (api.onMiniState) {
+    api.onMiniState((value) => {
+      document.body.classList.toggle('mini-mode', value);
+      const btn = $('winMiniBtn');
+      if (btn) btn.classList.toggle('active', value);
+    });
+  }
+  if (api.onMaximized) {
+    api.onMaximized((value) => {
+      const icon = $('winMaxIcon');
+      if (icon) icon.setAttribute('href', value ? '#icon-win-restore' : '#icon-win-max');
+      const btn = $('winMaxBtn');
+      if (btn) btn.title = value ? '还原' : '最大化';
+    });
+  }
   $('closeSettingsBtn').addEventListener('click', () => { $('settingsModal').hidden = true; });
   $('saveSettingsBtn').addEventListener('click', saveSettings);
   $('aboutBtn').addEventListener('click', openAbout);
   $('closeAboutBtn').addEventListener('click', () => { $('aboutModal').hidden = true; });
   $('viewLicenseBtn').addEventListener('click', () => api.openLicense());
-  $('spectrumMode').addEventListener('change', (event) => {
-    state.visual.mode = event.target.value;
-    if (event.target.value !== 'waterfall') state.visual.waterfall = [];
-  });
-  $('fftSizeSelect').addEventListener('change', (event) => {
-    state.visual.fftSize = Number(event.target.value);
-    if (analyser) {
-      analyser.fftSize = state.visual.fftSize;
-      analyserData = new Uint8Array(analyser.frequencyBinCount);
-    }
-  });
-  $('toggleInfoBtn').addEventListener('click', () => {
-    state.visual.infoVisible = !state.visual.infoVisible;
-    $('audioInfo').hidden = !state.visual.infoVisible;
-  });
+  $('muteBtn').addEventListener('click', toggleMute);
+  $('modeBtn').addEventListener('click', cycleMode);
+  $('lyricsBtn').addEventListener('click', toggleDesktopLyrics);
   window.addEventListener('resize', () => {
     // canvas resizes during animation loop
   });
@@ -1328,15 +2252,12 @@ async function init() {
   state.volume = state.settings.volume;
   state.mode = state.settings.playbackMode || 'list';
   $('volume').value = String(Math.round(state.volume * 100));
-  $('deviceSelect').innerHTML = '<option value="">默认输出</option>';
+  $('deviceSelect').innerHTML = `<option value="">${state.settings.language === 'zh' ? '默认输出' : 'System Default'}</option>`;
   applyLanguage(state.settings.language);
   applyTheme(state.settings.theme);
   updateModeButton();
   buildEQ();
   applyEffectsToUI();
-  $('spectrumMode').value = state.visual.mode;
-  $('fftSizeSelect').value = String(state.visual.fftSize);
-  $('audioInfo').hidden = !state.visual.infoVisible;
   bindUI();
   state.favorites = new Set(await api.getFavorites());
   await loadPresets();
