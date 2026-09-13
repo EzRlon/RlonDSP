@@ -45,6 +45,52 @@
   const noise1 = makeNoise(20260913);
   const noise2 = makeNoise(77003);
 
+  /** 把相位差折到 -0.5 ~ +0.5 —— PLL 软校正必须用最短路径 */
+  function wrapPhase(p) {
+    let x = p;
+    while (x > 0.5) x -= 1;
+    while (x < -0.5) x += 1;
+    return x;
+  }
+
+  /** 读取当前主题强调色的色相（颜色只作为视觉调制，绝不参与音频逻辑） */
+  let themeHueCache = -1;
+  function readThemeHue() {
+    try {
+      const css = getComputedStyle(document.documentElement);
+      const raw = (css.getPropertyValue('--accent') || '').trim();
+      if (!raw) return themeHueCache;
+      let r = 0, g = 0, b = 0;
+      if (raw[0] === '#') {
+        const hex = raw.length === 4
+          ? raw[1] + raw[1] + raw[2] + raw[2] + raw[3] + raw[3]
+          : raw.slice(1, 7);
+        r = parseInt(hex.slice(0, 2), 16);
+        g = parseInt(hex.slice(2, 4), 16);
+        b = parseInt(hex.slice(4, 6), 16);
+      } else {
+        const nums = raw.match(/\d+(\.\d+)?/g);
+        if (!nums || nums.length < 3) return themeHueCache;
+        r = +nums[0]; g = +nums[1]; b = +nums[2];
+      }
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const d = max - min;
+      let h = 0;
+      if (d > 1e-6) {
+        if (max === r) h = ((g - b) / d) % 6;
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+        h *= 60;
+        if (h < 0) h += 360;
+      }
+      themeHueCache = h;
+      return h;
+    } catch (error) {
+      return themeHueCache;
+    }
+  }
+
   /** 二维「类 curl」噪声场：给流场 / 粒子平流使用，避免机械式直线运动 */
   function curl(x, y, t) {
     const e = 0.35;
@@ -74,6 +120,42 @@
       stereoWidth: 0, correlation: 0, balance: 0,
       spectrum: null, waveform: null, albumHue: 200
     };
+    /**
+     * Music Motion Core 的对外读数：所有效果都从这里取“音乐时间”。
+     * 单位：phase 为 0~1（一拍一圈），时间单位为秒。
+     */
+    value.motion = {
+      tempo: 0, tempoConfidence: 0, beatInterval: 0.5,
+      beatPhase: 0, beatProgress: 0, beatIndex: 0,
+      barPhase: 0, barIndex: 0, phrasePhase: 0,
+      beatPulse: 0, beatAttack: 0, beatRelease: 0, beatEnergy: 0, beatVelocity: 0,
+      groove: 0, predictedBeatTime: 0, timeToNextBeat: 0.5,
+      lockState: 'UNLOCKED', holdover: false,
+      prepare: 0, attack: 0, peak: 0, overshoot: 0, release: 0,
+      beatEnvelope: 0, accent: 1, downbeatAccent: 1, releaseTime: 0.2,
+      phaseError: 0, correction: 0, lastObservedAt: 0,
+      // 五个频段的“动作角色”（已平滑）：bass 身体 / lowMid 聚散 / mid 方向 / highMid 结构 / treble 细节
+      role: { bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0 }
+    };
+    // 强弱拍重音模板（4/4）：1 强、2 弱、3 次强、4 弱
+    const ACCENTS = [1, 0.62, 0.88, 0.62];
+    const intervals = new Float32Array(12);
+    const scratch = new Float32Array(12);
+    let intervalHead = 0;
+    let intervalFilled = 0;
+    let lastBeatAt = 0;
+    let observedBeat = false;
+    let beatPhase = 0;
+    let lastPhase = 0;
+    let beatInterval = 0.5;
+    let tempoConfidence = 0;
+    let beatIndex = 0;
+    let barIndex = 0;
+    let downbeatAccent = 1;
+    let lastEnvelope = 0;
+    let hueClock = 1;
+    const pllGain = 0.12;          // 相位软校正增益（0.08~0.18）
+    const maxCorrection = 0.05;    // 每帧最多校正 5% 相位：所以永远不会跳变
     const bassHist = new Float32Array(64);
     const fluxHist = new Float32Array(48);
     let bassHead = 0;
@@ -217,6 +299,154 @@
       // 乐句级慢包络（2~8 秒尺度）：用于颜色 / 形态这类慢变化
       phraseEnv = lerp(phraseEnv, value.energy, clamp01(dt * 0.55));
       value.phrase = phraseEnv;
+
+      /* ======================================================================
+       * Music Motion Core（音乐运动核心）
+       * ----------------------------------------------------------------------
+       * 它是所有视觉效果唯一的“音乐时钟”。它不做两件事：
+       *   · 不把 detected beat 直接当成相位（那会造成每拍硬跳）；
+       *   · 不用“最近一次间隔”当 BPM（那会被误检带飞）。
+       * 它做的是：
+       *   1) 用最近 12 个有效间隔的中位数（去掉异常值）算稳定 tempo；
+       *   2) 用相位锁定环（PLL）持续跟踪 beatPhase，检测到的鼓点只做“软校正”；
+       *   3) 预测下一拍时间，提前 60~120ms 进入 prepare，让画面“先准备、再被推起来”；
+       *   4) 生成 prepare / attack / peak / overshoot / release 连续运动包络；
+       *   5) 给出小节与乐句相位、强弱拍重音、以及五个频段的“动作角色”。
+       * ==================================================================== */
+      const M = value.motion;
+      const beatNow = value.beat;
+      const now = performance.now() / 1000;
+
+      // --- 1. 稳定 tempo：中位数 + 异常值剔除（40~240 BPM）---
+      if (beatNow) {
+        if (lastBeatAt > 0) {
+          const iv = now - lastBeatAt;
+          if (iv >= 0.25 && iv <= 1.5) {
+            intervals[intervalHead] = iv;
+            intervalHead = (intervalHead + 1) % intervals.length;
+            if (intervalFilled < intervals.length) intervalFilled++;
+          }
+        }
+        lastBeatAt = now;
+        observedBeat = true;
+        M.lastObservedAt = now;
+      }
+      if (intervalFilled >= 4) {
+        // 取中位数：对漏拍/多拍都稳
+        const tmp = scratch;
+        for (let i = 0; i < intervalFilled; i++) tmp[i] = intervals[i];
+        for (let i = 1; i < intervalFilled; i++) {
+          const v = tmp[i];
+          let j = i - 1;
+          while (j >= 0 && tmp[j] > v) { tmp[j + 1] = tmp[j]; j--; }
+          tmp[j + 1] = v;
+        }
+        const med = tmp[Math.floor(intervalFilled / 2)];
+        // 只在“半拍 / 双拍”这类倍数关系上做一次收敛，避免抖动地来回跳
+        let target = med;
+        if (beatInterval > 0) {
+          const ratio = med / beatInterval;
+          if (ratio > 1.75 && ratio < 2.25) target = med / 2;
+          else if (ratio > 0.44 && ratio < 0.56) target = med * 2;
+        }
+        beatInterval += (target - beatInterval) * clamp01(dt * 2.5);
+        const bpm = 60 / beatInterval;
+        if (bpm >= 40 && bpm <= 240) value.bpm = Math.round(bpm);
+        tempoConfidence = clamp01(tempoConfidence + dt * 0.8);
+      } else {
+        tempoConfidence = clamp01(tempoConfidence - dt * 0.6);
+      }
+      M.tempo = value.bpm;
+      M.tempoConfidence = tempoConfidence;
+      M.beatInterval = beatInterval;
+
+      // --- 2. PLL：相位持续前进，鼓点只做有限幅度的软校正 ---
+      const targetInterval = beatInterval > 0 ? beatInterval : 0.5;
+      let phaseAdvance = dt / targetInterval;
+      if (observedBeat) {
+        // 观测相位：鼓点应该落在 0（拍点）
+        const err = wrapPhase(-beatPhase);
+        const corr = Math.max(-maxCorrection, Math.min(maxCorrection, err * pllGain));
+        phaseAdvance += corr;
+        observedBeat = false;
+        M.phaseError = err;
+        M.correction = corr;
+      }
+      beatPhase = wrapPhase(beatPhase + phaseAdvance);
+      if (beatPhase < lastPhase) {
+        // 走过一圈 = 一拍：这里才推进拍号（不是检测到鼓点就推进）
+        beatIndex++;
+        barIndex = Math.floor(beatIndex / 4);
+        downbeatAccent = ACCENTS[beatIndex % 4];
+      }
+      lastPhase = beatPhase;
+      M.beatPhase = beatPhase;
+      M.beatProgress = beatPhase;
+      M.beatIndex = beatIndex;
+      M.barIndex = barIndex;
+      M.barPhase = (beatIndex % 4 + beatPhase) / 4;
+      M.phrasePhase = ((beatIndex % 32) + beatPhase) / 32;
+      M.timeToNextBeat = (1 - beatPhase) * targetInterval;
+      M.predictedBeatTime = now + M.timeToNextBeat;
+      M.downbeatAccent = downbeatAccent;
+
+      // --- 3. 锁定状态机：漏拍也不会让画面失去节奏 ---
+      const sinceBeat = now - M.lastObservedAt;
+      if (!intervalFilled) M.lockState = 'UNLOCKED';
+      else if (intervalFilled < 4) M.lockState = 'ACQUIRING';
+      else if (sinceBeat > targetInterval * 2.2) M.lockState = 'HOLDOVER';
+      else if (M.lockState === 'HOLDOVER') M.lockState = 'RELOCK';
+      else if (M.lockState === 'RELOCK' && sinceBeat < targetInterval * 0.6) M.lockState = 'LOCKED';
+      else if (M.lockState !== 'RELOCK') M.lockState = 'LOCKED';
+      M.holdover = M.lockState === 'HOLDOVER';
+
+      // --- 4. 连续运动包络：prepare → attack → peak → overshoot → release ---
+      // 释放时间随 BPM 自适应：快歌收得快、慢歌收得慢，不会高 BPM 一直沸腾
+      const releaseTime = Math.max(0.08, Math.min(0.45, targetInterval * 0.35));
+      const prepareLead = Math.max(0.06, Math.min(0.12, targetInterval * 0.35));
+      const timeToBeat = (1 - beatPhase) * targetInterval;
+      const sinceLast = beatPhase * targetInterval;
+      // 提前量：拍点前 prepareLead 秒开始“准备”
+      M.prepare = timeToBeat <= prepareLead ? 1 - timeToBeat / prepareLead : 0;
+      // 打击：拍点后 18ms 内快速起
+      M.attack = sinceLast < 0.018 ? sinceLast / 0.018 : 0;
+      // 峰值与回弹：用指数衰减表示“被推起来 → 惯性 → 回弹”
+      const decay = Math.exp(-Math.max(0, sinceLast) / releaseTime);
+      M.peak = decay;
+      M.overshoot = sinceLast > releaseTime * 0.35 && sinceLast < releaseTime * 1.3
+        ? Math.exp(-Math.pow((sinceLast - releaseTime * 0.7) / (releaseTime * 0.5), 2)) * 0.35
+        : 0;
+      M.release = decay * (1 - M.overshoot);
+      // 合成包络：0 表示完全静止，1 表示这一拍最强
+      M.beatEnvelope = clamp01(
+        M.prepare * 0.28 + M.attack * 0.5 + M.peak * 0.75 + M.overshoot * 0.6 + M.release * 0.35
+      );
+      // 强弱拍：强拍更重，弱拍更轻（不再每拍一模一样）
+      M.accent = downbeatAccent;
+      M.beatEnergy = M.beatEnvelope * downbeatAccent;
+      M.beatVelocity = (M.beatEnvelope - lastEnvelope) / Math.max(dt, 1e-4);
+      lastEnvelope = M.beatEnvelope;
+      M.beatPulse = M.peak;                 // 与旧字段对应，兼容现有效果
+      M.beatAttack = M.attack;
+      M.beatRelease = M.release;
+      M.releaseTime = releaseTime;
+      M.groove = lerp(M.groove, clamp01(value.spectralFlux * 8 + value.highMid * 0.6), clamp01(dt * 3));
+
+      // --- 5. 频段角色：五个频段各自负责一种“动作类型” ---
+      const R = M.role;
+      R.bass = lerp(R.bass, value.bass, clamp01(dt * 4));
+      R.lowMid = lerp(R.lowMid, value.lowMid, clamp01(dt * 5));
+      R.mid = lerp(R.mid, value.mid, clamp01(dt * 6));
+      R.highMid = lerp(R.highMid, value.highMid, clamp01(dt * 8));
+      R.treble = lerp(R.treble, value.treble, clamp01(dt * 10));
+
+      // --- 6. 专辑 / 主题色相：每 0.5 秒读一次 CSS 变量，颜色只做视觉调制 ---
+      hueClock += dt;
+      if (hueClock > 0.5) {
+        hueClock = 0;
+        const v = readThemeHue();
+        if (v >= 0) value.albumHue = v;
+      }
     }
 
     return { value, update };
@@ -291,6 +521,8 @@
       glow: new Float32Array(n),
       local: new Float32Array(n),
       link: new Float32Array(n),      // 最近邻居索引（-1 表示没有）
+      beatPhaseOffset: new Float32Array(n), // 个体拍点偏移：±0.15 拍（有人先动、有人正拍、有人稍后回弹）
+      dirMix: new Float32Array(n),          // 0=径向为主 / 1=切向为主，避免所有效果都变成“中心爆炸”
       nb: new Uint8Array(n),          // 邻居数量（生命周期与渲染都会用到）
       cell: new Uint32Array(n),       // 网格归属（邻居查询用）
 
@@ -329,6 +561,8 @@
         A.noisePhase[i] = hash01(s, 21) * 200;
         A.rot[i] = Math.random() * TAU;
         A.rotV[i] = (Math.random() - 0.5) * 2.4;
+        A.beatPhaseOffset[i] = (hash01(s, 31) - 0.5) * 0.3;   // ±0.15 拍
+        A.dirMix[i] = hash01(s, 32);
         A.size[i] = 0.7 + Math.random() * 1.8;
         A.opacity[i] = 0.22 + Math.random() * 0.5;
         A.depth[i] = Math.random();
@@ -650,25 +884,56 @@
       }
 
       /* ---------------- 5. 节拍：不是遥控，而是世界给这个地方加了一点能量 ---------------- */
-      // 敏感度是个体差异：多数粒子只被轻微带一下，少数才会真的“跳起来”。
-      // 这里刻意把系数压小，否则所有人都会顶到能量上限，又变成全体同步。
-      const sens = A.beatSens[i] * (0.4 + A.audioSens[i] * 0.5);
-      // 关键：节拍只在“这一记鼓点”的瞬间起作用（kick 只有 45ms），再乘上它所在位置的
-      // 局部能量。环境能量绝不能作为持续输入 —— 那会让所有个体很快顶到上限，
-      // 于是又变回“全体同步”，这正是本任务要消灭的现象。
+      // Music Motion Core：所有个体共用同一条音乐时间轴，但每人有自己的 beatPhaseOffset。
+      // 于是同一拍里有人提前准备、有人正拍被推、有人稍后回弹 —— 既不脱节，也不同步。
+      // 驱动量是“连续运动包络 × 个体敏感度”，不是“检测到 beat 就跳一下”。
+      const mt = bus.motion;
       const localBoost = 0.5 + Math.min(1.5, envEnergy) * 0.35 + envHit * 0.35;
-      const beatOnly = cfg.beat * bus.kick * sens * 0.5 * localBoost;
-      if (beatOnly > 0) {
-        A.memBeat[i] = Math.min(1.5, A.memBeat[i] + beatOnly * dt * 4);
-        A.energy[i] = Math.min(1.6, A.energy[i] + beatOnly * dt * 1.2);
-      }
-      // 对音乐越敏感的个体，兴奋消退得越慢（记忆也有个体差异）
-      const decay = (cfg.memDecay === undefined ? 1.2 : cfg.memDecay) *
-        (1.25 - 0.6 * Math.min(1, A.beatSens[i] / 2));
+      const ownPhase = wrapPhase(mt.beatPhase - A.beatPhaseOffset[i]);
+      const interval = mt.beatInterval > 0 ? mt.beatInterval : 0.5;
+      const releaseT = mt.releaseTime > 0 ? mt.releaseTime : 0.2;
+      const toBeat = (1 - ownPhase) * interval;
+      const sinceOwn = ownPhase * interval;
+      const envPrepare = toBeat <= releaseT * 0.6 ? 1 - toBeat / Math.max(releaseT * 0.6, 1e-3) : 0;
+      const envPeak = Math.exp(-Math.max(0, sinceOwn) / releaseT);
+      const envOvershoot = sinceOwn > releaseT * 0.35 && sinceOwn < releaseT * 1.3
+        ? Math.exp(-Math.pow((sinceOwn - releaseT * 0.7) / (releaseT * 0.5), 2)) * 0.35
+        : 0;
+      const beatEnv = clamp01(envPrepare * 0.3 + envPeak * 0.8 + envOvershoot * 0.6) * mt.downbeatAccent;
+      // 100% 活跃个体都受音乐驱动（最低幅度 0.12），敏感度只决定强弱
+      const musicDrive = beatEnv * (0.12 + A.beatSens[i]) * (0.55 + localBoost * 0.45) * cfg.beat;
+      A.memBeat[i] = Math.min(1.5, A.memBeat[i] + musicDrive * dt * 3);
+      A.energy[i] = Math.min(1.6, A.energy[i] + musicDrive * dt * 1.1);
+      // 兴奋消退随 BPM 自适应：快歌收得快（不会持续沸腾），慢歌收得慢（不会呆滞）
+      const decay = (0.9 / releaseT) * (1.15 - 0.4 * Math.min(1, A.beatSens[i] / 2));
       A.memBeat[i] = Math.max(0, A.memBeat[i] - dt * decay);
       A.memEnergy[i] += (A.energy[i] - A.memEnergy[i]) * clamp01(dt * 1.2);
       // 平时靠“所在区域的能量”给一点常态底色：这是空间差异，不是时间上的全体同步
       A.energy[i] = Math.min(1.6, A.energy[i] + (0.25 + envEnergy * 0.12) * dt * 0.5);
+
+      /* ---------------- 5b. BeatForce：方向混合（径向 + 切向 + 空间场），不是纯爆炸 ------- */
+      const halfMin = Math.min(G.w, G.h) * 0.5 + 1e-3;
+      const bxn = (A.x[i] - G.w * 0.5) / halfMin;
+      const byn = (A.y[i] - G.h * 0.5) / halfMin;
+      const fieldX = noise1(A.x[i] * 0.0035 + mt.beatPhase * 1.7 + A.noisePhase[i] * 0.02);
+      const fieldY = noise2(A.y[i] * 0.0035 - mt.beatPhase * 1.7 + A.noisePhase[i] * 0.02);
+      const mix = A.dirMix[i];
+      ax += (bxn * mix - byn * (1 - mix)) * musicDrive * 55 + fieldX * musicDrive * 30;
+      ay += (byn * mix + bxn * (1 - mix)) * musicDrive * 55 + fieldY * musicDrive * 30;
+      /* ---------------- 5c. 频段角色：五个频段各负责一种动作 ---------------- */
+      const role = mt.role;
+      const bassF = role.bass * (cfg.bass === undefined ? 1 : cfg.bass);
+      ax += fieldX * bassF * 34;                       // BASS：整个空间有重量
+      ay += fieldY * bassF * 34;
+      const lowMidF = role.lowMid * (cfg.lowMid === undefined ? 1 : cfg.lowMid);
+      ax += -bxn * lowMidF * 26 * A.cohesion[i];        // LOW MID：群体聚散
+      ay += -byn * lowMidF * 26 * A.cohesion[i];
+      const midF = role.mid * (cfg.mid === undefined ? 1 : cfg.mid);
+      ax += (-byn) * midF * 22 * A.align[i];            // MID：方向 / 旋转 / 流向
+      ay += (bxn) * midF * 22 * A.align[i];
+      const microF = (role.highMid * 0.55 + role.treble * 0.5) * (cfg.micro === undefined ? 1 : cfg.micro);
+      ax += noise1(ph * 6.3 + t * 2.4) * microF * 22;   // HIGH MID + TREBLE：细节与微粒
+      ay += noise2(ph * 5.7 + t * 2.4) * microF * 22;
 
       /* ---------------- 6. 兴奋：沿记忆方向持续一段，再衰减（不是闪一下就没） ---------------- */
       const excite = A.memBeat[i];
@@ -684,7 +949,8 @@
       A.rotV[i] *= (1 - dt * 1.2);
 
       /* ---------------- 7. 惯性积分：加速度 → 速度 → 位置 ---------------- */
-      const dmp = drag / A.inertia[i];
+      // 阻尼按 BPM 自适应：拍点附近收得更快（不会高 BPM 一直沸腾），拍间放松
+      const dmp = (drag + musicDrive * 0.08 / Math.max(0.06, releaseT)) / A.inertia[i];
       A.vx[i] += (ax - A.vx[i] * dmp) * dt;
       A.vy[i] += (ay - A.vy[i] * dmp) * dt;
       const sp2 = A.vx[i] * A.vx[i] + A.vy[i] * A.vy[i];
