@@ -247,8 +247,6 @@ Bug Report 与 Feature Request 请在 [Issues](https://github.com/EzRlon/RlonDSP
 
 本仓库根目录的 [LICENSE](LICENSE) 为 GPL-3.0-only。
 
-> 注意：当前 `package.json` 中的 `license` 字段仍为 `MIT`，与仓库 `LICENSE` 文件不一致。此项尚未自动决定，需在后续维护中统一。
-
 ## 上游致谢
 
 RlonDSP 在以下部分参考并借鉴了 [Echomusic](https://github.com/hoowhoami/EchoMusic) 开源项目：

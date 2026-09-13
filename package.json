@@ -4,7 +4,7 @@
   "description": "Local music player with real-time audio effects",
   "main": "main.js",
   "author": "RlonDSP",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "scripts": {
     "start": "electron .",
     "dist:dir": "electron-builder --win dir --x64",
