@@ -709,15 +709,162 @@ function updateNowPlaying() {
   applyCoverBackground(track);
 }
 
+/* ============================================================================
+ * 动态专辑环境背景（Dynamic Album Environment Background）
+ * --------------------------------------------------------------------------
+ * 复用现有的专辑封面数据（track.cover，渲染进程已有的 artwork 来源），
+ * 在原「静态模糊底」的位置升级为动态环境层，不新建第二套封面/主题系统。
+ *
+ * 工作原理：
+ *   封面 → 大幅放大（图层比窗口大 70%）→ 严重模糊 → cover 铺满
+ *        → 由 4 组低频正弦叠加驱动的缓慢漂移 / 呼吸 → 全窗口背景
+ *
+ * 关键约束：
+ *   - 运动只写 transform / opacity（GPU 合成）：不重绘图片、不重复模糊、不重新解码；
+ *   - 轨迹由多组低频正弦叠加，周期 20～60 秒，连续且不可预测，不是左右往返；
+ *   - 切歌先预加载新封面，加载成功才交叉淡化（1.1 s），失败保持旧背景不闪；
+ *   - 无封面时整体淡出，回退到原有渐变背景（不出现破图 / 黑框）；
+ *   - 暂停播放时运动幅度平滑降到 30%，恢复播放平滑回到 100%，位置不跳变；
+ *   - 页面不可见时立即停表，避免后台空转；只操作两个图层，不产生额外 DOM。
+ *   - 只属于渲染层，完全不接触音频链路（DSP / AudioWorklet / 引擎均不涉及）。
+ * ========================================================================== */
+const AlbumEnv = (() => {
+  const TARGET_FPS = 24;      // 运动很慢，24 帧足够平滑，同时显著降低开销
+  const PAUSED_AMP = 0.3;     // 暂停时的运动幅度
+  const layers = [];
+  let frontIndex = 0;
+  let currentCover = '';
+  let pendingCover = '';
+  let rafId = 0;
+  let lastApply = 0;
+  let startTime = 0;
+  let ampTarget = 1;
+  let ampNow = 1;
+  let running = false;
+  let reduceMotion = false;
+
+  function init() {
+    if (layers.length) return true;
+    const a = document.getElementById('albumEnvA');
+    const b = document.getElementById('albumEnvB');
+    if (!a || !b) return false;
+    layers.push(a, b);
+    startTime = performance.now();
+    try {
+      reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (error) {
+      reduceMotion = false;
+    }
+    return true;
+  }
+
+  /** 当前可见的图层（新封面淡入后切换到这个索引） */
+  function front() {
+    return layers[frontIndex];
+  }
+
+  /** 把运动轨迹写到两个图层：这样新图层在淡入前就已经处于正确位置，不会跳 */
+  function applyTransform(now) {
+    if (!layers.length) return;
+    const t = (now - startTime) / 1000;
+    const amp = reduceMotion ? 0 : ampNow;
+    // 多组低频正弦叠加：连续、缓慢、没有明显规律
+    const x = (Math.sin(t * 0.105) * 1.8 + Math.sin(t * 0.261 + 1.7) * 1.2) * amp;
+    const y = (Math.sin(t * 0.087 + 0.9) * 1.7 + Math.sin(t * 0.213 + 2.6) * 1.1) * amp;
+    const scale = 1.13 + (Math.sin(t * 0.062 + 0.4) * 0.03 + Math.sin(t * 0.145 + 1.1) * 0.018) * amp;
+    const rotate = (Math.sin(t * 0.055 + 2.2) * 0.22 + Math.sin(t * 0.131 + 0.3) * 0.1) * amp;
+    const value = 'translate3d(' + x.toFixed(3) + '%, ' + y.toFixed(3) + '%, 0) '
+      + 'scale(' + scale.toFixed(4) + ') rotate(' + rotate.toFixed(3) + 'deg)';
+    for (let i = 0; i < layers.length; i++) layers[i].style.transform = value;
+  }
+
+  function tick(now) {
+    rafId = 0;
+    if (!running) return;
+    // 幅度平滑靠拢目标值：暂停 / 恢复不会突然跳变（约 2 秒过渡）
+    ampNow += (ampTarget - ampNow) * 0.045;
+    if (now - lastApply >= 1000 / TARGET_FPS) {
+      lastApply = now;
+      applyTransform(now);
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function start() {
+    if (running || !init() || !currentCover) return;
+    running = true;
+    if (!rafId) rafId = requestAnimationFrame(tick);
+  }
+
+  function stop() {
+    running = false;
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+  }
+
+  /** 清空两层并停表（没有封面时回退到原有渐变背景） */
+  function clear() {
+    currentCover = '';
+    pendingCover = '';
+    layers.forEach((layer) => {
+      layer.classList.remove('is-visible');
+      layer.style.backgroundImage = '';
+    });
+    stop();
+  }
+
+  function setCover(url) {
+    if (!init()) return;
+    if (!url) {
+      clear();
+      return;
+    }
+    if (url === currentCover) return;
+    pendingCover = url;
+    // 先加载 + 解码，成功后才进入交叉淡化：不先清空旧背景
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => {
+      if (pendingCover !== url) return;             // 期间又切歌，丢弃这次结果
+      const target = layers[1 - frontIndex];
+      target.style.backgroundImage = 'url("' + url + '")';
+      applyTransform(performance.now());            // 先摆到当前运动位置，避免跳变
+      target.classList.add('is-visible');
+      const previous = layers[frontIndex];
+      previous.classList.remove('is-visible');
+      frontIndex = 1 - frontIndex;
+      currentCover = url;
+      start();
+      // 旧图淡出完成后释放引用，避免多首歌曲累积
+      window.setTimeout(() => {
+        if (previous !== layers[frontIndex]) previous.style.backgroundImage = '';
+      }, 1500);
+    };
+    image.onerror = () => {
+      // 加载失败：保持当前背景，不闪、不回退到空白
+      console.warn('[AlbumEnv] 封面加载失败，保持当前背景');
+    };
+    image.src = url;
+  }
+
+  /** 播放状态变化时调整运动幅度（暂停 30%，播放 100%） */
+  function setPlaying(playing) {
+    ampTarget = playing ? 1 : PAUSED_AMP;
+    if (playing) start();
+  }
+
+  return { setCover, setPlaying, start, stop, clear };
+})();
+
 /**
- * 把当前歌曲的专辑封面送到最底层作为背景。
- * 封面本身不做处理，柔化由上层遮罩的高斯模糊完成；
- * 没有封面时置为 none，自动回退到原本的渐变背景。
+ * 把当前歌曲的专辑封面送到最底层做为环境背景。
+ * 封面本身只作为图片资源使用，柔化由图层自身的模糊完成；
+ * 没有封面时整体淡出，自动回退到原本的渐变背景。
  */
 function applyCoverBackground(track) {
-  const cover = track && track.cover ? `url("${track.cover}")` : 'none';
-  if (document.documentElement.style.getPropertyValue('--app-cover') === cover) return;
-  document.documentElement.style.setProperty('--app-cover', cover);
+  AlbumEnv.setCover(track && track.cover ? track.cover : '');
 }
 
 function renderPlaylist() {
@@ -862,6 +1009,8 @@ function setPlayButton(playing) {
   $('playBtn').title = playing ? t('pause') || '暂停' : t('play') || '播放';
   // 恢复播放时立即恢复频谱渲染
   if (playing) startVisualizerLoop();
+  // 暂停时专辑环境背景的运动平滑放缓（不是突然冻结），恢复播放再平滑回来
+  safeRun('专辑环境背景播放状态', () => AlbumEnv.setPlaying(playing));
 }
 
 function seekTo(ratio) {
@@ -3332,6 +3481,12 @@ function bindUI() {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (state.settings.theme === 'system') applyTheme('system');
   });
+  // 窗口不可见时停掉背景动画，回到前台再继续（避免后台空转）
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) AlbumEnv.stop();
+    else AlbumEnv.start();
+  });
+  window.addEventListener('beforeunload', () => AlbumEnv.stop());
   bindEffectInputs();
   handleDragDrop();
   api.onShortcut((command) => {

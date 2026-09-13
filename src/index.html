@@ -15,6 +15,13 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="lg-app lg-app-bg">
+  <!-- 动态专辑环境背景：两层做交叉淡化（切歌不闪），运动只改 transform / opacity。
+       它固定在最低视觉层，永远位于所有界面元素之下。 -->
+  <div class="album-env" id="albumEnv" aria-hidden="true">
+    <div class="album-env__layer" id="albumEnvA"></div>
+    <div class="album-env__layer" id="albumEnvB"></div>
+    <div class="album-env__tint"></div>
+  </div>
   <svg xmlns="http://www.w3.org/2000/svg" class="icon-sprite" aria-hidden="true" style="display:none">
     <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></symbol>
     <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></symbol>
