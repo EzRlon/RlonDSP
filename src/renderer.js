@@ -130,6 +130,7 @@ const I18N = {
     language: '语言',
     outputDevice: '输出设备',
     closeToTray: '关闭时最小化到托盘',
+    alwaysOnTop: '始终置顶',
     toastImported: '已导入歌曲',
     toastLoading: '正在读取音乐信息…',
     toastPresetSaved: '预设已保存',
@@ -318,6 +319,7 @@ const I18N = {
     language: 'Language',
     outputDevice: 'Output Device',
     closeToTray: 'Close to tray',
+    alwaysOnTop: 'Always on Top',
     toastImported: 'Tracks imported',
     toastLoading: 'Reading track info…',
     toastPresetSaved: 'Preset saved',
@@ -3158,9 +3160,43 @@ function openSettings() {
   $('themeSelect').value = state.settings.theme;
   $('languageSelect').value = state.settings.language;
   $('closeToTray').checked = state.settings.closeToTray;
+  syncAlwaysOnTopUI();
   $('settingsModal').hidden = false;
   // 打开设置时刷新一次版本信息（本地读取，不联网）
   safeRun('版本信息刷新', initUpdateSection);
+}
+
+/**
+ * 「始终置顶」开关与真实窗口状态保持一致的唯一入口。
+ * 界面永远显示 BrowserWindow 的真实状态（isAlwaysOnTop），
+ * 所以不会出现「开关是开的、窗口其实没置顶」这种不一致。
+ */
+async function syncAlwaysOnTopUI() {
+  const box = $('alwaysOnTop');
+  if (!box || !api.getAlwaysOnTop) return;
+  try {
+    const real = await api.getAlwaysOnTop();
+    box.checked = !!real;
+    state.settings.alwaysOnTop = !!real;
+  } catch (error) {
+    console.warn('读取置顶状态失败', error);
+  }
+}
+
+async function applyAlwaysOnTop(enabled) {
+  // 普通模式与迷你模式是同一个窗口，因此这一份状态天然共享
+  const wanted = !!enabled;
+  if (api.setAlwaysOnTop) {
+    const real = await api.setAlwaysOnTop(wanted);
+    // 以真实窗口状态为准回写开关，界面与系统层级永远一致
+    const box = $('alwaysOnTop');
+    if (box) box.checked = !!real;
+    state.settings.alwaysOnTop = !!real;
+    api.setSettings({ alwaysOnTop: !!real });
+    return;
+  }
+  state.settings.alwaysOnTop = wanted;
+  api.setSettings({ alwaysOnTop: wanted });
 }
 
 function renderAbout() {
@@ -3460,6 +3496,16 @@ function bindUI() {
     if (modal) modal.hidden = true;
   });
   on('saveSettingsBtn', 'click', saveSettings);
+  // 始终置顶：立即生效 + 立即保存（关掉设置窗口也不会丢）
+  on('alwaysOnTop', 'change', (event) => applyAlwaysOnTop(event.target.checked));
+  if (api.onAlwaysOnTopChanged) {
+    // 以真实窗口状态为准回写界面（例如系统或其它途径改变了置顶状态）
+    api.onAlwaysOnTopChanged((value) => {
+      const box = $('alwaysOnTop');
+      if (box) box.checked = !!value;
+      state.settings.alwaysOnTop = !!value;
+    });
+  }
   on('aboutBtn', 'click', openAbout);
   on('closeAboutBtn', 'click', () => {
     const modal = $('aboutModal');
@@ -3533,6 +3579,7 @@ async function init() {
   await safeRunAsync('输出设备枚举', enumerateOutputDevices);
   if (state.settings.outputDeviceId) applyOutputDevice(state.settings.outputDeviceId);
   await safeRunAsync('版本信息初始化', initUpdateSection);
+  await safeRunAsync('置顶状态同步', syncAlwaysOnTopUI);
   // 后台自动检查更新：默认开启，启动后延迟进行，只提示、不打扰播放
   if (state.settings.autoCheckUpdate !== false) {
     window.setTimeout(() => {

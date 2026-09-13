@@ -43,7 +43,8 @@ const defaultSettings = {
   desktopLyrics: false,
   outputDeviceId: '',
   playbackMode: 'list',
-  autoCheckUpdate: true
+  autoCheckUpdate: true,
+  alwaysOnTop: false
 };
 
 async function ensureFiles() {
@@ -179,6 +180,15 @@ function createMainWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
+
+  // 始终置顶：恢复用户上次的选择（默认关闭）。
+  // 用的是 Electron 原生窗口层级能力，普通模式与迷你模式是同一个窗口，
+  // 因此这份状态天然共享，不会因为切换尺寸而丢失。
+  if (getSettingsSync().alwaysOnTop) mainWindow.setAlwaysOnTop(true);
+  // 以真实窗口状态为准回报给界面，避免「开关显示开启、实际没置顶」
+  mainWindow.on('always-on-top-changed', (_event, value) => {
+    mainWindow?.webContents.send('window:always-on-top-changed', !!value);
+  });
 
   mainWindow.on('maximize', () => mainWindow?.webContents.send('window:maximized', true));
   mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:maximized', false));
@@ -651,6 +661,25 @@ ipcMain.on('window:maximize', () => {
   else mainWindow.maximize();
 });
 ipcMain.on('window:close', () => mainWindow?.close());
+
+/* ============================================================================
+ * 始终置顶（Always on Top）
+ * --------------------------------------------------------------------------
+ * 只用 Electron 的原生窗口能力：BrowserWindow.setAlwaysOnTop / isAlwaysOnTop。
+ * 渲染进程不接触 BrowserWindow：只能通过下面两个固定通道请求读/写，
+ * 传进来的值也强制转成布尔，不接受任何窗口对象或 Electron API。
+ * 不使用轮询、focus()、moveTop() 或外部脚本抢占窗口层级。
+ * ========================================================================== */
+ipcMain.handle('window:get-always-on-top', () => !!mainWindow && mainWindow.isAlwaysOnTop());
+ipcMain.handle('window:set-always-on-top', (_event, value) => {
+  if (!mainWindow) return false;
+  const wanted = !!value;
+  mainWindow.setAlwaysOnTop(wanted);
+  // 少数情况下系统会把首次设置吞掉（窗口尚未完成显示/层级初始化），
+  // 这里在极短时间内核对一次真实状态并补齐；只核对，不做任何轮询。
+  if (mainWindow.isAlwaysOnTop() !== wanted) mainWindow.setAlwaysOnTop(wanted);
+  return mainWindow.isAlwaysOnTop();
+});
 
 let miniMode = false;
 let miniPrevBounds = null;

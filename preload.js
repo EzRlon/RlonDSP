@@ -38,6 +38,10 @@ contextBridge.exposeInMainWorld('rlonDsp', {
   maximize: () => ipcRenderer.send('window:maximize'),
   close: () => ipcRenderer.send('window:close'),
   toggleMini: () => ipcRenderer.send('window:toggle-mini'),
+  // 始终置顶：只暴露固定通道，渲染进程拿不到 BrowserWindow
+  getAlwaysOnTop: () => ipcRenderer.invoke('window:get-always-on-top'),
+  setAlwaysOnTop: (value) => ipcRenderer.invoke('window:set-always-on-top', !!value),
+  onAlwaysOnTopChanged: (callback) => ipcRenderer.on('window:always-on-top-changed', (_event, value) => callback(!!value)),
   onMiniState: (callback) => ipcRenderer.on('window:mini-state', (_event, value) => callback(value)),
   onMaximized: (callback) => ipcRenderer.on('window:maximized', (_event, value) => callback(value)),
   showLyrics: () => ipcRenderer.send('lyrics:show'),
