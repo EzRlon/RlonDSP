@@ -192,6 +192,10 @@ function createMainWindow() {
 
   mainWindow.on('maximize', () => mainWindow?.webContents.send('window:maximized', true));
   mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:maximized', false));
+  // 窗口状态过渡：窗口本身的尺寸变化由系统完成，界面用一段短动画把这次跳变抹平
+  mainWindow.on('maximize', () => mainWindow?.webContents.send('window:anim', 'in'));
+  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:anim', 'in'));
+  mainWindow.on('restore', () => mainWindow?.webContents.send('window:anim', 'in'));
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow?.webContents.send('window:mini-state', miniMode);
     mainWindow?.webContents.send('window:maximized', !!mainWindow?.isMaximized());

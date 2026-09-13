@@ -3338,6 +3338,22 @@ function persistVisualState() {
   api.setSettings({ visualState: visualEngine.getState() });
 }
 
+/**
+ * 播放窗口状态过渡动画（最大化 / 还原 / 恢复 / 最小化）。
+ * 窗口尺寸的变化由系统瞬间完成，动画只作用在内容层：
+ * 起始缩放略大于 1，过渡期间不会在窗口四边露出底色缝隙。
+ */
+function playWindowAnim(kind) {
+  if (!document.body) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cls = kind === 'out' ? 'win-anim-out' : 'win-anim-in';
+  document.body.classList.remove('win-anim-in', 'win-anim-out');
+  // 强制一次重排，保证连续触发时动画能从头播放
+  void document.body.offsetWidth;
+  document.body.classList.add(cls);
+  window.setTimeout(() => document.body.classList.remove(cls), kind === 'out' ? 260 : 380);
+}
+
 function setVizPage(page, animate) {
   const pager = document.getElementById('vizPager');
   if (!pager) return;
@@ -3835,7 +3851,11 @@ function bindUI() {
   const studioFrame = document.getElementById('irStudioFrame');
   if (studioFrame) studioFrame.addEventListener('load', syncStudioTheme);
   on('settingsBtn', 'click', openSettings);
-  on('winMinBtn', 'click', () => api.minimize());
+  // 最小化：先播放淡出动画，动画结束后再真正最小化（观感连续，不突兀）
+  on('winMinBtn', 'click', () => {
+    playWindowAnim('out');
+    window.setTimeout(() => api.minimize(), 170);
+  });
   on('winMaxBtn', 'click', () => api.maximize());
   on('winCloseBtn', 'click', () => api.close());
   on('winMiniBtn', 'click', toggleMiniMode);
@@ -3857,6 +3877,10 @@ function bindUI() {
       const btn = $('winMaxBtn');
       if (btn) btn.title = value ? '还原' : '最大化';
     });
+  }
+  // 最大化 / 还原 / 从任务栏恢复：播放窗口过渡动画
+  if (api.onWindowAnim) {
+    api.onWindowAnim((kind) => playWindowAnim(kind === 'out' ? 'out' : 'in'));
   }
   on('closeSettingsBtn', 'click', () => {
     const modal = $('settingsModal');

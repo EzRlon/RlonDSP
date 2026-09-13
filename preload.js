@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('rlonDsp', {
   onAlwaysOnTopChanged: (callback) => ipcRenderer.on('window:always-on-top-changed', (_event, value) => callback(!!value)),
   onMiniState: (callback) => ipcRenderer.on('window:mini-state', (_event, value) => callback(value)),
   onMaximized: (callback) => ipcRenderer.on('window:maximized', (_event, value) => callback(value)),
+  onWindowAnim: (callback) => ipcRenderer.on('window:anim', (_event, kind) => callback(kind)),
   showLyrics: () => ipcRenderer.send('lyrics:show'),
   hideLyrics: () => ipcRenderer.send('lyrics:hide'),
   updateLyrics: (payload) => ipcRenderer.send('lyrics:update', payload),

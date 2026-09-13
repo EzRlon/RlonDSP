@@ -1627,3 +1627,29 @@ body.mini-mode .toast { bottom: 6px; }
 }
 
 .viz-dot.active { width: 34px; background: var(--accent); border-color: var(--accent); }
+
+/* ============================================================================
+   窗口状态过渡动画
+   --------------------------------------------------------------------------
+   最大 / 还原 / 从任务栏恢复：窗口尺寸由系统瞬间改变，这里给内容加一段
+   极短的淡入 + 微缩放，让这次跳变看起来是连续的，不闪烁。
+   起始缩放略大于 1，因此过渡过程中不会在窗口四边露出底色缝隙。
+   最小化：先播放"淡出 + 轻微放大"，动画结束后才真正最小化。
+   ========================================================================== */
+@keyframes winAnimIn {
+  from { opacity: 0.62; transform: scale(1.012); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes winAnimOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.02); }
+}
+
+body.win-anim-in { animation: winAnimIn 0.30s var(--lg-ease); }
+body.win-anim-out { animation: winAnimOut 0.18s ease-in forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  body.win-anim-in,
+  body.win-anim-out { animation: none; }
+}
