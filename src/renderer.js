@@ -50,6 +50,32 @@ const I18N = {
     eqPresetFolk: '民谣',
     eqPresetRock: '摇滚',
     eqPresetElectronic: '电子',
+    updateSection: '版本更新',
+    currentVersion: '当前版本',
+    updateStatus: '更新状态',
+    updateIdle: '尚未检查',
+    checkUpdate: '检查更新',
+    updateChecking: '正在检查更新…',
+    updateUpToDate: '当前已经是最新版本',
+    updateAvailable: '发现新版本',
+    updateNotes: '更新说明',
+    installNow: '立即更新',
+    cancelDownload: '取消下载',
+    updateDownloading: '下载中',
+    updateDownloadDone: '下载完成',
+    updateVerifying: '验证更新',
+    updateReady: '安装准备完成',
+    updateFailed: '更新失败',
+    updateNetError: '检查更新失败（网络不可用或无法连接更新源）',
+    updateNotFound: '更新源上还没有正式版本',
+    updateChecksumFailed: '更新包校验不通过，已停止更新',
+    updateCancelled: '已取消下载',
+    updatePortable: '便携版无法自动安装更新，请打开发布页下载新版本后手动替换',
+    openReleasePage: '打开发布页',
+    autoCheckUpdate: '自动检查更新',
+    updateNewVersionIs: '新版本',
+    updatePublishedAt: '发布时间',
+    restartNow: '重新启动',
     save: '保存',
     delete: '删除',
     export: '导出',
@@ -195,6 +221,32 @@ const I18N = {
     eqPresetFolk: 'Folk',
     eqPresetRock: 'Rock',
     eqPresetElectronic: 'Electronic',
+    updateSection: 'Software update',
+    currentVersion: 'Current version',
+    updateStatus: 'Status',
+    updateIdle: 'Not checked yet',
+    checkUpdate: 'Check for updates',
+    updateChecking: 'Checking for updates…',
+    updateUpToDate: 'You are up to date',
+    updateAvailable: 'Update available',
+    updateNotes: 'Release notes',
+    installNow: 'Update now',
+    cancelDownload: 'Cancel download',
+    updateDownloading: 'Downloading',
+    updateDownloadDone: 'Download complete',
+    updateVerifying: 'Verifying update',
+    updateReady: 'Ready to install',
+    updateFailed: 'Update failed',
+    updateNetError: 'Check failed (network or update source unreachable)',
+    updateNotFound: 'No published release yet',
+    updateChecksumFailed: 'Update package failed verification; aborted',
+    updateCancelled: 'Download cancelled',
+    updatePortable: 'The portable build cannot auto-install. Open the release page and replace it manually.',
+    openReleasePage: 'Open release page',
+    autoCheckUpdate: 'Check for updates automatically',
+    updateNewVersionIs: 'New version',
+    updatePublishedAt: 'Published',
+    restartNow: 'Restart',
     save: 'Save',
     delete: 'Delete',
     export: 'Export',
@@ -2747,6 +2799,8 @@ function openSettings() {
   $('languageSelect').value = state.settings.language;
   $('closeToTray').checked = state.settings.closeToTray;
   $('settingsModal').hidden = false;
+  // 打开设置时刷新一次版本信息（本地读取，不联网）
+  safeRun('版本信息刷新', initUpdateSection);
 }
 
 function renderAbout() {
@@ -2779,11 +2833,170 @@ function openAbout() {
   $('aboutModal').hidden = false;
 }
 
+/* ============================================================================
+ * 版本更新（设置窗口）
+ * --------------------------------------------------------------------------
+ * 这里只做界面与状态显示；联网、下载、校验、安装全部在主进程完成。
+ * 与音频系统完全无关：不改 DSP 图谱、不改音量、不改播放状态、不改预设。
+ * 更新说明只按纯文本显示 —— 远程内容永远不当作 HTML 执行。
+ * ========================================================================== */
+const updateUi = { info: null, result: null, phase: 'idle' };
+
+function updateEl(id) {
+  return document.getElementById(id);
+}
+
+function setUpdateStatusText(text, kind) {
+  const el = updateEl('updateStatusText');
+  if (!el) return;
+  // 状态文字是动态的，去掉 data-i18n 以免语言表把它覆盖回去
+  el.removeAttribute('data-i18n');
+  el.textContent = text;
+  el.className = 'update-status' + (kind ? ' is-' + kind : '');
+}
+
+function setUpdateControls(phase) {
+  const portable = !!(updateUi.info && updateUi.info.mode === 'portable');
+  const set = (id, visible) => {
+    const el = updateEl(id);
+    if (el) el.hidden = !visible;
+  };
+  set('installUpdateBtn', (phase === 'available' || phase === 'ready') && !portable);
+  set('cancelUpdateBtn', phase === 'downloading');
+  set('openReleaseBtn', phase === 'available' || phase === 'ready' || phase === 'portable');
+  set('updateProgressWrap', phase === 'downloading' || phase === 'ready');
+  const check = updateEl('checkUpdateBtn');
+  if (check) check.disabled = phase === 'checking' || phase === 'downloading';
+  const install = updateEl('installUpdateBtn');
+  if (install) {
+    const label = phase === 'ready' ? t('restartNow') : t('installNow');
+    if (install.textContent.trim() !== label) install.textContent = label;
+  }
+}
+
+function renderUpdateNotes(text) {
+  const notes = updateEl('updateNotes');
+  if (!notes) return;
+  notes.textContent = '';
+  if (!text) {
+    notes.hidden = true;
+    return;
+  }
+  // 只写 textContent：远程内容不会被执行，也不会被当成 HTML 渲染
+  notes.textContent = text;
+  notes.hidden = false;
+}
+
+function setUpdateProgress(received, total) {
+  const fill = updateEl('updateProgressFill');
+  const label = updateEl('updateProgressText');
+  if (!fill || !label) return;
+  const percent = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : 0;
+  fill.style.width = percent + '%';
+  const mb = (n) => (n / 1048576).toFixed(1);
+  label.textContent = total > 0 ? percent + '%  ·  ' + mb(received) + ' / ' + mb(total) + ' MB' : mb(received) + ' MB';
+}
+
+async function initUpdateSection() {
+  if (!updateEl('updateBlock')) return;
+  try {
+    const info = await api.updateInfo();
+    updateUi.info = info || null;
+    const versionEl = updateEl('updateCurrentVersion');
+    if (versionEl && info) versionEl.textContent = 'v' + info.version;
+  } catch (error) {
+    console.warn('读取版本信息失败', error);
+  }
+  const auto = updateEl('autoCheckUpdate');
+  if (auto) auto.checked = state.settings.autoCheckUpdate !== false;
+  if (updateUi.phase === 'idle') setUpdateControls('idle');
+}
+
+async function runUpdateCheck(manual) {
+  if (updateUi.phase === 'checking' || updateUi.phase === 'downloading') return;
+  updateUi.phase = 'checking';
+  setUpdateStatusText(t('updateChecking'), 'warn');
+  setUpdateControls('checking');
+  const res = await api.checkUpdate();
+  if (!res || !res.ok) {
+    updateUi.phase = 'failed';
+    const message = res && res.error === 'notfound' ? t('updateNotFound') : t('updateNetError');
+    setUpdateStatusText(message, 'error');
+    setUpdateControls('failed');
+    if (manual) showToast(message);
+    return;
+  }
+  updateUi.result = res;
+  if (res.hasUpdate) {
+    updateUi.phase = 'available';
+    const when = res.publishedAt ? new Date(res.publishedAt).toLocaleDateString() : '';
+    setUpdateStatusText(t('updateAvailable') + '：v' + res.latestVersion + (when ? '  ·  ' + t('updatePublishedAt') + ' ' + when : ''), 'ok');
+    renderUpdateNotes(res.notes);
+    setUpdateControls('available');
+    // 后台自动检查只提示，不打断任何操作
+    if (!manual) showToast(t('updateAvailable') + '：v' + res.latestVersion);
+  } else {
+    updateUi.phase = 'current';
+    setUpdateStatusText(t('updateUpToDate') + '（v' + res.currentVersion + '）', 'ok');
+    renderUpdateNotes('');
+    setUpdateControls('current');
+    if (manual) showToast(t('updateUpToDate'));
+  }
+}
+
+async function runUpdateDownload() {
+  if (updateUi.phase !== 'available') return;
+  updateUi.phase = 'downloading';
+  setUpdateStatusText(t('updateDownloading') + '：v' + updateUi.result.latestVersion, 'warn');
+  setUpdateControls('downloading');
+  setUpdateProgress(0, updateUi.result.asset ? updateUi.result.asset.size : 0);
+  const res = await api.downloadUpdate();
+  if (!res || !res.ok) {
+    if (res && res.error === 'cancelled') {
+      updateUi.phase = 'available';
+      setUpdateStatusText(t('updateCancelled'), '');
+      setUpdateControls('available');
+      return;
+    }
+    updateUi.phase = 'failed';
+    setUpdateStatusText(t('updateFailed'), 'error');
+    setUpdateControls('failed');
+    showToast(t('updateFailed'));
+    return;
+  }
+  setUpdateProgress(res.size, res.size);
+  const expected = (updateUi.result && updateUi.result.assetSha256) || '';
+  if (expected && String(expected).toLowerCase() !== String(res.sha256).toLowerCase()) {
+    // 校验不通过：绝不安装损坏或不完整的更新包
+    updateUi.phase = 'failed';
+    setUpdateStatusText(t('updateChecksumFailed'), 'error');
+    setUpdateControls('failed');
+    showToast(t('updateChecksumFailed'));
+    return;
+  }
+  updateUi.phase = 'ready';
+  setUpdateStatusText(t('updateReady') + (updateUi.info && updateUi.info.mode === 'portable' ? '（' + t('updatePortable') + '）' : ''), 'ok');
+  setUpdateControls('ready');
+}
+
+async function runUpdateInstall() {
+  const res = await api.installUpdate();
+  if (res && res.ok) {
+    setUpdateStatusText(t('restartNow') + '…', 'ok');
+    return;
+  }
+  const portable = res && res.error === 'portable';
+  updateUi.phase = portable ? 'portable' : 'failed';
+  setUpdateStatusText(portable ? t('updatePortable') : t('updateFailed'), portable ? 'warn' : 'error');
+  setUpdateControls(updateUi.phase);
+}
+
 async function saveSettings() {
   const next = {
     theme: $('themeSelect').value,
     language: $('languageSelect').value,
-    closeToTray: $('closeToTray').checked
+    closeToTray: $('closeToTray').checked,
+    autoCheckUpdate: $('autoCheckUpdate') ? $('autoCheckUpdate').checked : true
   };
   state.settings = { ...state.settings, ...next };
   state.settings = await api.setSettings(next);
@@ -2893,6 +3106,21 @@ function bindUI() {
     if (modal) modal.hidden = true;
   });
   on('viewLicenseBtn', 'click', () => api.openLicense());
+  // 版本更新：检查 / 下载 / 取消 / 安装 / 打开发布页
+  on('checkUpdateBtn', 'click', () => runUpdateCheck(true));
+  on('installUpdateBtn', 'click', () => {
+    if (updateUi.phase === 'ready') return runUpdateInstall();
+    return runUpdateDownload();
+  });
+  on('cancelUpdateBtn', 'click', async () => {
+    await api.cancelUpdate();
+  });
+  on('openReleaseBtn', 'click', () => api.openReleasePage());
+  if (api.onUpdateProgress) {
+    api.onUpdateProgress((payload) => {
+      if (payload) setUpdateProgress(Number(payload.received) || 0, Number(payload.total) || 0);
+    });
+  }
   on('muteBtn', 'click', toggleMute);
   on('modeBtn', 'click', cycleMode);
   window.addEventListener('resize', () => {
@@ -2938,6 +3166,13 @@ async function init() {
   safeRun('正在播放信息同步', updateNowPlaying);
   await safeRunAsync('输出设备枚举', enumerateOutputDevices);
   if (state.settings.outputDeviceId) applyOutputDevice(state.settings.outputDeviceId);
+  await safeRunAsync('版本信息初始化', initUpdateSection);
+  // 后台自动检查更新：默认开启，启动后延迟进行，只提示、不打扰播放
+  if (state.settings.autoCheckUpdate !== false) {
+    window.setTimeout(() => {
+      if (!document.hidden) safeRun('后台检查更新', () => runUpdateCheck(false));
+    }, 12000);
+  }
   drawVisualizer();
 }
 

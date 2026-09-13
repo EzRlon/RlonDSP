@@ -1,5 +1,36 @@
 # 发布流程
 
+## 版本更新（应用内「设置 → 版本更新」）与发布的关系
+
+应用内的更新检查读取的是 **GitHub 的正式 Release**（`releases/latest`），
+因此每次发版都要遵守下面两条，更新系统才能正常工作：
+
+1. **版本号必须递增**（`v1.0.0` → `v1.1.0` …）。应用用语义化版本比较，
+   同版本或更旧版本不会提示更新，也绝不会提示降级。
+2. **必须上传安装包**，文件名保持现有约定：
+   - `RlonDSP-<版本>-setup-x64.exe`（已安装版用它自动升级）
+   - `RlonDSP-<版本>-portable-x64.zip`（便携版下载入口）
+
+### 可选但推荐：附上校验文件
+
+在 Release 里额外上传一个 `SHA256SUMS.txt`，内容形如：
+
+```
+<64 位 SHA-256>  RlonDSP-1.1.0-setup-x64.exe
+<64 位 SHA-256>  RlonDSP-1.1.0-portable-x64.zip
+```
+
+应用下载完更新包后会比对这份摘要；**校验不通过会直接停止更新**。
+没有这个文件时，应用仍会计算并显示更新包的 SHA-256，但无法与官方值比对。
+
+生成命令（项目根目录）：
+
+```powershell
+Get-FileHash release\RlonDSP-1.1.0-setup-x64.exe -Algorithm SHA256 |
+  ForEach-Object { "$($_.Hash.ToLower())  RlonDSP-1.1.0-setup-x64.exe" } |
+  Set-Content release\SHA256SUMS.txt -Encoding ascii
+```
+
 本文说明如何为 RlonDSP 构建、打包并发布一个新版本。
 
 ---

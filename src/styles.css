@@ -744,6 +744,113 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
   justify-content: center;
 }
 
+/* ===== 设置窗口：版本更新 =====
+   沿用设置窗口既有的卡片 / 行 / 按钮 / 令牌，只补布局，
+   不新建主题，颜色全部来自当前的玻璃令牌与强调色。 */
+.setting-block {
+  margin: 14px 0 4px;
+  padding: 12px 13px;
+  border-radius: var(--lg-radius-sm);
+  background: var(--lg-bg-content);
+  border: 1px solid var(--lg-content-border);
+}
+
+.setting-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.setting-block-head .update-version {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.setting-block-head .update-version b {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.setting-row--plain { border-bottom: 0; }
+
+.update-status {
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.update-status.is-ok { color: var(--accent); }
+.update-status.is-warn { color: #ff9f43; }
+.update-status.is-error { color: #ff5b6b; }
+
+.update-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 2px;
+}
+
+/* 这里的 display:flex 会盖过 hidden 属性的默认样式，需要显式让位 */
+.update-progress[hidden],
+.update-notes[hidden],
+.update-actions button[hidden] { display: none; }
+
+.update-progress-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--lg-micro-bg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.update-progress-track > span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.15s linear;
+}
+
+.update-progress-text {
+  flex: none;
+  min-width: 84px;
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.update-notes {
+  margin: 8px 0 2px;
+  padding: 9px 10px;
+  max-height: 150px;
+  overflow: auto;
+  border-radius: 9px;
+  background: var(--lg-micro-bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+
 .preset-new-tag {
   display: inline-flex;
   align-items: center;

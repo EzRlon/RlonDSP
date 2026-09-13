@@ -28,6 +28,7 @@
     },
     "files": [
       "main.js",
+      "update-core.js",
       "preload.js",
       "lyrics-preload.js",
       "src/**/*",

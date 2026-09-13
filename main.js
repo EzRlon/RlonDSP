@@ -3,10 +3,14 @@
  * Copyright © 2026 RlonDSP. All rights reserved.
  * Based on Echomusic open-source project, modified and extended for RlonDSP.
  */
-const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, nativeTheme, nativeImage, screen, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, nativeTheme, nativeImage, screen, shell, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
+const crypto = require('node:crypto');
+const { spawn } = require('node:child_process');
+
+const updateCore = require('./update-core');
 
 app.setName('RlonDSP');
 
@@ -38,7 +42,8 @@ const defaultSettings = {
   minimizeToTray: false,
   desktopLyrics: false,
   outputDeviceId: '',
-  playbackMode: 'list'
+  playbackMode: 'list',
+  autoCheckUpdate: true
 };
 
 async function ensureFiles() {
@@ -381,6 +386,180 @@ ipcMain.handle('fs:scanFolder', async (_event, folderPath) => {
 });
 
 ipcMain.handle('meta:read', async (_event, filePath) => readMetadata(filePath));
+
+/* ============================================================================
+ * 版本更新
+ * --------------------------------------------------------------------------
+ * 正式更新源 = 项目在 GitHub 上的 Release（不使用 main 分支的提交）。
+ * 所有网络与文件操作都只发生在主进程：
+ *   - 渲染进程只能通过 preload 暴露的几个方法调用，拿不到任意 URL、拿不到任何 Token；
+ *   - 只允许下载「本次检查返回的那个附件」，且必须落在 userData/updates 目录内；
+ *   - 下载完成后做校验：官方 Release 若带 SHA-256 校验文件就比对，没有则计算并如实显示；
+ *   - 先下载 → 再校验 → 最后才交给安装程序，绝不先删当前版本再下载。
+ * 整个流程与音频系统无关：不改 DSP 图谱、不改音量、不改播放状态、不改预设。
+ * ========================================================================== */
+const UPDATE_DIR = path.join(userDataDir, 'updates');
+let updateSession = { release: null, filePath: '', sha256: '', aborted: false };
+
+/** setup.cmd 会把程序装到 %LOCALAPPDATA%\RlonDSP；不在这里就是便携版 */
+function appIsInstalled() {
+  const exe = String(app.getPath('exe') || '').toLowerCase();
+  const local = String(process.env.LOCALAPPDATA || '').toLowerCase();
+  return !!local && exe.startsWith(path.join(local, 'RlonDSP').toLowerCase());
+}
+
+function updateMode() {
+  return appIsInstalled() ? 'installed' : 'portable';
+}
+
+async function fetchUpdateJson(url) {
+  const res = await net.fetch(url, {
+    headers: { 'User-Agent': 'RlonDSP-Updater', Accept: 'application/vnd.github+json' }
+  });
+  if (res.status === 404) {
+    const error = new Error('release not found');
+    error.code = 'notfound';
+    throw error;
+  }
+  if (!res.ok) {
+    const error = new Error('http ' + res.status);
+    error.code = 'http';
+    throw error;
+  }
+  return res.json();
+}
+
+ipcMain.handle('update:info', async () => ({
+  version: app.getVersion(),
+  mode: updateMode(),
+  repo: updateCore.UPDATE_REPO,
+  platform: process.platform,
+  arch: process.arch
+}));
+
+ipcMain.handle('update:check', async () => {
+  const currentVersion = app.getVersion();
+  try {
+    const json = await fetchUpdateJson(updateCore.RELEASES_API);
+    const release = updateCore.parseRelease(json, process.platform, process.arch);
+    if (!release) return { ok: false, error: 'parse', currentVersion, mode: updateMode() };
+
+    // 有校验文件就顺手取下来，拿到本次更新包的官方 SHA-256
+    let assetSha256 = '';
+    if (release.checksumAsset && release.checksumAsset.url && release.asset) {
+      try {
+        const res = await net.fetch(release.checksumAsset.url, { headers: { 'User-Agent': 'RlonDSP-Updater' } });
+        if (res.ok) {
+          assetSha256 = updateCore.parseChecksum(await res.text(), release.asset.name) || '';
+        }
+      } catch (error) {
+        console.warn('[Updater] 校验文件获取失败', error && error.message);
+      }
+    }
+
+    updateSession = { release, filePath: '', sha256: '', aborted: false };
+    return {
+      ok: true,
+      currentVersion,
+      mode: updateMode(),
+      hasUpdate: updateCore.isNewer(release.version, currentVersion),
+      latestVersion: release.version,
+      notes: updateCore.sanitizeNotes(release.notes),
+      publishedAt: release.publishedAt,
+      releaseUrl: release.releaseUrl,
+      asset: release.asset,
+      assetSha256
+    };
+  } catch (error) {
+    console.error('[Updater] 检查更新失败', error && error.message);
+    return { ok: false, error: (error && error.code) || 'network', currentVersion, mode: updateMode() };
+  }
+});
+
+ipcMain.handle('update:download', async (event) => {
+  const release = updateSession.release;
+  if (!release || !release.asset || !release.asset.url) return { ok: false, error: 'no-release' };
+  updateSession.aborted = false;
+  const fileName = path.basename(release.asset.name || 'RlonDSP-update.bin');
+  const target = path.join(UPDATE_DIR, fileName);
+  try {
+    await fsp.mkdir(UPDATE_DIR, { recursive: true });
+    const res = await net.fetch(release.asset.url, { headers: { 'User-Agent': 'RlonDSP-Updater' } });
+    if (!res.ok) return { ok: false, error: 'http' };
+    const total = Number(res.headers.get('content-length')) || release.asset.size || 0;
+    const hash = crypto.createHash('sha256');
+    const handle = await fsp.open(target, 'w');
+    let received = 0;
+    try {
+      const reader = res.body.getReader();
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        if (updateSession.aborted) {
+          await reader.cancel().catch(() => {});
+          break;
+        }
+        const buf = Buffer.from(chunk.value);
+        await handle.write(buf);
+        hash.update(buf);
+        received += buf.length;
+        if (event && event.sender && !event.sender.isDestroyed()) {
+          event.sender.send('update:progress', { received, total });
+        }
+      }
+    } finally {
+      await handle.close();
+    }
+    if (updateSession.aborted) {
+      await fsp.rm(target, { force: true });
+      return { ok: false, error: 'cancelled' };
+    }
+    const sha256 = hash.digest('hex');
+    updateSession.filePath = target;
+    updateSession.sha256 = sha256;
+    return { ok: true, sha256, size: received, path: target, verified: 'computed' };
+  } catch (error) {
+    console.error('[Updater] 下载更新包失败', error && error.message);
+    await fsp.rm(target, { force: true }).catch(() => {});
+    updateSession.filePath = '';
+    return { ok: false, error: 'download' };
+  }
+});
+
+ipcMain.handle('update:cancel', async () => {
+  updateSession.aborted = true;
+  return { ok: true };
+});
+
+ipcMain.handle('update:install', async () => {
+  const file = updateSession.filePath;
+  if (!file) return { ok: false, error: 'no-file' };
+  // 只能安装「刚下载并校验过」的那一个文件，且必须落在 updates 目录内
+  const resolved = path.resolve(file);
+  const allowedDir = path.resolve(UPDATE_DIR) + path.sep;
+  if (!resolved.startsWith(allowedDir)) return { ok: false, error: 'bad-path' };
+  if (!fs.existsSync(resolved)) return { ok: false, error: 'missing' };
+  if (!/\.exe$/i.test(resolved)) return { ok: false, error: 'bad-type' };
+  if (updateMode() !== 'installed') return { ok: false, error: 'portable' };
+  try {
+    // 当前版本先保持可运行：安装程序自己会把新版本装好并启动，
+    // 我们只是退出，绝不主动删除或覆盖任何文件。
+    const child = spawn(resolved, [], { detached: true, stdio: 'ignore', cwd: path.dirname(resolved) });
+    child.unref();
+    isQuitting = true;
+    setTimeout(() => app.quit(), 900);
+    return { ok: true };
+  } catch (error) {
+    console.error('[Updater] 启动安装程序失败', error && error.message);
+    return { ok: false, error: 'launch' };
+  }
+});
+
+ipcMain.handle('update:open-release', async () => {
+  const url = updateCore.RELEASES_PAGE;
+  await shell.openExternal(url);
+  return { ok: true, url };
+});
 
 ipcMain.handle('settings:get', async () => readJSON(settingsFile, defaultSettings));
 ipcMain.handle('settings:set', async (_event, partial) => {
