@@ -15,7 +15,14 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="lg-app lg-app-bg">
-  <svg xmlns="http://www.w3.org/2000/svg" class="icon-sprite" aria-hidden="true" style="display:none">
+  <!-- 动态专辑环境背景：两层做交叉淡化（切歌不闪），运动只改 transform / opacity。
+       它固定在最低视觉层，永远位于所有界面元素之下。 -->
+  <div class="album-env" id="albumEnv" aria-hidden="true">
+    <div class="album-env__layer" id="albumEnvA"></div>
+    <div class="album-env__layer" id="albumEnvB"></div>
+    <div class="album-env__tint"></div>
+  </div>
+  <svg xmlns="http://www.w3.org/2000/svg" class="icon-sprite" id="iconSprite" aria-hidden="true" style="display:none">
     <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></symbol>
     <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></symbol>
     <symbol id="icon-prev" viewBox="0 0 24 24"><path d="M7 5v14M18 6l-9 6 9 6z"/></symbol>
@@ -28,6 +35,9 @@
     <symbol id="icon-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/></symbol>
     <symbol id="icon-wave" viewBox="0 0 24 24"><path d="M3 12h2l2-6 4 12 3-9 2 5 2-2h3"/></symbol>
     <symbol id="icon-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 3-8 2 5 2-2h3"/></symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="icon-pin" viewBox="0 0 24 24"><path d="M9 3h6"/><path d="M10 3v7l-2 2v1h8v-1l-2-2V3"/><path d="M12 13v8"/></symbol>
     <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
     <symbol id="icon-save" viewBox="0 0 24 24"><path d="M5 3h11l4 4v14H5z"/><path d="M8 3v6h7V3M8 21v-7h8v7"/></symbol>
     <symbol id="icon-note" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></symbol>
@@ -46,7 +56,16 @@
     <symbol id="icon-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></symbol>
     <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M4 20l1-4 11-11 3 3-11 11-4 1z"/><path d="M14 7l3 3"/></symbol>
     <symbol id="icon-loop-list" viewBox="0 0 24 24"><path d="M17 3l3 3-3 3M20 6H8a5 5 0 0 0-5 5v1M7 21l-3-3 3-3M4 18h12a5 5 0 0 0 5-5v-1"/></symbol>
-    <symbol id="icon-loop-single" viewBox="0 0 24 24"><path d="M17 3l3 3-3 3M20 6H8a5 5 0 0 0-5 5v1M7 21l-3-3 3-3M4 18h12a5 5 0 0 0 5-5v-1"/><path d="M12 9v6"/></symbol>
+    <symbol id="icon-loop-single" viewBox="0 0 24 24"><path d="M17 3l3 3-3 3M20 6H8a5 5 0 0 0-5 5v1M7 21l-3-3 3-3M4 18h12a5 5 0 0 0 5-5v-1"/><path d="M11.3 10.2l1.6-1.2v6.4"/></symbol>
+    <symbol id="icon-import-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M12 11.4v6M9.6 15l2.4 2.4L14.4 15"/></symbol>
+    <symbol id="icon-import-folder" viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v11H3z"/><path d="M12 11v5.4M9.7 14.1l2.3 2.3 2.3-2.3"/></symbol>
+    <symbol id="icon-dsp" viewBox="0 0 24 24"><path d="M6 3.6v16.8M12 3.6v16.8M18 3.6v16.8"/><path d="M3.4 9h5.2M9.4 14.8h5.2M15.4 7.2h5.2"/></symbol>
+    <symbol id="icon-spectrum" viewBox="0 0 24 24"><path d="M4.4 20V13M8.2 20V6.4M12 20V15.6M15.8 20V9.2M19.6 20v-5.4"/></symbol>
+    <symbol id="icon-visualizer" viewBox="0 0 24 24"><rect x="2.6" y="4.6" width="18.8" height="14.8" rx="3.2"/><path d="M5.6 13.6c2-3.6 4-3.6 6 0s4 3.6 6 0"/></symbol>
+    <symbol id="icon-spatial" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M3.2 12c0-2.3 3.9-4.2 8.8-4.2s8.8 1.9 8.8 4.2-3.9 4.2-8.8 4.2S3.2 14.3 3.2 12z"/><path d="M12 3.2c2.3 0 4.2 3.9 4.2 8.8s-1.9 8.8-4.2 8.8-4.2-3.9-4.2-8.8S9.7 3.2 12 3.2z"/></symbol>
+    <symbol id="icon-ir" viewBox="0 0 24 24"><path d="M3 13.4h3.1l1.6-7.6 2.3 13 2-6.6 1.6 3.6 1.3-2.1 1.2 1 1.2-.6 1.4.4 1.2-.2H21"/></symbol>
+    <symbol id="icon-plugin" viewBox="0 0 24 24"><rect x="4.4" y="4.4" width="15.2" height="15.2" rx="3.6"/><path d="M12 2.2v2.2M12 19.6v2.2M2.2 12h2.2M19.6 12h2.2"/></symbol>
+    <symbol id="icon-brand" viewBox="0 0 24 24"><clipPath id="brandClip"><rect x="1" y="1" width="22" height="22" rx="5.4"/></clipPath><g clip-path="url(#brandClip)"><rect x="0" y="0" width="24" height="24" fill="#4c7dff"/><path d="M0 18.6 24 5.4V24H0z" fill="#7a5cff"/><rect x="8.35" y="6.85" width="2.25" height="10.3" fill="#fff"/><path d="M10.6 6.85h2.95a2.9 2.9 0 0 1 0 5.8H10.6z" fill="#fff"/><path d="M12.35 12.15 15.75 17.15" fill="none" stroke="#fff" stroke-width="2.25"/></g></symbol>
     <symbol id="icon-loop-random" viewBox="0 0 24 24"><path d="M16 3h5v5M21 3l-6 6M4 20l6-6M16 21h5v-5M21 21l-6-6M4 4l6 6"/></symbol>
     <symbol id="icon-vector" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M5 19 19 5M19 19 5 5"/></symbol>
     <symbol id="icon-meter" viewBox="0 0 24 24"><path d="M3 8h18M3 12h18M3 16h18"/><path d="M9 5v14"/></symbol>
@@ -57,10 +76,11 @@
   </svg>
   <header class="titlebar lg-surface lg-surface--control">
     <div class="titlebar-brand">
-      <img class="titlebar-logo" src="../assets/icon.png" alt="" draggable="false">
+      <svg class="titlebar-logo" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#icon-brand"></use></svg>
       <span class="titlebar-name">RlonDSP</span>
     </div>
     <div class="titlebar-controls">
+      <button class="tb-btn" id="pinBtn" title="始终置顶" aria-label="始终置顶"><svg class="icon"><use href="#icon-pin"></use></svg></button>
       <button class="tb-btn" id="winMiniBtn"><svg class="icon"><use href="#icon-win-mini"></use></svg></button>
       <button class="tb-btn" id="winMinBtn" title="最小化" aria-label="最小化"><svg class="icon"><use href="#icon-win-min"></use></svg></button>
       <button class="tb-btn" id="winMaxBtn" title="最大化" aria-label="最大化"><svg class="icon"><use id="winMaxIcon" href="#icon-win-max"></use></svg></button>
@@ -78,8 +98,8 @@
         <input id="playlistSearch" type="text" data-i18n-ph="searchPlaceholder" placeholder="搜索歌曲">
       </div>
       <div class="sidebar-tools">
-        <button class="tool-btn lg-button" id="importFileBtn"><svg class="icon icon-sm"><use href="#icon-file"></use></svg><span data-i18n="importFiles">导入文件</span></button>
-        <button class="tool-btn lg-button" id="importFolderBtn"><svg class="icon icon-sm"><use href="#icon-folder"></use></svg><span data-i18n="importFolder">导入文件夹</span></button>
+        <button class="tool-btn lg-button" id="importFileBtn"><svg class="icon icon-sm"><use href="#icon-import-file"></use></svg><span data-i18n="importFiles">导入文件</span></button>
+        <button class="tool-btn lg-button" id="importFolderBtn"><svg class="icon icon-sm"><use href="#icon-import-folder"></use></svg><span data-i18n="importFolder">导入文件夹</span></button>
         <select id="sortSelect" class="compact-select">
           <option value="default" data-i18n="sortDefault">默认排序</option>
           <option value="title" data-i18n="sortTitle">按标题</option>
@@ -92,6 +112,9 @@
     </aside>
 
     <main class="main-panel lg-surface lg-surface--panel">
+      <!-- 频谱空间：两个横向页面。左右滑动切换（左滑到第二页视觉空间） -->
+      <div class="viz-pager" id="vizPager">
+      <section class="viz-page viz-page--analysis is-active" data-viz-page="0">
       <div class="viz-stage">
         <div class="viz-grid">
           <div class="viz-card" data-cell="a">
@@ -136,6 +159,27 @@
           </div>
         </div>
       </div>
+      </section>
+
+      <section class="viz-page viz-page--visual" data-viz-page="1">
+        <div class="visual-workspace">
+          <div class="visual-main">
+            <canvas class="visual-canvas" id="visualCanvas"></canvas>
+            <div class="visual-hud" id="visualHud">
+              <span class="visual-hud-title" data-i18n="visualPageTitle">沉浸视觉</span>
+              <span class="visual-hud-stats" id="visualStats">—</span>
+            </div>
+          </div>
+          <div class="visual-presets" id="visualPresets"></div>
+          <div class="visual-cards" id="visualCards"></div>
+        </div>
+      </section>
+      </div>
+
+      <div class="viz-dots" id="vizDots">
+        <button class="viz-dot active" data-viz-dot="0" aria-label="Professional Analysis"></button>
+        <button class="viz-dot" data-viz-dot="1" aria-label="Immersive Visual"></button>
+      </div>
     </main>
 
     <aside class="settings-modal effects-modal" id="effectsModal" hidden>
@@ -154,25 +198,29 @@
           <div class="fx-section-title">
             <span data-i18n="preset">预设</span>
             <div class="preset-actions">
+              <button class="mini-btn lg-button" id="savePresetBtn"><svg class="icon icon-sm"><use href="#icon-save"></use></svg><span data-i18n="save">保存</span></button>
               <button class="mini-btn lg-button" id="resetFxBtn"><svg class="icon icon-sm"><use href="#icon-reset"></use></svg><span data-i18n="reset">重置</span></button>
               <button class="mini-btn lg-button" id="exportPresetBtn"><svg class="icon icon-sm"><use href="#icon-export"></use></svg><span data-i18n="export">导出</span></button>
               <button class="mini-btn lg-button" id="importPresetBtn"><svg class="icon icon-sm"><use href="#icon-import"></use></svg><span data-i18n="import">导入</span></button>
             </div>
           </div>
           <div class="preset-list" id="presetList"></div>
+          <!-- 这一行是「新建预设」的输入行，不是一条已保存的预设：
+               所以只保留「名称 + 保存」，并带明显的「＋ 新建预设」标记，
+               不再放重命名 / 删除 / 开关（那三项对新建行没有意义，
+               放在这里只会让人以为是一条点不动的坏条目）。 -->
           <div class="preset-row preset-row--new">
             <input type="text" id="presetNameInput" class="preset-name-input" maxlength="40" spellcheck="false" data-i18n-ph="presetNamePlaceholder" placeholder="RlonIR_">
-            <div class="preset-row-actions">
-              <button class="mini-btn lg-button" id="savePresetBtn"><svg class="icon icon-sm"><use href="#icon-save"></use></svg><span data-i18n="save">保存</span></button>
-              <button class="mini-btn lg-button" id="renamePresetBtn" disabled><svg class="icon icon-sm"><use href="#icon-edit"></use></svg><span data-i18n="rename">重命名</span></button>
-              <button class="mini-btn lg-button" id="deletePresetBtn" disabled><svg class="icon icon-sm"><use href="#icon-trash"></use></svg><span data-i18n="delete">删除</span></button>
-            </div>
-            <label class="switch"><input type="checkbox" id="presetNewToggle" disabled></label>
+            <span class="preset-new-tag"><svg class="icon icon-sm"><use href="#icon-plus"></use></svg><span data-i18n="newPreset">新建预设</span></span>
           </div>
         </div>
 
-        <div class="fx-section">
-          <div class="fx-section-title"><span data-i18n="equalizer">均衡器</span></div>
+        <!-- 均衡器卡片不参与折叠：它是常驻的主要调节区，始终完整展开 -->
+        <div class="fx-section" id="eqSection">
+          <div class="fx-section-title">
+            <span data-i18n="equalizer">均衡器</span>
+            <div class="eq-presets" id="eqPresets"></div>
+          </div>
           <div class="eq-bands" id="eqBands"></div>
         </div>
 
@@ -259,6 +307,96 @@
           <div class="param"><label data-i18n="lookahead">前瞻</label><input type="range" id="limiterLookahead" min="0.5" max="10" value="2" step="0.5"><span id="limiterLookaheadVal">2.0 ms</span></div>
           <div class="param"><label data-i18n="release">释放</label><input type="range" id="limiterRelease" min="10" max="500" value="60" step="5"><span id="limiterReleaseVal">60 ms</span></div>
         </div>
+
+        <!-- ============================================================
+             以下为追加的效果器：一律接在「实时音效」列表末尾，
+             使用与上方完全相同的卡片 / 开关 / 折叠 / 参数行结构。
+             ============================================================ -->
+
+        <div class="fx-section" id="dynEqParams">
+          <div class="fx-section-title"><span data-i18n="dynEq">动态 EQ</span><label class="switch"><input type="checkbox" id="fxDynEq"></label></div>
+          <div class="param"><label data-i18n="frequency">频率</label><input type="range" id="dynEqFreq" min="40" max="16000" value="200" step="10"><span id="dynEqFreqVal">200 Hz</span></div>
+          <div class="param"><label data-i18n="q">Q 值</label><input type="range" id="dynEqQ" min="0.3" max="8" value="1.2" step="0.1"><span id="dynEqQVal">1.20</span></div>
+          <div class="param"><label data-i18n="gain">增益</label><input type="range" id="dynEqGain" min="-18" max="18" value="-6" step="0.5"><span id="dynEqGainVal">-6.0 dB</span></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="dynEqThreshold" min="-60" max="0" value="-30" step="1"><span id="dynEqThresholdVal">-30 dB</span></div>
+          <div class="param"><label data-i18n="range">作用范围</label><input type="range" id="dynEqRange" min="0" max="24" value="12" step="1"><span id="dynEqRangeVal">12 dB</span></div>
+          <div class="param"><label data-i18n="attack">启动</label><input type="range" id="dynEqAttack" min="0.5" max="200" value="10" step="0.5"><span id="dynEqAttackVal">10 ms</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="dynEqRelease" min="5" max="1000" value="150" step="5"><span id="dynEqReleaseVal">150 ms</span></div>
+        </div>
+
+        <div class="fx-section" id="mbCompParams">
+          <div class="fx-section-title"><span data-i18n="mbComp">多段压缩</span><label class="switch"><input type="checkbox" id="fxMbComp"></label></div>
+          <div class="param"><label data-i18n="lowXover">低频分频</label><input type="range" id="mbLowXover" min="40" max="800" value="200" step="10"><span id="mbLowXoverVal">200 Hz</span></div>
+          <div class="param"><label data-i18n="highXover">高频分频</label><input type="range" id="mbHighXover" min="1000" max="12000" value="3000" step="100"><span id="mbHighXoverVal">3000 Hz</span></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="mbThreshold" min="-60" max="0" value="-20" step="1"><span id="mbThresholdVal">-20 dB</span></div>
+          <div class="param"><label data-i18n="ratio">压缩比</label><input type="range" id="mbRatio" min="1" max="20" value="3" step="0.5"><span id="mbRatioVal">3.0:1</span></div>
+          <div class="param"><label data-i18n="attack">启动</label><input type="range" id="mbAttack" min="0.5" max="200" value="10" step="0.5"><span id="mbAttackVal">10 ms</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="mbRelease" min="5" max="1000" value="120" step="5"><span id="mbReleaseVal">120 ms</span></div>
+          <div class="param"><label data-i18n="lowGain">低频增益</label><input type="range" id="mbLowGain" min="-24" max="24" value="0" step="0.5"><span id="mbLowGainVal">0.0 dB</span></div>
+          <div class="param"><label data-i18n="midGain">中频增益</label><input type="range" id="mbMidGain" min="-24" max="24" value="0" step="0.5"><span id="mbMidGainVal">0.0 dB</span></div>
+          <div class="param"><label data-i18n="highGain">高频增益</label><input type="range" id="mbHighGain" min="-24" max="24" value="0" step="0.5"><span id="mbHighGainVal">0.0 dB</span></div>
+        </div>
+
+        <div class="fx-section" id="deesserParams">
+          <div class="fx-section-title"><span data-i18n="deesser">去齿音</span><label class="switch"><input type="checkbox" id="fxDeesser"></label></div>
+          <div class="param"><label data-i18n="frequency">频率</label><input type="range" id="dsFreq" min="2000" max="12000" value="6000" step="100"><span id="dsFreqVal">6000 Hz</span></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="dsThreshold" min="-60" max="0" value="-24" step="1"><span id="dsThresholdVal">-24 dB</span></div>
+          <div class="param"><label data-i18n="range">作用范围</label><input type="range" id="dsRange" min="0" max="40" value="12" step="1"><span id="dsRangeVal">12 dB</span></div>
+          <div class="param"><label data-i18n="attack">启动</label><input type="range" id="dsAttack" min="0.1" max="50" value="1" step="0.1"><span id="dsAttackVal">1.0 ms</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="dsRelease" min="5" max="500" value="60" step="5"><span id="dsReleaseVal">60 ms</span></div>
+        </div>
+
+        <div class="fx-section" id="expanderParams">
+          <div class="fx-section-title"><span data-i18n="expander">扩展器</span><label class="switch"><input type="checkbox" id="fxExpander"></label></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="expThreshold" min="-80" max="0" value="-40" step="1"><span id="expThresholdVal">-40 dB</span></div>
+          <div class="param"><label data-i18n="ratio">扩展比</label><input type="range" id="expRatio" min="1" max="10" value="2" step="0.1"><span id="expRatioVal">2.0:1</span></div>
+          <div class="param"><label data-i18n="attack">启动</label><input type="range" id="expAttack" min="0.1" max="100" value="5" step="0.1"><span id="expAttackVal">5.0 ms</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="expRelease" min="5" max="1000" value="150" step="5"><span id="expReleaseVal">150 ms</span></div>
+          <div class="param"><label data-i18n="range">作用范围</label><input type="range" id="expRange" min="0" max="60" value="24" step="1"><span id="expRangeVal">24 dB</span></div>
+        </div>
+
+        <div class="fx-section" id="transientParams">
+          <div class="fx-section-title"><span data-i18n="transient">瞬态整形</span><label class="switch"><input type="checkbox" id="fxTransient"></label></div>
+          <div class="param"><label data-i18n="transientAttack">起音</label><input type="range" id="trAttack" min="0" max="100" value="50" step="1"><span id="trAttackVal">0.50</span></div>
+          <div class="param"><label data-i18n="transientSustain">延音</label><input type="range" id="trSustain" min="0" max="100" value="50" step="1"><span id="trSustainVal">0.50</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="trMix" min="0" max="100" value="100" step="1"><span id="trMixVal">1.00</span></div>
+          <div class="param"><label data-i18n="outputGain">输出</label><input type="range" id="trOutput" min="-24" max="24" value="0" step="0.5"><span id="trOutputVal">0.0 dB</span></div>
+        </div>
+
+        <div class="fx-section" id="clipperParams">
+          <div class="fx-section-title"><span data-i18n="clipper">削波 / 饱和</span><label class="switch"><input type="checkbox" id="fxClipper"></label></div>
+          <div class="param"><label data-i18n="drive">驱动</label><input type="range" id="clipDrive" min="1" max="12" value="2" step="0.1"><span id="clipDriveVal">2.0</span></div>
+          <div class="param"><label data-i18n="mode">模式</label><select id="clipMode" class="full-select"><option value="soft" selected data-i18n="clipSoft">软削波</option><option value="hard" data-i18n="clipHard">硬削波</option></select></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="clipThreshold" min="-24" max="0" value="-6" step="0.5"><span id="clipThresholdVal">-6.0 dB</span></div>
+          <div class="param"><label data-i18n="ceiling">上限</label><input type="range" id="clipCeiling" min="-12" max="0" value="0" step="0.5"><span id="clipCeilingVal">0.0 dB</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="clipMix" min="0" max="100" value="100" step="1"><span id="clipMixVal">1.00</span></div>
+          <div class="param"><label data-i18n="outputGain">输出</label><input type="range" id="clipOutput" min="-24" max="12" value="0" step="0.5"><span id="clipOutputVal">0.0 dB</span></div>
+        </div>
+
+        <div class="fx-section" id="delayParams">
+          <div class="fx-section-title"><span data-i18n="delay">延迟 / 回声</span><label class="switch"><input type="checkbox" id="fxDelay"></label></div>
+          <div class="param"><label data-i18n="delayTime">延迟时间</label><input type="range" id="delayTime" min="20" max="1000" value="320" step="5"><span id="delayTimeVal">320 ms</span></div>
+          <div class="param"><label data-i18n="feedback">反馈</label><input type="range" id="delayFeedback" min="0" max="90" value="35" step="1"><span id="delayFeedbackVal">0.35</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="delayMix" min="0" max="100" value="25" step="1"><span id="delayMixVal">0.25</span></div>
+          <div class="param"><label data-i18n="delayFilter">反馈滤波</label><input type="range" id="delayFilter" min="1000" max="20000" value="20000" step="100"><span id="delayFilterVal">20000 Hz</span></div>
+          <div class="param"><label data-i18n="pingPong">乒乓</label><select id="delayPingPong" class="full-select"><option value="off" selected data-i18n="off">关</option><option value="on" data-i18n="on">开</option></select></div>
+        </div>
+
+        <div class="fx-section" id="chorusParams">
+          <div class="fx-section-title"><span data-i18n="chorus">合唱</span><label class="switch"><input type="checkbox" id="fxChorus"></label></div>
+          <div class="param"><label data-i18n="rate">速率</label><input type="range" id="chorusRate" min="5" max="800" value="60" step="5"><span id="chorusRateVal">0.60 Hz</span></div>
+          <div class="param"><label data-i18n="depth">深度</label><input type="range" id="chorusDepth" min="0" max="15" value="6" step="0.5"><span id="chorusDepthVal">6.0 ms</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="chorusMix" min="0" max="100" value="40" step="1"><span id="chorusMixVal">0.40</span></div>
+          <div class="param"><label data-i18n="spread">左右错开</label><input type="range" id="chorusSpread" min="0" max="100" value="50" step="1"><span id="chorusSpreadVal">0.50</span></div>
+        </div>
+
+        <div class="fx-section" id="flangerParams">
+          <div class="fx-section-title"><span data-i18n="flanger">镶边</span><label class="switch"><input type="checkbox" id="fxFlanger"></label></div>
+          <div class="param"><label data-i18n="rate">速率</label><input type="range" id="flangerRate" min="5" max="500" value="25" step="5"><span id="flangerRateVal">0.25 Hz</span></div>
+          <div class="param"><label data-i18n="depth">深度</label><input type="range" id="flangerDepth" min="0" max="6" value="3" step="0.1"><span id="flangerDepthVal">3.0 ms</span></div>
+          <div class="param"><label data-i18n="feedback">反馈</label><input type="range" id="flangerFeedback" min="-90" max="90" value="40" step="1"><span id="flangerFeedbackVal">0.40</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="flangerMix" min="0" max="100" value="45" step="1"><span id="flangerMixVal">0.45</span></div>
+        </div>
       </div>
       </div>
       <div class="fx-tab-panel" data-fx-panel="pulse" hidden>
@@ -294,7 +432,7 @@
     <div class="player-right">
       <button class="round-btn lg-button" id="muteBtn" title="静音"><svg class="icon"><use id="muteBtnIcon" href="#icon-volume"></use></svg></button>
       <input type="range" id="volume" min="0" max="100" value="80" step="1">
-      <button class="round-btn lg-button" id="effectsBtn" title="实时音效"><svg class="icon"><use href="#icon-effects"></use></svg></button>
+      <button class="round-btn lg-button" id="effectsBtn" title="实时音效"><svg class="icon"><use href="#icon-dsp"></use></svg></button>
       <button class="round-btn lg-button" id="settingsBtn" title="设置"><svg class="icon"><use href="#icon-settings"></use></svg></button>
     </div>
     <button class="mini-only-btn mini-close-btn" id="miniCloseBtn"><svg class="icon"><use href="#icon-close"></use></svg></button>
@@ -326,10 +464,36 @@
           <select id="deviceSelect" class="compact-select setting-select"></select>
         </label>
         <label class="setting-row"><span data-i18n="closeToTray">关闭时最小化到托盘</span>
-          <input type="checkbox" id="closeToTray">
+          <span class="switch"><input type="checkbox" id="closeToTray"></span>
         </label>
         <div class="settings-about-row">
           <button class="ghost-btn lg-button" id="aboutBtn" data-i18n="about">关于 RlonDSP</button>
+        </div>
+
+        <!-- 版本更新：完全沿用设置窗口既有的行 / 卡片 / 按钮样式 -->
+        <div class="setting-block" id="updateBlock">
+          <div class="setting-block-head">
+            <span data-i18n="updateSection">版本更新</span>
+            <span class="update-version"><span data-i18n="currentVersion">当前版本</span> <b id="updateCurrentVersion">-</b></span>
+          </div>
+          <div class="setting-row setting-row--plain">
+            <span data-i18n="updateStatus">更新状态</span>
+            <span class="update-status" id="updateStatusText" data-i18n="updateIdle">尚未检查</span>
+          </div>
+          <div class="update-progress" id="updateProgressWrap" hidden>
+            <div class="update-progress-track"><span id="updateProgressFill"></span></div>
+            <div class="update-progress-text" id="updateProgressText">0%</div>
+          </div>
+          <div class="update-notes" id="updateNotes" hidden></div>
+          <div class="update-actions">
+            <button class="ghost-btn lg-button" id="checkUpdateBtn"><svg class="icon icon-sm"><use href="#icon-loop-list"></use></svg><span data-i18n="checkUpdate">检查更新</span></button>
+            <button class="primary-btn lg-button" id="installUpdateBtn" hidden data-i18n="installNow">立即更新</button>
+            <button class="ghost-btn lg-button" id="cancelUpdateBtn" hidden data-i18n="cancelDownload">取消下载</button>
+            <button class="ghost-btn lg-button" id="openReleaseBtn" hidden data-i18n="openReleasePage">打开发布页</button>
+          </div>
+          <label class="setting-row"><span data-i18n="autoCheckUpdate">自动检查更新</span>
+            <span class="switch"><input type="checkbox" id="autoCheckUpdate"></span>
+          </label>
         </div>
       </div>
       <div class="modal-foot">
@@ -346,7 +510,7 @@
       </div>
       <div class="modal-body about-body">
         <div class="about-title">RlonDSP</div>
-        <div class="about-version" id="aboutVersion">1.0.0</div>
+        <div class="about-version" id="aboutVersion">1.0.1</div>
         <div class="about-copyright">Copyright © 2026 RlonDSP. All rights reserved.</div>
         <div class="about-desc" id="aboutDesc"></div>
         <div class="about-upstream">
@@ -368,9 +532,11 @@
     </div>
   </div>
 
-  <script src="glass-motion.js"></script>
-  <script src="dsp-host.js"></script>
+<script src="glass-motion.js"></script>
+<script src="icon-registry.js"></script>
+<script src="dsp-host.js"></script>
   <script src="ir-generator.js"></script>
+  <script src="visual-engine.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

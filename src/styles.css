@@ -64,14 +64,83 @@ body {
    --app-cover 由渲染进程在切歌时写入；没有封面时为 none，自动回退到渐变。 */
 body {
   background-image:
-    var(--app-cover, none),
     radial-gradient(circle at 16% 0%, rgba(76, 125, 255, 0.24), transparent 36%),
     radial-gradient(circle at 86% 14%, rgba(122, 92, 255, 0.20), transparent 32%),
     linear-gradient(160deg, var(--bg), var(--bg));
-  background-size: cover, auto, auto, auto;
+  background-size: auto, auto, auto;
   background-position: center center;
   background-repeat: no-repeat;
   background-attachment: fixed;
+}
+
+/* ============================================================================
+   动态专辑环境背景（Dynamic Album Environment Background）
+   --------------------------------------------------------------------------
+   结构：两层图片层做交叉淡化（切歌时旧的淡出、新的淡入，不闪黑不闪白），
+        上层仍是既有的 .lg-app-bg::before（主题明暗 + 对比遮罩）。
+   层级：z-index:0 的固定层，界面内容全部在它之上（标题栏 3、内容区 2、播放栏 1），
+        因此永远不会盖住文字、按钮、弹窗或任何交互元素；
+        页面没有封面时两层都是透明的，自动回到原有渐变背景。
+   运动：只改 transform / opacity（GPU 合成），不重绘图片、不重新模糊。
+   ========================================================================== */
+.album-env {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* 关键：这是「贴屏幕」的固定层，不受 body 圆角裁剪。
+     必须让它自己带上与窗口一致的圆角，否则不透明的背景会填满
+     窗口四角的圆弧缺口，看起来就是四个角变回直角。
+     最大化时窗口没有圆角，这里也要跟着取消。 */
+  border-radius: 12px;
+}
+
+html.is-maximized .album-env { border-radius: 0; }
+body.mini-mode .album-env { border-radius: 10px; }
+
+.album-env__layer {
+  position: absolute;
+  /* 比窗口大一圈，位移/缩放时四边永远不会露出底色 */
+  inset: -35%;
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  /* 大幅放大 + 严重模糊：只留下色彩与光影，看不清具体画面 */
+  filter: blur(72px) saturate(1.35);
+  opacity: 0;
+  transform: translate3d(0, 0, 0) scale(1.13);
+  transform-origin: center center;
+  transition: opacity 1.1s var(--ease);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+.album-env__layer.is-visible { opacity: 0.95; }
+
+/* 浅色主题下背景略收敛一点，保证卡片与文字对比度；深色主题下略微压暗 */
+[data-theme="light"] .album-env__layer.is-visible { opacity: 1; }
+[data-theme="dark"] .album-env__layer.is-visible { opacity: 0.85; }
+
+/* 第三层：主题对比遮罩。
+   作用与原来 .lg-app-bg::before 里的主题叠加一致 —— 浅色压一层薄雾、
+   深色压暗，保证任何专辑（哪怕是全白封面）下文字依然清晰。
+   它只跟随主题令牌，切换主题时平滑过渡，不另建主题体系。 */
+.album-env__tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: background 0.4s var(--ease);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(255, 255, 255, 0.06));
+}
+
+[data-theme="dark"] .album-env__tint {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.58));
+}
+
+/* 系统开启「减少动态」时不做位移，只保留静态环境色 */
+@media (prefers-reduced-motion: reduce) {
+  .album-env__layer { transition: opacity 0.4s var(--ease); }
 }
 
 /* ===== 窗口圆角 =====
@@ -530,7 +599,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
   border-bottom: 1px solid var(--line);
 }
 
-.fx-section-title > span:first-child {
+.fx-section-title > span:first-of-type {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -623,6 +692,75 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
 .fx-section .ir-actions,
 .fx-section .preset-actions { gap: 6px; }
 
+/* ===== 统一效果卡片：折叠 / 展开 =====
+   所有 DSP 卡片共用同一套标题栏（折叠箭头 + 名称 + 开关）。
+   折叠只影响界面显示，开关才真正改变音频处理 —— 两者严格分离。
+   折叠后只留标题栏，参数整体收起，几十个效果也不会把面板撑得很长。 */
+.fx-section-title > .switch,
+.fx-section-title > .preset-actions,
+.fx-section-title > .value { margin-left: auto; }
+
+.fx-caret {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0 2px 0 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: transform 0.18s var(--ease), background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.fx-caret .icon { width: 13px; height: 13px; }
+.fx-caret:hover { background: var(--hover); color: var(--text); }
+.fx-section.collapsed .fx-caret { transform: rotate(-90deg); }
+
+/* 折叠时只保留标题栏：参数、按钮、列表全部收起 */
+.fx-section.collapsed > *:not(.fx-section-title) { display: none; }
+.fx-section.collapsed .fx-section-title {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.fx-section.collapsed { padding: 8px 12px; }
+
+/* 均衡器风格预设：固定 8 种风格按钮，排在「均衡器」标题右侧。
+   点击即把 10 段 EQ 调成该风格曲线，当前生效的风格会点亮。 */
+.eq-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.eq-preset-btn {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--lg-micro-bg);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.eq-preset-btn:hover { background: var(--hover); color: var(--text); }
+.eq-preset-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* 实时音效面板：每个功能区块之间补一条可见的分割线。
    原先各区块只有一层近乎透明的白色描边，浅色背景下几乎看不见，
    区块之间糊在一起；这里在间距中间补一条实色细线作为区隔。 */
@@ -650,7 +788,152 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
   background: var(--lg-bg-content);
   border: 1px solid var(--lg-content-border);
 }
-.preset-row--new { margin-top: 6px; }
+/* 「新建预设」行：与已保存的预设行刻意做出区分。
+   虚线描边 + 透明底 + 右侧「＋ 新建预设」标记，
+   让人一眼看出这是「在这里新建一条」，而不是一条用不了的预设。 */
+.preset-row--new {
+  margin-top: 6px;
+  border-style: dashed;
+  background: transparent;
+}
+
+/* 正在使用的预设：蓝边 + 淡蓝底，与未启用的条目一眼区分 */
+.preset-row.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* 条目右侧的操作按钮只留图标：正方形、图标居中，不再带文字 */
+.preset-row .preset-row-actions .mini-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== 设置窗口：版本更新 =====
+   沿用设置窗口既有的卡片 / 行 / 按钮 / 令牌，只补布局，
+   不新建主题，颜色全部来自当前的玻璃令牌与强调色。 */
+.setting-block {
+  margin: 14px 0 4px;
+  padding: 12px 13px;
+  border-radius: var(--lg-radius-sm);
+  background: var(--lg-bg-content);
+  border: 1px solid var(--lg-content-border);
+}
+
+.setting-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.setting-block-head .update-version {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.setting-block-head .update-version b {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.setting-row--plain { border-bottom: 0; }
+
+.update-status {
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.update-status.is-ok { color: var(--accent); }
+.update-status.is-warn { color: #ff9f43; }
+.update-status.is-error { color: #ff5b6b; }
+
+.update-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 2px;
+}
+
+/* 这里的 display:flex 会盖过 hidden 属性的默认样式，需要显式让位 */
+.update-progress[hidden],
+.update-notes[hidden],
+.update-actions button[hidden] { display: none; }
+
+.update-progress-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--lg-micro-bg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.update-progress-track > span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.15s linear;
+}
+
+.update-progress-text {
+  flex: none;
+  min-width: 84px;
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.update-notes {
+  margin: 8px 0 2px;
+  padding: 9px 10px;
+  max-height: 150px;
+  overflow: auto;
+  border-radius: 9px;
+  background: var(--lg-micro-bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+
+.preset-new-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  margin-left: auto;
+  padding-right: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.preset-new-tag .icon { width: 14px; height: 14px; }
 .preset-name-input {
   flex: 0 1 168px;
   min-width: 0;
@@ -1194,4 +1477,601 @@ body.mini-mode .toast { bottom: 6px; }
 /* 中间频谱展示区：四边都不需要描边 */
 .app-shell > .main-panel {
   border-width: 0;
+}
+
+/* 频谱区（两页都在这块里）去掉面板级毛玻璃。
+   原因：它的背景本来就是经过 72px 模糊的专辑色，这层毛玻璃在画面上几乎看不出来
+   （实测开/关的平均像素差只有 0.42/255），却会把整块区域提升成合成层，
+   使两页文字都失去次像素抗锯齿、看起来发虚。去掉后文字恢复清晰。 */
+.app-shell > .main-panel.lg-surface--panel {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ============================================================================
+   频谱空间：横向双页面
+   --------------------------------------------------------------------------
+   PAGE 1 = 专业分析（现有 10 路可视化，完全不动）
+   PAGE 2 = 沉浸视觉工作区（Audio-Reactive Visual Engine）
+   翻页只平移视口，不重新加载任何内容；隐藏页的渲染由脚本真正停表。
+   ========================================================================== */
+.main-panel { position: relative; overflow: hidden; }
+
+.viz-pager {
+  /* 两个页面各占满整个可视区，靠显隐 + 过渡动画切换。
+     不再用「200% 宽容器 + transform 平移」：那种做法会把整个频谱区
+     强制提升成合成层，浏览器会关掉子像素抗锯齿，两页文字都会发虚。 */
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: block;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.viz-page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  /* 静止状态不做任何 transform / will-change：
+     文字保持浏览器默认的次像素抗锯齿，最清晰。 */
+}
+
+/* 当前页：完全不透明、参与布局与绘制，且不带任何合成层属性 */
+.viz-page.is-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* 切换瞬间才有动画：旧页向左淡出，新页从右侧滑入 */
+.viz-page.is-in { animation: vizPageIn 0.36s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.viz-page.is-out { animation: vizPageOut 0.36s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes vizPageIn {
+  from { opacity: 0; transform: translate3d(5%, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes vizPageOut {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate3d(-5%, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-page.is-in,
+  .viz-page.is-out { animation-duration: 0.01ms; }
+}
+
+/* 第二页：上方主视觉画布 + 下方效果卡片工作区，比例随效果数量自适应 */
+.visual-workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  /* 三行：主视觉画布 / 预设条 / 效果卡片 */
+  grid-template-rows: minmax(150px, 1.15fr) auto minmax(0, 1fr);
+  gap: 10px;
+}
+
+.visual-main {
+  position: relative;
+  min-height: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--lg-bg-panel);
+  border: 1px solid var(--lg-border);
+}
+
+.visual-canvas { display: block; width: 100%; height: 100%; }
+
+.visual-hud {
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.visual-hud-title { font-weight: 700; text-transform: uppercase; color: var(--text); }
+.visual-hud-stats { font-family: "Consolas", "SFMono-Regular", monospace; }
+
+/* 预设条：自动模式 + 固定预设 / 预设组合 */
+.visual-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 0 1px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.vfx-chip {
+  flex: none;
+  height: 24px;
+  padding: 0 11px;
+  border: 1px solid var(--lg-border);
+  border-radius: 999px;
+  background: var(--lg-micro-bg);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.vfx-chip:hover { color: var(--text); background: var(--hover); }
+
+.vfx-chip.is-active {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.vfx-chip--auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+}
+
+.vfx-chip--auto .icon { width: 12px; height: 12px; }
+
+/* 效果卡片：同一套设计语言，尺寸随效果特性与可用空间自适应 */
+.visual-cards {
+  min-height: 0;
+  overflow: auto;
+  /* 用「会换行的弹性行」而不是固定网格：
+     卡片宽度自动跟随窗口，每一行的最后一个卡片会把剩下的宽度吃掉，
+     所以右侧不会再空出一条空白。 */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  align-content: flex-start;
+  gap: 8px;
+}
+
+.vfx-card {
+  flex: 1 1 var(--vfx-col, 300px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--lg-bg-panel);
+  border: 1px solid var(--lg-border);
+  overflow: hidden;
+}
+
+.vfx-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vfx-head .vfx-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vfx-head .vfx-cat {
+  flex: none;
+  font-size: 9px;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* 卡片被拉高时，参数行均匀铺开，看起来是“填满”而不是底部空一截 */
+.vfx-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  padding: 2px 10px 10px;
+}
+.vfx-card.collapsed .vfx-body { display: none; }
+.vfx-card.collapsed .vfx-head { border-bottom: 0; }
+
+.vfx-card .param { grid-template-columns: 68px 1fr 62px; margin: 4px 0; }
+
+/* 分页指示点 */
+.viz-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 5;
+}
+
+.viz-dot {
+  width: 22px;
+  height: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lg-micro-bg);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 0.2s var(--ease), width 0.2s var(--ease);
+}
+
+.viz-dot.active { width: 34px; background: var(--accent); border-color: var(--accent); }
+
+/* ============================================================================
+   窗口状态过渡动画
+   --------------------------------------------------------------------------
+   最大 / 还原 / 从任务栏恢复：窗口尺寸由系统瞬间改变，这里给内容加一段
+   极短的淡入 + 微缩放，让这次跳变看起来是连续的，不闪烁。
+   起始缩放略大于 1，因此过渡过程中不会在窗口四边露出底色缝隙。
+   最小化：先播放"淡出 + 轻微放大"，动画结束后才真正最小化。
+   ========================================================================== */
+@keyframes winAnimIn {
+  from { opacity: 0.62; transform: scale(1.012); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes winAnimOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.02); }
+}
+
+body.win-anim-in { animation: winAnimIn 0.30s var(--lg-ease); }
+body.win-anim-out { animation: winAnimOut 0.18s ease-in forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  body.win-anim-in,
+  body.win-anim-out { animation: none; }
+}
+
+/* ============================================================================
+   RlonDSP Tactile Vector UI
+   --------------------------------------------------------------------------
+   这一层负责“手感”：让软件内部所有按钮共用同一套设计与状态机。
+
+   结构（从下往上）：
+     Button Surface  →  微边框/斜面  →  顶部高光  →  矢量图标  →  交互状态
+
+   硬性约束（改这一块时必须遵守）：
+     1. 只动 transform / opacity / 颜色 / 阴影，绝不动 width / height / padding，
+        所以卡片高度、工具栏宽度、播放栏位置都不会变化；
+     2. 不使用 will-change、不把控件提升成合成层（层一多，文字就会发虚）；
+     3. 不使用大范围发光、厚重 3D、弹跳动画 —— 这是生产工具，不是游戏界面。
+   ========================================================================== */
+:root {
+  /* ---- 表面阶梯 ---- */
+  --tl-surface: rgba(255, 255, 255, 0.66);
+  --tl-surface-hover: rgba(255, 255, 255, 0.92);
+  --tl-surface-pressed: rgba(232, 237, 246, 0.88);
+  --tl-surface-active: rgba(76, 125, 255, 0.14);
+  --tl-surface-disabled: rgba(240, 242, 247, 0.55);
+
+  /* ---- 边框 ---- */
+  --tl-border: rgba(16, 22, 36, 0.10);
+  --tl-border-hover: rgba(16, 22, 36, 0.16);
+  --tl-border-pressed: rgba(16, 22, 36, 0.22);
+
+  /* ---- 高光 / 阴影（一层高光 + 一层环境阴影 = 微立体） ---- */
+  --tl-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --tl-highlight-active: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --tl-shadow-rest: 0 1px 2px rgba(16, 22, 36, 0.10), 0 2px 7px rgba(16, 22, 36, 0.06);
+  --tl-shadow-hover: 0 2px 5px rgba(16, 22, 36, 0.14), 0 8px 20px rgba(16, 22, 36, 0.12);
+  --tl-shadow-pressed: 0 1px 1px rgba(16, 22, 36, 0.08);
+  --tl-inset-pressed: inset 0 1.5px 3px rgba(16, 22, 36, 0.16), inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+
+  /* ---- 图标色 ---- */
+  --tl-icon-disabled: rgba(120, 128, 145, 0.55);
+
+  /* ---- 焦点圈（键盘 Tab 用，鼠标点击不出现） ---- */
+  --tl-focus-ring: 0 0 0 2px rgba(76, 125, 255, 0.5);
+
+  /* ---- 动效令牌：全软件统一的时间与曲线 ---- */
+  --motion-instant: 70ms;
+  --motion-fast: 120ms;
+  --motion-normal: 160ms;
+  --motion-slow: 240ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---- 触感位移：0.5px 视觉抬升 + 1px 按压深度 ---- */
+  --tl-lift: -0.5px;
+  --tl-press: 1px;
+}
+
+[data-theme="dark"] {
+  --tl-surface: rgba(255, 255, 255, 0.07);
+  --tl-surface-hover: rgba(255, 255, 255, 0.13);
+  --tl-surface-pressed: rgba(0, 0, 0, 0.28);
+  --tl-surface-active: rgba(111, 146, 255, 0.18);
+  --tl-surface-disabled: rgba(255, 255, 255, 0.03);
+
+  --tl-border: rgba(255, 255, 255, 0.10);
+  --tl-border-hover: rgba(255, 255, 255, 0.18);
+  --tl-border-pressed: rgba(255, 255, 255, 0.05);
+
+  --tl-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --tl-highlight-active: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --tl-shadow-rest: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.22);
+  --tl-shadow-hover: 0 2px 6px rgba(0, 0, 0, 0.45), 0 10px 22px rgba(0, 0, 0, 0.34);
+  --tl-shadow-pressed: 0 1px 1px rgba(0, 0, 0, 0.30);
+  --tl-inset-pressed: inset 0 1.5px 3px rgba(0, 0, 0, 0.45), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+
+  --tl-icon-disabled: rgba(255, 255, 255, 0.28);
+  --tl-focus-ring: 0 0 0 2px rgba(111, 146, 255, 0.55);
+}
+
+/* ---------------------------------------------------------------------------
+   1) 统一状态机：所有内部按钮共用同一套时间与曲线
+   ------------------------------------------------------------------------- */
+.tb-btn,
+.icon-btn,
+.round-btn,
+.mini-btn,
+.ghost-btn,
+.tool-btn,
+.primary-btn,
+.fx-caret,
+.vfx-chip,
+.viz-dot {
+  /* 离开 hover 时的回归：稍快一点，不能“拖泥带水” */
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out);
+}
+
+/* 图标层单独过渡：按压时图标跟着表面一起“陷”下去一点点 */
+.tb-btn > .icon,
+.icon-btn > .icon,
+.round-btn > .icon,
+.mini-btn > .icon,
+.ghost-btn > .icon,
+.tool-btn > .icon,
+.primary-btn > .icon,
+.fx-caret > .icon {
+  transition:
+    transform var(--motion-fast) var(--motion-ease-out),
+    opacity var(--motion-fast) var(--motion-ease-out);
+}
+
+/* 鼠标移入：只做 0.5px 视觉抬升 + 阴影稍微变实，绝不放大跳动 */
+@media (hover: hover) {
+  .tb-btn:not(.tb-close):hover,
+  .icon-btn:hover,
+  .mini-btn:hover,
+  .ghost-btn:hover,
+  .tool-btn:hover,
+  .fx-caret:hover {
+    transform: translateY(var(--tl-lift));
+    border-color: var(--tl-border-hover);
+    box-shadow: var(--tl-highlight), var(--tl-shadow-hover);
+  }
+
+  .tb-btn:not(.tb-close):hover > .icon,
+  .icon-btn:hover > .icon,
+  .mini-btn:hover > .icon,
+  .ghost-btn:hover > .icon,
+  .tool-btn:hover > .icon,
+  .fx-caret:hover > .icon {
+    transform: translateY(var(--tl-lift));
+  }
+
+  /* 播放控制：原来的 hover 会放大 8%，属于“游戏按钮感”，改成微抬升 */
+  .round-btn:not(.play):hover {
+    transform: translateY(var(--tl-lift));
+    box-shadow: var(--tl-highlight), var(--tl-shadow-hover);
+  }
+
+  .round-btn:not(.play):hover > .icon { transform: translateY(var(--tl-lift)); }
+
+  .round-btn.play:hover {
+    transform: translateY(var(--tl-lift));
+    box-shadow: 0 2px 6px rgba(16, 22, 36, 0.16), 0 8px 20px rgba(76, 125, 255, 0.28);
+  }
+
+  .vfx-chip:hover { transform: translateY(var(--tl-lift)); box-shadow: var(--tl-shadow-rest); }
+  .viz-dot:hover { transform: translateY(var(--tl-lift)); }
+}
+
+/* 按下：表面内陷 + 阴影收缩 + 图标跟着下沉，1px 深度，不做夸张弹跳。
+   注意：这里必须带上 :not() 版本，否则上面「鼠标移入」的规则优先级更高，
+   按住不放时看到的还是 hover 状态（圆形按钮曾出现这个问题）。 */
+.tb-btn:active,
+.tb-btn:not(.tb-close):active,
+.icon-btn:active,
+.round-btn:active,
+.round-btn:not(.play):active,
+.round-btn.play:active,
+.mini-btn:active,
+.ghost-btn:active,
+.tool-btn:active,
+.primary-btn:active,
+.fx-caret:active,
+.vfx-chip:active {
+  transform: translateY(var(--tl-press)) scale(0.988);
+  box-shadow: var(--tl-inset-pressed);
+}
+
+.tb-btn:active > .icon,
+.tb-btn:not(.tb-close):active > .icon,
+.icon-btn:active > .icon,
+.round-btn:active > .icon,
+.round-btn:not(.play):active > .icon,
+.round-btn.play:active > .icon,
+.mini-btn:active > .icon,
+.ghost-btn:active > .icon,
+.tool-btn:active > .icon,
+.primary-btn:active > .icon,
+.fx-caret:active > .icon {
+  transform: translateY(var(--tl-press)) scale(0.97);
+}
+
+/* 键盘焦点：克制的焦点圈，鼠标点击不会出现（:focus-visible） */
+.tb-btn:focus-visible,
+.icon-btn:focus-visible,
+.round-btn:focus-visible,
+.mini-btn:focus-visible,
+.ghost-btn:focus-visible,
+.tool-btn:focus-visible,
+.primary-btn:focus-visible,
+.fx-caret:focus-visible,
+.vfx-chip:focus-visible,
+.viz-dot:focus-visible {
+  outline: none;
+  box-shadow: var(--tl-focus-ring), var(--tl-highlight);
+}
+
+/* 禁用：整体变淡变平，不响应 hover 位移 */
+.tb-btn:disabled,
+.icon-btn:disabled,
+.round-btn:disabled,
+.mini-btn:disabled,
+.ghost-btn:disabled,
+.tool-btn:disabled,
+.primary-btn:disabled {
+  transform: none;
+  cursor: default;
+  opacity: 0.5;
+  box-shadow: none;
+  color: var(--tl-icon-disabled);
+}
+
+/* 选中态（例如置顶、随机、单曲循环）：只染底色与图标色，不做发光 */
+.tb-btn.is-active,
+.mini-btn.is-active,
+.tool-btn.is-active,
+.ghost-btn.is-active,
+.round-btn.is-active {
+  background: var(--tl-surface-active);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------------------------------------------------------------------------
+   2) 图标状态变化：Play↔Pause、音量↔静音 之类的“软切换”
+   （几何差异大的图标不做强行变形，只做 140ms 的轻微淡入+微缩放，避免畸形）
+   ------------------------------------------------------------------------- */
+.icon.is-swapping {
+  animation: iconSwap var(--motion-normal) var(--motion-ease-out);
+}
+
+@keyframes iconSwap {
+  from { opacity: 0.45; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ---------------------------------------------------------------------------
+   3) 开关（Toggle）：Track + Thumb + 高低面 + 主题色指示
+   尺寸保持原样（34 × 19，滑块 13），只换成更精致的表面与更顺的过渡
+   ------------------------------------------------------------------------- */
+.switch input[type="checkbox"] {
+  background: rgba(120, 128, 145, 0.32);
+  border: 1px solid var(--tl-border);
+  box-shadow: inset 0 1px 2px rgba(16, 22, 36, 0.16);
+  transition:
+    background-color var(--motion-normal) var(--motion-ease-out),
+    border-color var(--motion-normal) var(--motion-ease-out),
+    box-shadow var(--motion-normal) var(--motion-ease-out);
+}
+
+[data-theme="dark"] .switch input[type="checkbox"] {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.switch input[type="checkbox"]::after {
+  /* 用 transform 平移：不再修改 left（修改 left 会让浏览器重新排版） */
+  left: 2px;
+  transform: translateX(0);
+  box-shadow:
+    0 1px 2px rgba(16, 22, 36, 0.28),
+    0 2px 5px rgba(16, 22, 36, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition:
+    transform var(--motion-normal) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+.switch input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: transparent;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.switch input[type="checkbox"]:checked::after {
+  left: 2px;
+  transform: translateX(15px);
+  box-shadow:
+    0 1px 2px rgba(16, 22, 36, 0.30),
+    0 2px 6px rgba(16, 22, 36, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+@media (hover: hover) {
+  .switch:hover input[type="checkbox"]:not(:checked) {
+    background: rgba(120, 128, 145, 0.42);
+    border-color: var(--tl-border-hover);
+  }
+}
+
+.switch input[type="checkbox"]:active::after { transform: translateX(0) scale(0.94); }
+.switch input[type="checkbox"]:checked:active::after { transform: translateX(15px) scale(0.94); }
+
+.switch input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--tl-focus-ring), inset 0 1px 2px rgba(16, 22, 36, 0.16);
+}
+
+/* ---------------------------------------------------------------------------
+   4) 标题栏标识：由 PNG 换成矢量标记（任意 DPI 都清晰，不再是位图）
+   ------------------------------------------------------------------------- */
+.titlebar-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: block;
+  overflow: hidden;
+}
+
+/* 尊重系统「减少动态效果」设置 */
+@media (prefers-reduced-motion: reduce) {
+  .tb-btn,
+  .icon-btn,
+  .round-btn,
+  .mini-btn,
+  .ghost-btn,
+  .tool-btn,
+  .primary-btn,
+  .fx-caret,
+  .vfx-chip,
+  .viz-dot,
+  .switch input[type="checkbox"],
+  .switch input[type="checkbox"]::after {
+    transition-duration: 1ms !important;
+  }
+  .icon.is-swapping { animation: none; }
 }

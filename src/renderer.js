@@ -24,6 +24,135 @@ const I18N = {
     pulseFeedback: '脉冲反馈',
     reset: '重置',
     preset: '预设',
+    newPreset: '新建预设',
+    clipper: '削波 / 饱和',
+    delay: '延迟 / 回声',
+    chorus: '合唱',
+    flanger: '镶边',
+    delayTime: '延迟时间',
+    feedback: '反馈',
+    pingPong: '乒乓',
+    rate: '速率',
+    depth: '深度',
+    spread: '左右错开',
+    mode: '模式',
+    clipSoft: '软削波',
+    clipHard: '硬削波',
+    outputGain: '输出',
+    off: '关',
+    on: '开',
+    collapse: '折叠 / 展开',
+    eqPresetDefault: '默认',
+    eqPresetClassical: '古典',
+    eqPresetHeavyMetal: '重金属',
+    eqPresetPop: '流行',
+    eqPresetJazz: '爵士',
+    eqPresetFolk: '民谣',
+    eqPresetRock: '摇滚',
+    eqPresetElectronic: '电子',
+    updateSection: '版本更新',
+    currentVersion: '当前版本',
+    updateStatus: '更新状态',
+    updateIdle: '尚未检查',
+    checkUpdate: '检查更新',
+    updateChecking: '正在检查更新…',
+    updateUpToDate: '当前已经是最新版本',
+    updateAvailable: '发现新版本',
+    updateNotes: '更新说明',
+    installNow: '立即更新',
+    cancelDownload: '取消下载',
+    updateDownloading: '下载中',
+    updateDownloadDone: '下载完成',
+    updateVerifying: '验证更新',
+    updateReady: '安装准备完成',
+    updateFailed: '更新失败',
+    updateNetError: '检查更新失败（网络不可用或无法连接更新源）',
+    updateNotFound: '更新源上还没有正式版本',
+    updateChecksumFailed: '更新包校验不通过，已停止更新',
+    updateCancelled: '已取消下载',
+    updatePortable: '便携版无法自动安装更新，请打开发布页下载新版本后手动替换',
+    openReleasePage: '打开发布页',
+    autoCheckUpdate: '自动检查更新',
+    updateNewVersionIs: '新版本',
+    updatePublishedAt: '发布时间',
+    restartNow: '重新启动',
+    dynEq: '动态 EQ',
+    mbComp: '多段压缩',
+    deesser: '去齿音',
+    expander: '扩展器',
+    transient: '瞬态整形',
+    frequency: '频率',
+    q: 'Q 值',
+    gain: '增益',
+    range: '作用范围',
+    lowXover: '低频分频',
+    highXover: '高频分频',
+    lowGain: '低频增益',
+    midGain: '中频增益',
+    highGain: '高频增益',
+    transientAttack: '起音',
+    transientSustain: '延音',
+    delayFilter: '反馈滤波',
+    visualPageTitle: '沉浸视觉',
+    vfxHint: '向左滑动进入视觉空间',
+    vfxHeartbeat: '心跳',
+    vfxNebula: '星云',
+    vfxParticles: '粒子星系',
+    vfxLiquid: '液体涟漪',
+    vfxEnergyCore: '能量核心',
+    vfxCymatics: '声波图形',
+    vfxCatLife: '生命',
+    vfxCatCosmic: '宇宙',
+    vfxCatParticle: '粒子',
+    vfxCatFluid: '流体',
+    vfxCatEnergy: '能量',
+    vfxCatScientific: '科学',
+    vfxSensitivity: '灵敏度',
+    vfxGlow: '光晕',
+    vfxEcg: '心电曲线',
+    vfxDensity: '层次',
+    vfxReactivity: '反应强度',
+    vfxDrift: '漂移速度',
+    vfxHueShift: '色相变化',
+    vfxParticleCount: '粒子数量',
+    vfxSpeed: '速度',
+    vfxSpread: '扩散',
+    vfxRipples: '波纹层数',
+    vfxViscosity: '黏度',
+    vfxRays: '射线数量',
+    vfxOrder: '对称阶数',
+    vfxDetail: '细节密度',
+    vfxOrganicPulse: '有机脉冲场',
+    vfxFlowField: '流场',
+    vfxAurora: '极光',
+    vfxFluid: '流体',
+    vfxPlasma: '等离子',
+    vfxElectricField: '电场',
+    vfxCatOrganic: '有机',
+    vfxCatField: '场',
+    vfxFlowSpeed: '流动速度',
+    vfxPulseStrength: '脉冲强度',
+    vfxTurbulence: '扰动',
+    vfxAttraction: '吸引 / 排斥',
+    vfxNoiseScale: '噪声尺度',
+    vfxTrail: '拖尾',
+    vfxRibbons: '条带数量',
+    vfxHeight: '高度',
+    vfxShimmer: '闪烁',
+    vfxInjection: '注入强度',
+    vfxDissipation: '耗散',
+    vfxDiffusion: '扩散',
+    vfxContrast: '对比度',
+    vfxDecay: '衰减',
+    vfxBranch: '分叉',
+    vfxLifetime: '生命周期',
+    vfxModeAuto: '自动',
+    vfxPresetNebulaAurora: '星云极光',
+    vfxPresetFluidElectric: '流体电场',
+    vfxPresetPulseCymatics: '脉冲声波',
+    vfxPresetPlasmaFlow: '等离子流场',
+    vfxPresetAuroraElectric: '极光电场',
+    vfxPresetDeepSpace: '星云三重奏',
     save: '保存',
     delete: '删除',
     export: '导出',
@@ -61,6 +190,7 @@ const I18N = {
     language: '语言',
     outputDevice: '输出设备',
     closeToTray: '关闭时最小化到托盘',
+    alwaysOnTop: '始终置顶',
     toastImported: '已导入歌曲',
     toastLoading: '正在读取音乐信息…',
     toastPresetSaved: '预设已保存',
@@ -143,6 +273,135 @@ const I18N = {
     pulseFeedback: 'Pulse Feedback',
     reset: 'Reset',
     preset: 'Presets',
+    newPreset: 'New preset',
+    clipper: 'Clipper / Saturation',
+    delay: 'Delay / Echo',
+    chorus: 'Chorus',
+    flanger: 'Flanger',
+    delayTime: 'Delay time',
+    feedback: 'Feedback',
+    pingPong: 'Ping-pong',
+    rate: 'Rate',
+    depth: 'Depth',
+    spread: 'Stereo spread',
+    mode: 'Mode',
+    clipSoft: 'Soft clip',
+    clipHard: 'Hard clip',
+    outputGain: 'Output',
+    off: 'Off',
+    on: 'On',
+    collapse: 'Collapse / expand',
+    eqPresetDefault: 'Default',
+    eqPresetClassical: 'Classical',
+    eqPresetHeavyMetal: 'Heavy Metal',
+    eqPresetPop: 'Pop',
+    eqPresetJazz: 'Jazz',
+    eqPresetFolk: 'Folk',
+    eqPresetRock: 'Rock',
+    eqPresetElectronic: 'Electronic',
+    updateSection: 'Software update',
+    currentVersion: 'Current version',
+    updateStatus: 'Status',
+    updateIdle: 'Not checked yet',
+    checkUpdate: 'Check for updates',
+    updateChecking: 'Checking for updates…',
+    updateUpToDate: 'You are up to date',
+    updateAvailable: 'Update available',
+    updateNotes: 'Release notes',
+    installNow: 'Update now',
+    cancelDownload: 'Cancel download',
+    updateDownloading: 'Downloading',
+    updateDownloadDone: 'Download complete',
+    updateVerifying: 'Verifying update',
+    updateReady: 'Ready to install',
+    updateFailed: 'Update failed',
+    updateNetError: 'Check failed (network or update source unreachable)',
+    updateNotFound: 'No published release yet',
+    updateChecksumFailed: 'Update package failed verification; aborted',
+    updateCancelled: 'Download cancelled',
+    updatePortable: 'The portable build cannot auto-install. Open the release page and replace it manually.',
+    openReleasePage: 'Open release page',
+    autoCheckUpdate: 'Check for updates automatically',
+    updateNewVersionIs: 'New version',
+    updatePublishedAt: 'Published',
+    restartNow: 'Restart',
+    dynEq: 'Dynamic EQ',
+    mbComp: 'Multiband Compressor',
+    deesser: 'De-esser',
+    expander: 'Expander',
+    transient: 'Transient Shaper',
+    frequency: 'Frequency',
+    q: 'Q',
+    gain: 'Gain',
+    range: 'Range',
+    lowXover: 'Low crossover',
+    highXover: 'High crossover',
+    lowGain: 'Low gain',
+    midGain: 'Mid gain',
+    highGain: 'High gain',
+    transientAttack: 'Attack',
+    transientSustain: 'Sustain',
+    delayFilter: 'Feedback filter',
+    visualPageTitle: 'Immersive Visual',
+    vfxHint: 'Swipe left for the visual space',
+    vfxHeartbeat: 'Heartbeat',
+    vfxNebula: 'Nebula',
+    vfxParticles: 'Particle Galaxy',
+    vfxLiquid: 'Liquid Ripple',
+    vfxEnergyCore: 'Energy Core',
+    vfxCymatics: 'Cymatics',
+    vfxCatLife: 'Life',
+    vfxCatCosmic: 'Cosmic',
+    vfxCatParticle: 'Particle',
+    vfxCatFluid: 'Fluid',
+    vfxCatEnergy: 'Energy',
+    vfxCatScientific: 'Scientific',
+    vfxSensitivity: 'Sensitivity',
+    vfxGlow: 'Glow',
+    vfxEcg: 'ECG',
+    vfxDensity: 'Density',
+    vfxReactivity: 'Reactivity',
+    vfxDrift: 'Drift',
+    vfxHueShift: 'Hue shift',
+    vfxParticleCount: 'Particles',
+    vfxSpeed: 'Speed',
+    vfxSpread: 'Spread',
+    vfxRipples: 'Ripples',
+    vfxViscosity: 'Viscosity',
+    vfxRays: 'Rays',
+    vfxOrder: 'Symmetry',
+    vfxDetail: 'Detail',
+    vfxOrganicPulse: 'Organic Pulse',
+    vfxFlowField: 'Flow Field',
+    vfxAurora: 'Aurora',
+    vfxFluid: 'Fluid',
+    vfxPlasma: 'Plasma',
+    vfxElectricField: 'Electric Field',
+    vfxCatOrganic: 'Organic',
+    vfxCatField: 'Field',
+    vfxFlowSpeed: 'Flow speed',
+    vfxPulseStrength: 'Pulse strength',
+    vfxTurbulence: 'Turbulence',
+    vfxAttraction: 'Attraction',
+    vfxNoiseScale: 'Noise scale',
+    vfxTrail: 'Trail',
+    vfxRibbons: 'Ribbons',
+    vfxHeight: 'Height',
+    vfxShimmer: 'Shimmer',
+    vfxInjection: 'Injection',
+    vfxDissipation: 'Dissipation',
+    vfxDiffusion: 'Diffusion',
+    vfxContrast: 'Contrast',
+    vfxDecay: 'Decay',
+    vfxBranch: 'Branch',
+    vfxLifetime: 'Lifetime',
+    vfxModeAuto: 'Auto',
+    vfxPresetNebulaAurora: 'Nebula Aurora',
+    vfxPresetFluidElectric: 'Fluid Field',
+    vfxPresetPulseCymatics: 'Pulse Wave',
+    vfxPresetPlasmaFlow: 'Plasma Flow',
+    vfxPresetAuroraElectric: 'Aurora Field',
+    vfxPresetDeepSpace: 'Deep Space Trio',
     save: 'Save',
     delete: 'Delete',
     export: 'Export',
@@ -180,6 +439,7 @@ const I18N = {
     language: 'Language',
     outputDevice: 'Output Device',
     closeToTray: 'Close to tray',
+    alwaysOnTop: 'Always on Top',
     toastImported: 'Tracks imported',
     toastLoading: 'Reading track info…',
     toastPresetSaved: 'Preset saved',
@@ -259,7 +519,16 @@ const defaultEffects = {
     tube: false,
     reverb: false,
     noiseGate: false,
-    limiter: true
+    limiter: true,
+    delay: false,
+    chorus: false,
+    flanger: false,
+    clipper: false,
+    expander: false,
+    transient: false,
+    deesser: false,
+    dynEq: false,
+    mbComp: false
   },
   compressor: { thresholdDB: -24, ratio: 4, attackMs: 10, releaseMs: 120 },
   bass: { gainDB: 6, crossoverHz: 80 },
@@ -272,6 +541,23 @@ const defaultEffects = {
   limiter: { ceilingDB: -1, lookaheadMs: 2, releaseMs: 60 },
   // 差分环绕：延迟声道（L/R）与延迟毫秒数
   channelDelay: { enabled: false, channel: 'R', ms: 15 },
+  // 延迟 / 回声（可交叉反馈做乒乓）
+  delay: { timeMs: 320, feedback: 0.35, mix: 0.25, pingPong: false, filterHz: 20000 },
+  // 合唱：速率 / 深度 / 干湿 / 左右错开
+  chorus: { rateHz: 0.6, depthMs: 6, mix: 0.4, spread: 0.5 },
+  // 镶边：速率 / 深度 / 反馈 / 干湿
+  flanger: { rateHz: 0.25, depthMs: 3, feedback: 0.4, mix: 0.45 },
+  // 削波 / 饱和：驱动 / 模式 / 输出补偿
+  clipper: { drive: 2, mode: 'soft', thresholdDB: -6, ceilingDB: 0, mix: 1, outputDB: 0 },
+  // 扩展器 / 瞬态整形 / 去齿音 / 动态 EQ / 多段压缩
+  expander: { threshold: -40, ratio: 2, attackMs: 5, releaseMs: 150, range: 24 },
+  transient: { attack: 0.5, sustain: 0.5, mix: 1, outputDB: 0 },
+  deesser: { freq: 6000, threshold: -24, range: 12, attackMs: 1, releaseMs: 60 },
+  dynEq: { freq: 200, q: 1.2, gainDB: -6, threshold: -30, range: 12, attackMs: 10, releaseMs: 150 },
+  mbComp: {
+    lowXover: 200, highXover: 3000, lowGainDB: 0, midGainDB: 0, highGainDB: 0,
+    threshold: -20, ratio: 3, attackMs: 10, releaseMs: 120
+  },
   ir: { enabled: false, filePath: '', wet: 0.35, predelay: 0.02, highpass: 20, lowpass: 20000, ab: false }
 };
 
@@ -310,12 +596,23 @@ const DSP_BUILTIN_SPECS = [
   { type: 'spatial', name: '空间音效', latencyFrames: 0, tailFrames: 2048, key: 'surround' },
   { type: 'tube', name: '胆机模拟', latencyFrames: 0, tailFrames: 0, key: 'tube' },
   { type: 'ultrasonic', name: '超高频净化', latencyFrames: 0, tailFrames: 0, key: 'ultrasonic' },
+  { type: 'clipper', name: '削波 / 饱和', latencyFrames: 0, tailFrames: 0, key: 'clipper' },
   { type: 'reverb', name: '混响', latencyFrames: 0, tailFrames: 24000, key: 'reverb' },
   { type: 'gate', name: '降噪', latencyFrames: 0, tailFrames: 0, key: 'noiseGate' },
   { type: 'gain', name: '总增益', latencyFrames: 0, tailFrames: 0, key: 'gain' },
   { type: 'limiter', name: '限幅', latencyFrames: 96, tailFrames: 0, key: 'limiter' },
   // 差分环绕：把选定声道整体延后，制造左右时间差（Haas 效应）
   { type: 'channel-delay', name: '差分环绕（声道延迟）', latencyFrames: 0, tailFrames: 0, key: 'channelDelay' },
+  // 时间 / 调制类：延迟线共用同一套基础设施（DelayLine），延迟与尾音如实上报
+  { type: 'delay', name: '延迟 / 回声', latencyFrames: 0, tailFrames: 96000, key: 'delay' },
+  { type: 'chorus', name: '合唱', latencyFrames: 0, tailFrames: 4096, key: 'chorus' },
+  { type: 'flanger', name: '镶边', latencyFrames: 0, tailFrames: 4096, key: 'flanger' },
+  // —— 追加的效果器（按实时音效列表末尾的顺序注册）——
+  { type: 'dyn-eq', name: '动态 EQ', latencyFrames: 0, tailFrames: 0, key: 'dynEq' },
+  { type: 'mb-comp', name: '多段压缩', latencyFrames: 0, tailFrames: 0, key: 'mbComp' },
+  { type: 'deesser', name: '去齿音', latencyFrames: 0, tailFrames: 0, key: 'deesser' },
+  { type: 'expander', name: '扩展器', latencyFrames: 0, tailFrames: 0, key: 'expander' },
+  { type: 'transient', name: '瞬态整形', latencyFrames: 0, tailFrames: 0, key: 'transient' },
   // 卷积在渲染进程的 Web Audio 图里执行，位于内置链条之后
   { type: 'convolution', name: '脉冲卷积（IRS）', latencyFrames: 0, tailFrames: 48000, key: 'ir' }
 ];
@@ -494,11 +791,29 @@ function toggleMiniMode() {
   api.toggleMini();
 }
 
+/**
+ * 图标状态切换（播放↔暂停、音量↔静音、循环模式、最大化↔还原）。
+ * 只做两件事：换成新的矢量图标 + 在它身上播一段 160ms 的轻微淡入/微缩放。
+ * 不延时、不拦截功能：功能状态立即生效，动画只是视觉上的顺滑。
+ */
+function swapIcon(useEl, href) {
+  if (!useEl) return;
+  if (useEl.getAttribute('href') === href) return;
+  useEl.setAttribute('href', href);
+  const svg = useEl.ownerSVGElement;
+  if (!svg) return;
+  svg.classList.remove('is-swapping');
+  // 强制重新开始动画（连续快速切换时也要重播）
+  void svg.getBoundingClientRect();
+  svg.classList.add('is-swapping');
+  window.setTimeout(() => svg.classList.remove('is-swapping'), 220);
+}
+
 function updateModeButton() {
   const icon = $('modeBtnIcon');
   if (!icon) return;
   const map = { list: '#icon-loop-list', single: '#icon-loop-single', random: '#icon-loop-random' };
-  icon.setAttribute('href', map[state.mode] || '#icon-loop-list');
+  swapIcon(icon, map[state.mode] || '#icon-loop-list');
   $('modeBtn').title = t('playbackMode');
 }
 
@@ -534,15 +849,170 @@ function updateNowPlaying() {
   applyCoverBackground(track);
 }
 
+/* ============================================================================
+ * 动态专辑环境背景（Dynamic Album Environment Background）
+ * --------------------------------------------------------------------------
+ * 复用现有的专辑封面数据（track.cover，渲染进程已有的 artwork 来源），
+ * 在原「静态模糊底」的位置升级为动态环境层，不新建第二套封面/主题系统。
+ *
+ * 工作原理：
+ *   封面 → 大幅放大（图层比窗口大 70%）→ 严重模糊 → cover 铺满
+ *        → 由 4 组低频正弦叠加驱动的缓慢漂移 / 呼吸 → 全窗口背景
+ *
+ * 关键约束：
+ *   - 运动只写 transform / opacity（GPU 合成）：不重绘图片、不重复模糊、不重新解码；
+ *   - 轨迹由多组低频正弦叠加（主周期约 7～20 秒），连续且不可预测，不是左右往返；
+ *   - 切歌先预加载新封面，加载成功才交叉淡化（1.1 s），失败保持旧背景不闪；
+ *   - 无封面时整体淡出，回退到原有渐变背景（不出现破图 / 黑框）；
+ *   - 暂停播放时运动幅度平滑降到 30%，恢复播放平滑回到 100%，位置不跳变；
+ *   - 页面不可见时立即停表，避免后台空转；只操作两个图层，不产生额外 DOM。
+ *   - 只属于渲染层，完全不接触音频链路（DSP / AudioWorklet / 引擎均不涉及）。
+ * ========================================================================== */
+const AlbumEnv = (() => {
+  const TARGET_FPS = 30;      // 漂移速度调快后，30 帧写入足以保持顺滑
+  const PAUSED_AMP = 0.3;     // 暂停时的运动幅度
+  const layers = [];
+  let frontIndex = 0;
+  let currentCover = '';
+  let pendingCover = '';
+  let rafId = 0;
+  let lastApply = 0;
+  let clock = 0;        // 累计运行时间（秒）；窗口不可见时不推进，避免回到前台突然跳位
+  let lastTick = 0;
+  let ampTarget = 1;
+  let ampNow = 1;
+  let running = false;
+  let reduceMotion = false;
+
+  function init() {
+    if (layers.length) return true;
+    const a = document.getElementById('albumEnvA');
+    const b = document.getElementById('albumEnvB');
+    if (!a || !b) return false;
+    layers.push(a, b);
+    clock = 0;
+    lastTick = 0;
+    try {
+      reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (error) {
+      reduceMotion = false;
+    }
+    return true;
+  }
+
+  /** 当前可见的图层（新封面淡入后切换到这个索引） */
+  function front() {
+    return layers[frontIndex];
+  }
+
+  /** 把运动轨迹写到两个图层：这样新图层在淡入前就已经处于正确位置，不会跳 */
+  function applyTransform() {
+    if (!layers.length) return;
+    const t = clock;
+    const amp = reduceMotion ? 0 : ampNow;
+    // 多组低频正弦叠加：连续、平滑、没有明显规律。
+    // 主周期约 7～20 秒（此前 20～60 秒偏慢），所以整体漂移明显更活。
+    const x = (Math.sin(t * 0.38) * 1.8 + Math.sin(t * 0.85 + 1.7) * 1.2) * amp;
+    const y = (Math.sin(t * 0.31 + 0.9) * 1.7 + Math.sin(t * 0.71 + 2.6) * 1.1) * amp;
+    const scale = 1.13 + (Math.sin(t * 0.22 + 0.4) * 0.03 + Math.sin(t * 0.52 + 1.1) * 0.018) * amp;
+    const rotate = (Math.sin(t * 0.19 + 2.2) * 0.22 + Math.sin(t * 0.47 + 0.3) * 0.1) * amp;
+    const value = 'translate3d(' + x.toFixed(3) + '%, ' + y.toFixed(3) + '%, 0) '
+      + 'scale(' + scale.toFixed(4) + ') rotate(' + rotate.toFixed(3) + 'deg)';
+    for (let i = 0; i < layers.length; i++) layers[i].style.transform = value;
+  }
+
+  function tick(now) {
+    rafId = 0;
+    if (!running) return;
+    // 用「只在运行时推进」的时间轴：窗口被遮挡或最小化时系统会节流，
+    // 回到前台时从这里接着走，不会因为跳过大段实时时间而突然跳位。
+    if (lastTick) clock += Math.min(0.25, (now - lastTick) / 1000);
+    lastTick = now;
+    // 幅度平滑靠拢目标值：暂停 / 恢复不会突然跳变（约 2 秒过渡）
+    ampNow += (ampTarget - ampNow) * 0.045;
+    if (now - lastApply >= 1000 / TARGET_FPS) {
+      lastApply = now;
+      applyTransform();
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function start() {
+    if (running || !init() || !currentCover) return;
+    running = true;
+    if (!rafId) rafId = requestAnimationFrame(tick);
+  }
+
+  function stop() {
+    running = false;
+    lastTick = 0;      // 停表：下次恢复时从当前时间点继续，不补跳
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+  }
+
+  /** 清空两层并停表（没有封面时回退到原有渐变背景） */
+  function clear() {
+    currentCover = '';
+    pendingCover = '';
+    layers.forEach((layer) => {
+      layer.classList.remove('is-visible');
+      layer.style.backgroundImage = '';
+    });
+    stop();
+  }
+
+  function setCover(url) {
+    if (!init()) return;
+    if (!url) {
+      clear();
+      return;
+    }
+    if (url === currentCover) return;
+    pendingCover = url;
+    // 先加载 + 解码，成功后才进入交叉淡化：不先清空旧背景
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => {
+      if (pendingCover !== url) return;             // 期间又切歌，丢弃这次结果
+      const target = layers[1 - frontIndex];
+      target.style.backgroundImage = 'url("' + url + '")';
+      applyTransform();                             // 先摆到当前运动位置，避免跳变
+      target.classList.add('is-visible');
+      const previous = layers[frontIndex];
+      previous.classList.remove('is-visible');
+      frontIndex = 1 - frontIndex;
+      currentCover = url;
+      start();
+      // 旧图淡出完成后释放引用，避免多首歌曲累积
+      window.setTimeout(() => {
+        if (previous !== layers[frontIndex]) previous.style.backgroundImage = '';
+      }, 1500);
+    };
+    image.onerror = () => {
+      // 加载失败：保持当前背景，不闪、不回退到空白
+      console.warn('[AlbumEnv] 封面加载失败，保持当前背景');
+    };
+    image.src = url;
+  }
+
+  /** 播放状态变化时调整运动幅度（暂停 30%，播放 100%） */
+  function setPlaying(playing) {
+    ampTarget = playing ? 1 : PAUSED_AMP;
+    if (playing) start();
+  }
+
+  return { setCover, setPlaying, start, stop, clear };
+})();
+
 /**
- * 把当前歌曲的专辑封面送到最底层作为背景。
- * 封面本身不做处理，柔化由上层遮罩的高斯模糊完成；
- * 没有封面时置为 none，自动回退到原本的渐变背景。
+ * 把当前歌曲的专辑封面送到最底层做为环境背景。
+ * 封面本身只作为图片资源使用，柔化由图层自身的模糊完成；
+ * 没有封面时整体淡出，自动回退到原本的渐变背景。
  */
 function applyCoverBackground(track) {
-  const cover = track && track.cover ? `url("${track.cover}")` : 'none';
-  if (document.documentElement.style.getPropertyValue('--app-cover') === cover) return;
-  document.documentElement.style.setProperty('--app-cover', cover);
+  AlbumEnv.setCover(track && track.cover ? track.cover : '');
 }
 
 function renderPlaylist() {
@@ -683,10 +1153,12 @@ function togglePlay() {
 function setPlayButton(playing) {
   state.isPlaying = playing;
   const icon = $('playBtnIcon');
-  if (icon) icon.setAttribute('href', playing ? '#icon-pause' : '#icon-play');
+  swapIcon(icon, playing ? '#icon-pause' : '#icon-play');
   $('playBtn').title = playing ? t('pause') || '暂停' : t('play') || '播放';
   // 恢复播放时立即恢复频谱渲染
   if (playing) startVisualizerLoop();
+  // 暂停时专辑环境背景的运动平滑放缓（不是突然冻结），恢复播放再平滑回来
+  safeRun('专辑环境背景播放状态', () => AlbumEnv.setPlaying(playing));
 }
 
 function seekTo(ratio) {
@@ -705,7 +1177,7 @@ function toggleMute() {
   state.muted = !state.muted;
   if (audioElement) audioElement.muted = state.muted;
   const icon = $('muteBtnIcon');
-  if (icon) icon.setAttribute('href', state.muted ? '#icon-mute' : '#icon-volume');
+  swapIcon(icon, state.muted ? '#icon-mute' : '#icon-volume');
   $('muteBtn').title = state.muted ? t('unmute') || '取消静音' : t('mute') || '静音';
 }
 
@@ -743,6 +1215,8 @@ function applyEffectsToUIRaw() {
     slider.value = String(Math.round(fx.eqGains[index] * 10));
     slider.parentElement.querySelector('.eq-db').textContent = `${fx.eqGains[index].toFixed(1)} dB`;
   });
+  // 均衡器风格高亮：与曲线一致才点亮，手动拖动后自动取消
+  syncEqPresetButtons();
   $('fxCompressor').checked = fx.enabled.compressor;
   $('fxBass').checked = fx.enabled.bass;
   $('fxStereo').checked = fx.enabled.stereo;
@@ -753,6 +1227,112 @@ function applyEffectsToUIRaw() {
   $('fxReverb').checked = fx.enabled.reverb;
   $('fxNoiseGate').checked = fx.enabled.noiseGate;
   $('fxLimiter').checked = fx.enabled.limiter;
+  $('fxDelay').checked = fx.enabled.delay;
+  $('fxChorus').checked = fx.enabled.chorus;
+  $('fxFlanger').checked = fx.enabled.flanger;
+  $('fxClipper').checked = fx.enabled.clipper;
+  $('clipDrive').value = String(fx.clipper.drive);
+  $('clipDriveVal').textContent = fx.clipper.drive.toFixed(1);
+  $('clipMode').value = fx.clipper.mode;
+  $('clipOutput').value = String(fx.clipper.outputDB);
+  $('clipOutputVal').textContent = `${fx.clipper.outputDB.toFixed(1)} dB`;
+  $('delayTime').value = String(fx.delay.timeMs);
+  $('delayTimeVal').textContent = `${fx.delay.timeMs} ms`;
+  $('delayFeedback').value = String(Math.round(fx.delay.feedback * 100));
+  $('delayFeedbackVal').textContent = fx.delay.feedback.toFixed(2);
+  $('delayMix').value = String(Math.round(fx.delay.mix * 100));
+  $('delayMixVal').textContent = fx.delay.mix.toFixed(2);
+  $('delayPingPong').value = fx.delay.pingPong ? 'on' : 'off';
+  $('chorusRate').value = String(Math.round(fx.chorus.rateHz * 100));
+  $('chorusRateVal').textContent = `${fx.chorus.rateHz.toFixed(2)} Hz`;
+  $('chorusDepth').value = String(fx.chorus.depthMs);
+  $('chorusDepthVal').textContent = `${fx.chorus.depthMs.toFixed(1)} ms`;
+  $('chorusMix').value = String(Math.round(fx.chorus.mix * 100));
+  $('chorusMixVal').textContent = fx.chorus.mix.toFixed(2);
+  $('chorusSpread').value = String(Math.round(fx.chorus.spread * 100));
+  $('chorusSpreadVal').textContent = fx.chorus.spread.toFixed(2);
+  $('flangerRate').value = String(Math.round(fx.flanger.rateHz * 100));
+  $('flangerRateVal').textContent = `${fx.flanger.rateHz.toFixed(2)} Hz`;
+  $('flangerDepth').value = String(fx.flanger.depthMs);
+  $('flangerDepthVal').textContent = `${fx.flanger.depthMs.toFixed(1)} ms`;
+  $('flangerFeedback').value = String(Math.round(fx.flanger.feedback * 100));
+  $('flangerFeedbackVal').textContent = fx.flanger.feedback.toFixed(2);
+  $('flangerMix').value = String(Math.round(fx.flanger.mix * 100));
+  $('flangerMixVal').textContent = fx.flanger.mix.toFixed(2);
+  // —— 追加的效果器 ——
+  $('fxDynEq').checked = fx.enabled.dynEq;
+  $('fxMbComp').checked = fx.enabled.mbComp;
+  $('fxDeesser').checked = fx.enabled.deesser;
+  $('fxExpander').checked = fx.enabled.expander;
+  $('fxTransient').checked = fx.enabled.transient;
+  $('clipThreshold').value = String(fx.clipper.thresholdDB);
+  $('clipThresholdVal').textContent = `${fx.clipper.thresholdDB.toFixed(1)} dB`;
+  $('clipCeiling').value = String(fx.clipper.ceilingDB);
+  $('clipCeilingVal').textContent = `${fx.clipper.ceilingDB.toFixed(1)} dB`;
+  $('clipMix').value = String(Math.round(fx.clipper.mix * 100));
+  $('clipMixVal').textContent = fx.clipper.mix.toFixed(2);
+  $('delayFilter').value = String(Math.round(fx.delay.filterHz || 20000));
+  $('delayFilterVal').textContent = `${Math.round(fx.delay.filterHz || 20000)} Hz`;
+  $('dynEqFreq').value = String(fx.dynEq.freq);
+  $('dynEqFreqVal').textContent = `${fx.dynEq.freq} Hz`;
+  $('dynEqQ').value = String(fx.dynEq.q);
+  $('dynEqQVal').textContent = fx.dynEq.q.toFixed(2);
+  $('dynEqGain').value = String(fx.dynEq.gainDB);
+  $('dynEqGainVal').textContent = `${fx.dynEq.gainDB.toFixed(1)} dB`;
+  $('dynEqThreshold').value = String(fx.dynEq.threshold);
+  $('dynEqThresholdVal').textContent = `${fx.dynEq.threshold} dB`;
+  $('dynEqRange').value = String(fx.dynEq.range);
+  $('dynEqRangeVal').textContent = `${fx.dynEq.range} dB`;
+  $('dynEqAttack').value = String(fx.dynEq.attackMs);
+  $('dynEqAttackVal').textContent = `${fx.dynEq.attackMs} ms`;
+  $('dynEqRelease').value = String(fx.dynEq.releaseMs);
+  $('dynEqReleaseVal').textContent = `${fx.dynEq.releaseMs} ms`;
+  $('mbLowXover').value = String(fx.mbComp.lowXover);
+  $('mbLowXoverVal').textContent = `${fx.mbComp.lowXover} Hz`;
+  $('mbHighXover').value = String(fx.mbComp.highXover);
+  $('mbHighXoverVal').textContent = `${fx.mbComp.highXover} Hz`;
+  $('mbThreshold').value = String(fx.mbComp.threshold);
+  $('mbThresholdVal').textContent = `${fx.mbComp.threshold} dB`;
+  $('mbRatio').value = String(fx.mbComp.ratio);
+  $('mbRatioVal').textContent = `${fx.mbComp.ratio.toFixed(1)}:1`;
+  $('mbAttack').value = String(fx.mbComp.attackMs);
+  $('mbAttackVal').textContent = `${fx.mbComp.attackMs} ms`;
+  $('mbRelease').value = String(fx.mbComp.releaseMs);
+  $('mbReleaseVal').textContent = `${fx.mbComp.releaseMs} ms`;
+  $('mbLowGain').value = String(fx.mbComp.lowGainDB);
+  $('mbLowGainVal').textContent = `${fx.mbComp.lowGainDB.toFixed(1)} dB`;
+  $('mbMidGain').value = String(fx.mbComp.midGainDB);
+  $('mbMidGainVal').textContent = `${fx.mbComp.midGainDB.toFixed(1)} dB`;
+  $('mbHighGain').value = String(fx.mbComp.highGainDB);
+  $('mbHighGainVal').textContent = `${fx.mbComp.highGainDB.toFixed(1)} dB`;
+  $('dsFreq').value = String(fx.deesser.freq);
+  $('dsFreqVal').textContent = `${fx.deesser.freq} Hz`;
+  $('dsThreshold').value = String(fx.deesser.threshold);
+  $('dsThresholdVal').textContent = `${fx.deesser.threshold} dB`;
+  $('dsRange').value = String(fx.deesser.range);
+  $('dsRangeVal').textContent = `${fx.deesser.range} dB`;
+  $('dsAttack').value = String(fx.deesser.attackMs);
+  $('dsAttackVal').textContent = `${fx.deesser.attackMs} ms`;
+  $('dsRelease').value = String(fx.deesser.releaseMs);
+  $('dsReleaseVal').textContent = `${fx.deesser.releaseMs} ms`;
+  $('expThreshold').value = String(fx.expander.threshold);
+  $('expThresholdVal').textContent = `${fx.expander.threshold} dB`;
+  $('expRatio').value = String(fx.expander.ratio);
+  $('expRatioVal').textContent = `${fx.expander.ratio.toFixed(1)}:1`;
+  $('expAttack').value = String(fx.expander.attackMs);
+  $('expAttackVal').textContent = `${fx.expander.attackMs} ms`;
+  $('expRelease').value = String(fx.expander.releaseMs);
+  $('expReleaseVal').textContent = `${fx.expander.releaseMs} ms`;
+  $('expRange').value = String(fx.expander.range);
+  $('expRangeVal').textContent = `${fx.expander.range} dB`;
+  $('trAttack').value = String(Math.round(fx.transient.attack * 100));
+  $('trAttackVal').textContent = fx.transient.attack.toFixed(2);
+  $('trSustain').value = String(Math.round(fx.transient.sustain * 100));
+  $('trSustainVal').textContent = fx.transient.sustain.toFixed(2);
+  $('trMix').value = String(Math.round(fx.transient.mix * 100));
+  $('trMixVal').textContent = fx.transient.mix.toFixed(2);
+  $('trOutput').value = String(fx.transient.outputDB);
+  $('trOutputVal').textContent = `${fx.transient.outputDB.toFixed(1)} dB`;
   $('compThreshold').value = String(fx.compressor.thresholdDB);
   $('compThresholdVal').textContent = `${fx.compressor.thresholdDB} dB`;
   $('compRatio').value = String(fx.compressor.ratio);
@@ -833,6 +1413,65 @@ function updateEffectsFromUIRaw() {
   fx.enabled.reverb = $('fxReverb').checked;
   fx.enabled.noiseGate = $('fxNoiseGate').checked;
   fx.enabled.limiter = $('fxLimiter').checked;
+  fx.enabled.delay = $('fxDelay').checked;
+  fx.enabled.chorus = $('fxChorus').checked;
+  fx.enabled.flanger = $('fxFlanger').checked;
+  fx.enabled.clipper = $('fxClipper').checked;
+  fx.clipper.drive = Number($('clipDrive').value);
+  fx.clipper.mode = $('clipMode').value === 'hard' ? 'hard' : 'soft';
+  fx.clipper.outputDB = Number($('clipOutput').value);
+  fx.delay.timeMs = Number($('delayTime').value);
+  fx.delay.feedback = Number($('delayFeedback').value) / 100;
+  fx.delay.mix = Number($('delayMix').value) / 100;
+  fx.delay.pingPong = $('delayPingPong').value === 'on';
+  fx.chorus.rateHz = Number($('chorusRate').value) / 100;
+  fx.chorus.depthMs = Number($('chorusDepth').value);
+  fx.chorus.mix = Number($('chorusMix').value) / 100;
+  fx.chorus.spread = Number($('chorusSpread').value) / 100;
+  fx.flanger.rateHz = Number($('flangerRate').value) / 100;
+  fx.flanger.depthMs = Number($('flangerDepth').value);
+  fx.flanger.feedback = Number($('flangerFeedback').value) / 100;
+  fx.flanger.mix = Number($('flangerMix').value) / 100;
+  // —— 追加的效果器 ——
+  fx.enabled.dynEq = $('fxDynEq').checked;
+  fx.enabled.mbComp = $('fxMbComp').checked;
+  fx.enabled.deesser = $('fxDeesser').checked;
+  fx.enabled.expander = $('fxExpander').checked;
+  fx.enabled.transient = $('fxTransient').checked;
+  fx.clipper.thresholdDB = Number($('clipThreshold').value);
+  fx.clipper.ceilingDB = Number($('clipCeiling').value);
+  fx.clipper.mix = Number($('clipMix').value) / 100;
+  fx.delay.filterHz = Number($('delayFilter').value);
+  fx.dynEq.freq = Number($('dynEqFreq').value);
+  fx.dynEq.q = Number($('dynEqQ').value);
+  fx.dynEq.gainDB = Number($('dynEqGain').value);
+  fx.dynEq.threshold = Number($('dynEqThreshold').value);
+  fx.dynEq.range = Number($('dynEqRange').value);
+  fx.dynEq.attackMs = Number($('dynEqAttack').value);
+  fx.dynEq.releaseMs = Number($('dynEqRelease').value);
+  fx.mbComp.lowXover = Number($('mbLowXover').value);
+  fx.mbComp.highXover = Number($('mbHighXover').value);
+  fx.mbComp.threshold = Number($('mbThreshold').value);
+  fx.mbComp.ratio = Number($('mbRatio').value);
+  fx.mbComp.attackMs = Number($('mbAttack').value);
+  fx.mbComp.releaseMs = Number($('mbRelease').value);
+  fx.mbComp.lowGainDB = Number($('mbLowGain').value);
+  fx.mbComp.midGainDB = Number($('mbMidGain').value);
+  fx.mbComp.highGainDB = Number($('mbHighGain').value);
+  fx.deesser.freq = Number($('dsFreq').value);
+  fx.deesser.threshold = Number($('dsThreshold').value);
+  fx.deesser.range = Number($('dsRange').value);
+  fx.deesser.attackMs = Number($('dsAttack').value);
+  fx.deesser.releaseMs = Number($('dsRelease').value);
+  fx.expander.threshold = Number($('expThreshold').value);
+  fx.expander.ratio = Number($('expRatio').value);
+  fx.expander.attackMs = Number($('expAttack').value);
+  fx.expander.releaseMs = Number($('expRelease').value);
+  fx.expander.range = Number($('expRange').value);
+  fx.transient.attack = Number($('trAttack').value) / 100;
+  fx.transient.sustain = Number($('trSustain').value) / 100;
+  fx.transient.mix = Number($('trMix').value) / 100;
+  fx.transient.outputDB = Number($('trOutput').value);
   fx.compressor.thresholdDB = Number($('compThreshold').value);
   fx.compressor.ratio = Number($('compRatio').value);
   fx.compressor.attackMs = Number($('compAttack').value);
@@ -868,6 +1507,42 @@ function bindEffectInputs() {
   safeRun('音效控件绑定', bindEffectInputsRaw);
 }
 
+/**
+ * 统一效果卡片：给实时音效里的每个区块加上「折叠 / 展开」。
+ *
+ * 关键点：折叠只影响界面显示，与开关（Enable）完全无关。
+ *   - 折叠 = 把参数收起来，不动音频；
+ *   - 开关 = 真正在图谱里启用/停用该节点。
+ * 所有区块共用同一套标题栏结构（名称 + 开关），不针对某个效果单独写组件，
+ * 以后新增效果只要用同样的 .fx-section 结构就自动获得折叠能力。
+ * 默认除第一块（预设）外全部收起，几十个效果也不会把面板撑得很长。
+ */
+function setupEffectCards() {
+  const sections = document.querySelectorAll('#effectsModal .fx-section');
+  sections.forEach((section, index) => {
+    const title = section.querySelector('.fx-section-title');
+    if (!title || title.querySelector('.fx-caret')) return;
+    // 均衡器是常驻的主要调节区，不参与折叠，始终保持完整展开
+    if (section.id === 'eqSection') return;
+    const label = t('collapse') || '折叠 / 展开';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fx-caret lg-button';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = '<svg class="icon"><use href="#icon-caret"></use></svg>';
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const collapsed = section.classList.toggle('collapsed');
+      btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+    title.insertBefore(btn, title.firstChild);
+    const startCollapsed = index > 0;
+    section.classList.toggle('collapsed', startCollapsed);
+    btn.setAttribute('aria-expanded', startCollapsed ? 'false' : 'true');
+  });
+}
+
 function bindEffectInputsRaw() {
   const valueBindings = {
     masterGain: () => `${(Number($('masterGain').value) / 10).toFixed(1)} dB`,
@@ -890,6 +1565,53 @@ function bindEffectInputsRaw() {
     limiterCeiling: () => `${(Number($('limiterCeiling').value)).toFixed(1)} dB`,
     limiterLookahead: () => `${(Number($('limiterLookahead').value)).toFixed(1)} ms`,
     limiterRelease: () => `${$('limiterRelease').value} ms`,
+    clipDrive: () => Number($('clipDrive').value).toFixed(1),
+    clipOutput: () => `${Number($('clipOutput').value).toFixed(1)} dB`,
+    clipThreshold: () => `${Number($('clipThreshold').value).toFixed(1)} dB`,
+    clipCeiling: () => `${Number($('clipCeiling').value).toFixed(1)} dB`,
+    clipMix: () => (Number($('clipMix').value) / 100).toFixed(2),
+    delayTime: () => `${$('delayTime').value} ms`,
+    delayFeedback: () => (Number($('delayFeedback').value) / 100).toFixed(2),
+    delayMix: () => (Number($('delayMix').value) / 100).toFixed(2),
+    chorusRate: () => `${(Number($('chorusRate').value) / 100).toFixed(2)} Hz`,
+    chorusDepth: () => `${Number($('chorusDepth').value).toFixed(1)} ms`,
+    chorusMix: () => (Number($('chorusMix').value) / 100).toFixed(2),
+    chorusSpread: () => (Number($('chorusSpread').value) / 100).toFixed(2),
+    flangerRate: () => `${(Number($('flangerRate').value) / 100).toFixed(2)} Hz`,
+    flangerDepth: () => `${Number($('flangerDepth').value).toFixed(1)} ms`,
+    flangerFeedback: () => (Number($('flangerFeedback').value) / 100).toFixed(2),
+    flangerMix: () => (Number($('flangerMix').value) / 100).toFixed(2),
+    delayFilter: () => `${$('delayFilter').value} Hz`,
+    dynEqFreq: () => `${$('dynEqFreq').value} Hz`,
+    dynEqQ: () => Number($('dynEqQ').value).toFixed(2),
+    dynEqGain: () => `${Number($('dynEqGain').value).toFixed(1)} dB`,
+    dynEqThreshold: () => `${$('dynEqThreshold').value} dB`,
+    dynEqRange: () => `${$('dynEqRange').value} dB`,
+    dynEqAttack: () => `${$('dynEqAttack').value} ms`,
+    dynEqRelease: () => `${$('dynEqRelease').value} ms`,
+    mbLowXover: () => `${$('mbLowXover').value} Hz`,
+    mbHighXover: () => `${$('mbHighXover').value} Hz`,
+    mbThreshold: () => `${$('mbThreshold').value} dB`,
+    mbRatio: () => `${Number($('mbRatio').value).toFixed(1)}:1`,
+    mbAttack: () => `${$('mbAttack').value} ms`,
+    mbRelease: () => `${$('mbRelease').value} ms`,
+    mbLowGain: () => `${Number($('mbLowGain').value).toFixed(1)} dB`,
+    mbMidGain: () => `${Number($('mbMidGain').value).toFixed(1)} dB`,
+    mbHighGain: () => `${Number($('mbHighGain').value).toFixed(1)} dB`,
+    dsFreq: () => `${$('dsFreq').value} Hz`,
+    dsThreshold: () => `${$('dsThreshold').value} dB`,
+    dsRange: () => `${$('dsRange').value} dB`,
+    dsAttack: () => `${Number($('dsAttack').value).toFixed(1)} ms`,
+    dsRelease: () => `${$('dsRelease').value} ms`,
+    expThreshold: () => `${$('expThreshold').value} dB`,
+    expRatio: () => `${Number($('expRatio').value).toFixed(1)}:1`,
+    expAttack: () => `${Number($('expAttack').value).toFixed(1)} ms`,
+    expRelease: () => `${$('expRelease').value} ms`,
+    expRange: () => `${$('expRange').value} dB`,
+    trAttack: () => (Number($('trAttack').value) / 100).toFixed(2),
+    trSustain: () => (Number($('trSustain').value) / 100).toFixed(2),
+    trMix: () => (Number($('trMix').value) / 100).toFixed(2),
+    trOutput: () => `${Number($('trOutput').value).toFixed(1)} dB`,
     irWet: () => (Number($('irWet').value) / 100).toFixed(2),
     irPredelay: () => `${(Number($('irPredelay').value) / 100).toFixed(2)} s`,
     irHighpass: () => `${$('irHighpass').value} Hz`,
@@ -903,8 +1625,15 @@ function bindEffectInputsRaw() {
   // 各效果开关已下放到对应子卡片的标题栏，这里按 id 直接绑定，不再依赖容器结构
   [
     'fxCompressor', 'fxBass', 'fxStereo', 'fxSurround', 'fxClarity',
-    'fxUltrasonic', 'fxTube', 'fxReverb', 'fxNoiseGate', 'fxLimiter'
+    'fxUltrasonic', 'fxTube', 'fxReverb', 'fxNoiseGate', 'fxLimiter',
+    'fxDelay', 'fxChorus', 'fxFlanger', 'fxClipper',
+    'fxDynEq', 'fxMbComp', 'fxDeesser', 'fxExpander', 'fxTransient'
   ].forEach((id) => {
+    const el = $(id);
+    if (el) el.addEventListener('change', updateEffectsFromUI);
+  });
+  // 下拉/勾选类参数（模式、乒乓）改动后同样立即生效
+  ['clipMode', 'delayPingPong'].forEach((id) => {
     const el = $(id);
     if (el) el.addEventListener('change', updateEffectsFromUI);
   });
@@ -937,6 +1666,60 @@ function buildEQ() {
     band.append(slider, db, label);
     container.appendChild(band);
   });
+}
+
+/* ============================================================================
+ * 均衡器风格预设：固定这 8 种，点击即把 10 段 EQ 调成对应曲线。
+ * 频点顺序与 buildEQ 一致：31 / 62 / 125 / 250 / 500 / 1k / 2k / 4k / 8k / 16k Hz
+ * 单位 dB，全部落在 EQ 的可调范围（±12 dB）之内。
+ * ========================================================================== */
+const EQ_PRESET_STYLES = [
+  { id: 'default', i18n: 'eqPresetDefault', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { id: 'classical', i18n: 'eqPresetClassical', gains: [4, 3, 2, 0, 0, 0, -1, 0, 2, 3] },
+  { id: 'heavyMetal', i18n: 'eqPresetHeavyMetal', gains: [6, 5, 3, 1, -2, -3, -1, 2, 4, 5] },
+  { id: 'pop', i18n: 'eqPresetPop', gains: [-1, -1, 0, 2, 3, 3, 1, 0, -1, -1] },
+  { id: 'jazz', i18n: 'eqPresetJazz', gains: [3, 2, 1, 0, -1, -1, 0, 1, 2, 3] },
+  { id: 'folk', i18n: 'eqPresetFolk', gains: [2, 1, 0, 1, 2, 2, 1, 1, 2, 2] },
+  { id: 'rock', i18n: 'eqPresetRock', gains: [5, 4, 2, -1, -3, -2, 0, 2, 4, 5] },
+  { id: 'electronic', i18n: 'eqPresetElectronic', gains: [6, 5, 2, 0, -2, -1, 1, 2, 4, 6] }
+];
+
+/** 当前高亮的风格（与曲线自动比对得出，手动拖动滑杆后会自动取消高亮） */
+function syncEqPresetButtons() {
+  const box = $('eqPresets');
+  if (!box) return;
+  const gains = state.effects.eqGains || [];
+  box.querySelectorAll('[data-eq-preset]').forEach((btn) => {
+    const style = EQ_PRESET_STYLES.find((s) => s.id === btn.dataset.eqPreset);
+    const match = !!style && style.gains.every((g, i) => Math.abs((Number(gains[i]) || 0) - g) < 0.05);
+    btn.classList.toggle('active', match);
+  });
+}
+
+function applyEqPreset(style) {
+  state.effects.eqGains = style.gains.slice();
+  applyEffectsToUI();
+  syncDspGraph();
+  sendDSPParams();
+  syncEqPresetButtons();
+  showToast(`${t('equalizer')} · ${t(style.i18n)}`);
+}
+
+function buildEqPresets() {
+  const box = $('eqPresets');
+  if (!box) return;
+  box.innerHTML = '';
+  EQ_PRESET_STYLES.forEach((style) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'eq-preset-btn lg-button';
+    btn.dataset.eqPreset = style.id;
+    btn.textContent = t(style.i18n);
+    btn.title = t(style.i18n);
+    btn.addEventListener('click', () => applyEqPreset(style));
+    box.appendChild(btn);
+  });
+  syncEqPresetButtons();
 }
 
 function resetEffects() {
@@ -987,31 +1770,21 @@ function renderPresets() {
   if (list) {
     list.innerHTML = '';
     state.presets.filter((preset) => preset.type !== 'pulse').forEach((preset) => {
+      const isActive = activePresetId === preset.id;
       const row = document.createElement('div');
-      row.className = 'preset-row';
+      // 「正在使用」的条目加蓝边 + 淡蓝底，与未启用的条目一眼区分
+      row.className = 'preset-row' + (isActive ? ' active' : '');
       row.innerHTML = `
-        <input type="text" class="preset-name-input" maxlength="40" spellcheck="false" data-preset-name="${preset.id}">
+        <input type="text" class="preset-name-input" maxlength="40" spellcheck="false" data-preset-name="${preset.id}" title="${t('rename')}">
         <div class="preset-row-actions">
-          <button class="mini-btn lg-button" data-preset-save="${preset.id}"><svg class="icon icon-sm"><use href="#icon-save"></use></svg><span></span></button>
-          <button class="mini-btn lg-button" data-preset-rename="${preset.id}"><svg class="icon icon-sm"><use href="#icon-edit"></use></svg><span></span></button>
-          <button class="mini-btn lg-button" data-preset-del="${preset.id}"><svg class="icon icon-sm"><use href="#icon-trash"></use></svg><span></span></button>
+          <button class="mini-btn lg-button" data-preset-del="${preset.id}" title="${t('delete')}"><svg class="icon icon-sm"><use href="#icon-trash"></use></svg></button>
         </div>
-        <label class="switch"><input type="checkbox" data-preset-toggle="${preset.id}"${activePresetId === preset.id ? ' checked' : ''}></label>
+        <label class="switch"><input type="checkbox" data-preset-toggle="${preset.id}"${isActive ? ' checked' : ''}></label>
       `;
       row.querySelector('[data-preset-name]').value = preset.name || DEFAULT_PRESET_NAME;
-      const labels = row.querySelectorAll('.preset-row-actions span');
-      labels[0].textContent = t('save');
-      labels[1].textContent = t('rename');
-      labels[2].textContent = t('delete');
       list.appendChild(row);
     });
 
-    list.querySelectorAll('[data-preset-save]').forEach((btn) => {
-      btn.addEventListener('click', () => overwritePreset(btn.dataset.presetSave));
-    });
-    list.querySelectorAll('[data-preset-rename]').forEach((btn) => {
-      btn.addEventListener('click', () => renamePreset(btn.dataset.presetRename));
-    });
     list.querySelectorAll('[data-preset-del]').forEach((btn) => {
       btn.addEventListener('click', () => deletePreset(btn.dataset.presetDel));
     });
@@ -1019,8 +1792,17 @@ function renderPresets() {
       toggle.addEventListener('change', () => togglePreset(toggle.dataset.presetToggle, toggle.checked));
     });
     list.querySelectorAll('[data-preset-name]').forEach((input) => {
+      // 名称框本身就是可编辑的：点进去直接改，
+      // 回车或点到别处即保存。所以右侧不再需要「重命名」按钮。
       input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') { event.preventDefault(); renamePreset(input.dataset.presetName); }
+        if (event.key === 'Escape') { event.preventDefault(); input.blur(); renderPresets(); }
+      });
+      input.addEventListener('change', () => {
+        const preset = state.presets.find((p) => p.id === input.dataset.presetName);
+        if (preset && String(input.value || '').trim() !== (preset.name || '')) {
+          renamePreset(input.dataset.presetName);
+        }
       });
     });
   }
@@ -1043,11 +1825,27 @@ function syncPresetCard() {
 }
 
 /**
- * 点击顶部条目的「保存」：按当前音效新建一条预设。
+ * 顶部的「保存」：整个实时音效区只有这一个保存入口。
+ * - 若有已开启（开关打开）的预设：把当前完整状态覆盖写回该预设；
+ * - 否则：按名称输入框里的名字新建一条（名称默认自动升序编号）。
+ * 保存的是完整状态（各效果开关、参数、差分环绕、空间音效等），
+ * 复用同一个 Preset 存储，不另建第二套保存系统。
  * 注意：不使用 window.prompt —— Electron 中该弹窗不可用（会直接返回空值），
- * 名称一律取自条目里的输入框。
+ * 名称一律取自「新建预设」行里的输入框。
  */
 async function savePreset() {
+  const active = state.presets.find((item) => item.id === activePresetId && item.type !== 'pulse');
+  if (active) {
+    const row = document.querySelector(`[data-preset-name="${active.id}"]`);
+    const rowName = row ? String(row.value || '').trim() : '';
+    active.name = rowName || active.name || DEFAULT_PRESET_NAME;
+    active.effects = collectEffects();
+    active.updatedAt = Date.now();
+    state.presets = await api.savePreset(active);
+    renderPresets();
+    showToast(t('toastPresetSaved'));
+    return;
+  }
   const input = $('presetNameInput');
   const name = ((input && input.value) || '').trim() || suggestedPresetName();
   const preset = { id: `preset-${Date.now()}`, name, effects: collectEffects(), updatedAt: Date.now() };
@@ -1326,10 +2124,12 @@ async function registerExternalPulse(filePath, decoded) {
     (item) => item.type === 'pulse' && item.source === 'external' && item.filePath === filePath
   );
   const baseName = String(filePath).split(/[\\/]/).pop().replace(/\.[^.]+$/, '') || '外部脉冲';
+  let activeId = null;
   if (existing) {
     existing.enabled = true;
     existing.updatedAt = Date.now();
     state.presets = await api.savePreset(existing);
+    activeId = existing.id;
   } else {
     const preset = {
       id: `pulse-ext-${Date.now()}`,
@@ -1342,8 +2142,18 @@ async function registerExternalPulse(filePath, decoded) {
       enabled: true
     };
     state.presets = await api.savePreset(preset);
+    activeId = preset.id;
   }
-  renderPulseList();
+  // 外部加载的脉冲同样是独占的：其余脉冲自动关闭
+  if (activeId) {
+    const active = state.presets.find((p) => p.id === activeId);
+    // 蓝边（当前使用标记）按名称比对，外部脉冲也统一用名称标记，
+    // 否则它虽然被加载了却不会高亮
+    if (active) state.effects.ir.filePath = active.name;
+    await activatePulsePreset(activeId);
+  } else {
+    renderPulseList();
+  }
 }
 
 function clearIR() {
@@ -1353,6 +2163,10 @@ function clearIR() {
   $('fxIR').checked = false;
   applyEffectsToUI();
   updateIRGraph();
+  // 卷积器已经空了，脉冲列表里的开关也要跟着关掉，
+  // 否则会出现「列表显示已启用、实际没有加载」的状态不一致。
+  renderPulseList();
+  void deactivateAllPulses();
   showToast(state.settings.language === 'zh' ? 'IR 已清除' : 'IR cleared');
 }
 
@@ -1394,6 +2208,38 @@ function base64ToArrayBuffer(base64) {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
+}
+
+/* ============================================================================
+ * 脉冲（空间音效）的启用是「独占」的：
+ * 卷积器同一时刻只能加载一条脉冲，所以任意时刻只允许一条脉冲处于启用状态。
+ * 之前只把被点的那条置为启用、没有关掉其它的，于是列表里会出现两个开关
+ * 同时打开，而蓝边（当前使用标记）只落在真正加载的那一条上 —— 看起来就像
+ * 「多出一个蓝色边框」。现在统一由下面两个函数维护，两者永远一致。
+ * ========================================================================== */
+
+/** 把某条脉冲设为当前使用，其余脉冲自动关闭（并写回存储） */
+async function activatePulsePreset(id) {
+  const pulses = state.presets.filter((p) => p.type === 'pulse');
+  for (const pulse of pulses) {
+    const want = pulse.id === id;
+    if (!!pulse.enabled === want) continue;
+    pulse.enabled = want;
+    pulse.updatedAt = Date.now();
+    state.presets = await api.savePreset(pulse);
+  }
+  renderPulseList();
+}
+
+/** 关闭全部脉冲（用于「清除」：卷积器已空，列表不应再有启用项） */
+async function deactivateAllPulses() {
+  const pulses = state.presets.filter((p) => p.type === 'pulse' && p.enabled);
+  for (const pulse of pulses) {
+    pulse.enabled = false;
+    pulse.updatedAt = Date.now();
+    state.presets = await api.savePreset(pulse);
+  }
+  renderPulseList();
 }
 
 async function applyPulsePreset(preset) {
@@ -1541,14 +2387,19 @@ function renderPulseList() {
   const pulses = state.presets.filter((preset) => preset.type === 'pulse');
   list.innerHTML = '';
   pulses.forEach((preset) => {
+    // 「是否在使用」只有唯一判据：当前加载进卷积器的那条脉冲名称。
+    // 开关与蓝边都由它决定，所以两者永远一致 —— 不会再出现
+    // 「开关是打开的、却没有蓝边（或反过来）」这种看起来多一个边框的情况。
+    // 重启后 IR 尚未加载，列表因此全部显示为关闭。
+    const isActive = !!state.effects.ir.filePath && state.effects.ir.filePath === preset.name;
     const item = document.createElement('div');
-    item.className = 'pulse-item' + (state.effects.ir.filePath === preset.name ? ' active' : '');
+    item.className = 'pulse-item' + (isActive ? ' active' : '');
     item.innerHTML = `
       <span class="pulse-name"></span>
       <span class="pulse-badge" hidden></span>
       <button data-pulse-rename="${preset.id}">重命名</button>
       <button data-pulse-del="${preset.id}">删除</button>
-      <label class="switch"><input type="checkbox" data-pulse-toggle="${preset.id}" ${preset.enabled ? 'checked' : ''}></label>
+      <label class="switch"><input type="checkbox" data-pulse-toggle="${preset.id}" ${isActive ? 'checked' : ''}></label>
     `;
     item.querySelector('.pulse-name').textContent = preset.name;
     if (preset.source === 'external') {
@@ -1560,12 +2411,21 @@ function renderPulseList() {
   });
   list.querySelectorAll('[data-pulse-toggle]').forEach((toggle) => {
     toggle.addEventListener('change', async (event) => {
-      const preset = state.presets.find((p) => p.id === event.target.dataset.pulseToggle);
+      const id = event.target.dataset.pulseToggle;
+      const preset = state.presets.find((p) => p.id === id);
       if (!preset) return;
-      preset.enabled = event.target.checked;
-      await api.savePreset(preset);
-      if (preset.enabled) await applyPulsePreset(preset);
-      else clearIR();
+      if (event.target.checked) {
+        // 打开一条 = 独占：其余脉冲自动关闭，蓝边只会落在真正加载的这一条上
+        await activatePulsePreset(id);
+        await applyPulsePreset(preset);
+      } else {
+        preset.enabled = false;
+        preset.updatedAt = Date.now();
+        state.presets = await api.savePreset(preset);
+        // 只有关掉的正好是当前加载的那条时才清空卷积（clearIR 内部会同步列表）
+        if (state.effects.ir.filePath === preset.name) clearIR();
+        else renderPulseList();
+      }
     });
   });
   list.querySelectorAll('[data-pulse-del]').forEach((btn) => {
@@ -2358,6 +3218,17 @@ function drawEvents(ctx, width, height) {
 }
 
 function renderVisualization() {
+  refreshAnalysis();
+  drawVisualizationCanvases();
+  return true;
+}
+
+/**
+ * 音频分析（读取频谱 / 时域数据，更新响度与每帧指标）。
+ * 与「绘制」拆开：翻到第二页时第一页不再绘制，但分析必须继续，
+ * 视觉引擎才有实时数据可用 —— 两边共用同一份分析结果，不做第二次 FFT。
+ */
+function refreshAnalysis() {
   const hasSignal = analyser && state.isPlaying;
   if (hasSignal) {
     analyser.getByteFrequencyData(freqData);
@@ -2378,6 +3249,12 @@ function renderVisualization() {
     updateLoudness(monoData, monoCount);
     computeVizMetrics();
   }
+  return hasSignal;
+}
+
+/** 第一页的 10 路可视化绘制（隐藏页不做这一步） */
+function drawVisualizationCanvases() {
+  const hasSignal = analyser && state.isPlaying;
   const keys = ['analyzer', 'scope', 'polar', 'loudness', 'arc', 'octave', 'phase', 'stats', 'centroid', 'events'];
   for (const key of keys) {
     const canvas = getVizCanvas(key);
@@ -2413,12 +3290,18 @@ function renderVisualization() {
 // 渲染循环开关：已经在跑就不重复排队
 function startVisualizerLoop() {
   if (animationFrame) return;
+  // 第二页显示时第一页的渲染完全停表（不是隐藏，而是真的不排队）
+  if (typeof currentVizPage === 'number' && currentVizPage !== 0) return;
   animationFrame = requestAnimationFrame(drawVisualizer);
 }
 
 function drawVisualizer() {
   if (document.hidden) {
     animationFrame = null;
+    return;
+  }
+  if (typeof currentVizPage === 'number' && currentVizPage !== 0) {
+    animationFrame = null;   // 隐藏页：立即停止渲染循环，切回来再启动
     return;
   }
   if (analyser && freqData) renderVisualization();
@@ -2431,14 +3314,467 @@ function drawVisualizer() {
 }
 
 document.addEventListener('visibilitychange', () => {
+  // 窗口被最小化 / 被别的窗口完全挡住时，系统会暂停动画；
+  // 回到前台要立刻接着跑，否则第二页会停在最后一帧不动。
+  if (visualEngine) visualEngine.setWindowVisible(!document.hidden);
   if (!document.hidden && state.isPlaying) startVisualizerLoop();
 });
+
+/* ============================================================================
+ * 频谱空间分页 + Audio-Reactive Visual Engine
+ * --------------------------------------------------------------------------
+ * 第一页：现有专业分析（10 路可视化，逻辑不动，只加一处分页门控）。
+ * 第二页：沉浸视觉工作区，效果由视觉引擎驱动，音频数据复用现有分析结果。
+ * 两页同属一个频谱空间：不新建窗口、不新建分析器、不碰 DSP 与音频链路。
+ * ========================================================================== */
+let currentVizPage = 0;
+let visualEngine = null;
+let visualCardEls = new Map();
+
+/** 按注册表生成效果卡片（统一设计语言，尺寸随效果特性自适应） */
+function buildVisualCards() {
+  const host = document.getElementById('visualCards');
+  if (!host || !window.RlonVisualEngine) return;
+  host.innerHTML = '';
+  visualCardEls = new Map();
+  window.RlonVisualEngine.registry.forEach((def) => {
+    const card = document.createElement('div');
+    card.className = 'vfx-card' + (def.layout && def.layout.span > 1 ? ' vfx-card--wide' : '');
+    card.dataset.vfx = def.id;
+    card.innerHTML =
+      '<div class="vfx-head">'
+      + '<button class="fx-caret" type="button"><svg class="icon"><use href="#icon-caret"></use></svg></button>'
+      + '<span class="vfx-name"></span>'
+      + '<span class="vfx-cat"></span>'
+      + '<label class="switch"><input type="checkbox" data-vfx-enable="' + def.id + '"></label>'
+      + '</div>'
+      + '<div class="vfx-body"></div>';
+    card.querySelector('.vfx-name').textContent = t(def.nameKey);
+    const catKey = 'vfxCat' + def.category.charAt(0).toUpperCase() + def.category.slice(1);
+    card.querySelector('.vfx-cat').textContent = t(catKey);
+    const body = card.querySelector('.vfx-body');
+    def.parameters.forEach((p) => {
+      const row = document.createElement('div');
+      row.className = 'param';
+      row.dataset.priority = p.priority || 'core';
+      const label = document.createElement('label');
+      label.textContent = t(p.labelKey);
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = String(p.min);
+      slider.max = String(p.max);
+      slider.step = String(p.step);
+      slider.value = String(p.default);
+      slider.dataset.vfxParam = def.id + ':' + p.id;
+      const out = document.createElement('span');
+      const fmt = (v) => (p.step >= 1 ? String(Math.round(v)) : v.toFixed(2));
+      out.textContent = fmt(p.default);
+      slider.addEventListener('input', () => {
+        const v = Number(slider.value);
+        out.textContent = fmt(v);
+        if (visualEngine) visualEngine.setParam(def.id, p.id, v);
+        persistVisualState();
+      });
+      row.append(label, slider, out);
+      body.appendChild(row);
+    });
+    const caret = card.querySelector('.fx-caret');
+    caret.addEventListener('click', () => {
+      const collapsed = card.classList.toggle('collapsed');
+      caret.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+    const toggle = card.querySelector('[data-vfx-enable]');
+    toggle.addEventListener('change', () => {
+      if (visualEngine) visualEngine.setEnabled(def.id, toggle.checked);
+      card.classList.toggle('is-enabled', toggle.checked);
+      updateVisualStats();
+      syncVisualScene();
+      persistVisualState();
+    });
+    host.appendChild(card);
+    visualCardEls.set(def.id, { card, toggle });
+  });
+}
+
+/**
+ * 预设条：最左边是「自动」，其余是一条条固定预设（单效果或组合）。
+ * 点自动 → 按音乐节拍自动轮换；点某条预设 → 固定用它。
+ */
+function buildVisualPresets() {
+  const host = document.getElementById('visualPresets');
+  if (!host || !window.RlonVisualEngine) return;
+  host.innerHTML = '';
+  const autoChip = document.createElement('button');
+  autoChip.type = 'button';
+  autoChip.className = 'vfx-chip vfx-chip--auto';
+  autoChip.dataset.vfxAuto = '1';
+  autoChip.innerHTML = '<svg class="icon"><use href="#icon-loop-random"></use></svg><span data-i18n="vfxModeAuto"></span>';
+  autoChip.querySelector('span').textContent = t('vfxModeAuto');
+  autoChip.addEventListener('click', () => {
+    if (!visualEngine) return;
+    if (visualEngine.getMode() === 'auto') visualEngine.setAuto(false);
+    else visualEngine.setAuto(true);
+    syncVisualScene();
+    persistVisualState();
+  });
+  host.appendChild(autoChip);
+  (window.RlonVisualEngine.presets || []).forEach((preset) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'vfx-chip';
+    chip.dataset.vfxPreset = preset.id;
+    chip.dataset.i18n = preset.labelKey;
+    chip.textContent = t(preset.labelKey);
+    chip.addEventListener('click', () => {
+      if (!visualEngine) return;
+      visualEngine.setPreset(preset.id);
+      syncVisualScene();
+      persistVisualState();
+    });
+    host.appendChild(chip);
+  });
+  syncVisualScene();
+}
+
+/** 让界面跟上引擎的真实状态：预设条高亮 + 卡片开关（自动模式换组合时也会对上） */
+function syncVisualScene() {
+  if (!visualEngine) return;
+  const bar = document.getElementById('visualPresets');
+  if (bar) {
+    const mode = visualEngine.getMode();
+    const preset = visualEngine.getPreset();
+    bar.querySelectorAll('.vfx-chip').forEach((chip) => {
+      const active = chip.dataset.vfxAuto === '1'
+        ? mode === 'auto'
+        : (mode !== 'auto' && chip.dataset.vfxPreset === preset);
+      chip.classList.toggle('is-active', active);
+    });
+  }
+  visualCardEls.forEach((el, id) => {
+    const fx = visualEngine.instances.get(id);
+    if (!fx) return;
+    el.toggle.checked = !!fx.enabled;
+    el.card.classList.toggle('is-enabled', !!fx.enabled);
+  });
+  updateVisualStats();
+}
+
+/** 卡片密度随可用宽度自适应：窄窗口收紧列宽并隐藏次要参数 */
+function updateVisualLayout() {
+  const host = document.getElementById('visualCards');
+  if (!host) return;
+  const w = host.clientWidth;
+  const h = host.clientHeight;
+  const gap = 8;
+  const count = Math.max(1, host.children.length);
+  /** 平均分给 cols 列之后，每张卡片能拿到多宽 */
+  const share = (cols) => Math.max(120, Math.floor((w - gap * (cols - 1)) / cols));
+  // 按窗口宽度先算出「正常情况下能排几列」
+  const fit = Math.max(1, Math.min(count, Math.floor((w + gap) / (236 + gap))));
+  // 再优先挑一个能把卡片数量整除的列数：每行都排满，右侧不留空白。
+  let cols = 0;
+  for (let c = Math.min(count, 6); c >= 1; c--) {
+    if (count % c === 0 && share(c) >= 195) { cols = c; break; }
+  }
+  if (!cols) cols = fit;
+  host.style.setProperty('--vfx-col', share(cols) + 'px');
+  // 竖向自适应：先试着把全部参数都摆下（整块正好铺满，不留滚动条）；
+  // 摆不下才逐级收起最不常用的参数，而不是让卡片被裁掉一半。
+  const rows = Math.ceil(count / cols);
+  const limit = h - gap * (rows - 1);
+  let level = 0;
+  if (!fits(host, rows, limit, 0)) level = 1;
+  if (!fits(host, rows, limit, 1)) level = 2;
+  applyParamLevel(host, level);
+}
+
+/** 按层级显示参数行：0=全部，1=收起高级，2=再收起次级 */
+function applyParamLevel(host, level) {
+  host.querySelectorAll('.param').forEach((row) => {
+    const priority = row.dataset.priority || 'core';
+    const hide = (level >= 2 && priority !== 'core') || (level === 1 && priority === 'advanced');
+    row.style.display = hide ? 'none' : '';
+  });
+}
+
+/** 试摆一次：按 level 显示参数，看看最高的卡片乘行数塞不塞得进可用高度 */
+function fits(host, rows, limit, level) {
+  applyParamLevel(host, level);
+  let tallest = 0;
+  host.querySelectorAll('.vfx-card').forEach((card) => {
+    if (card.offsetHeight > tallest) tallest = card.offsetHeight;
+  });
+  // 留 8px 余量：刚好卡满时容易因为取整冒出一条细滚动条，反而更难看
+  return tallest * rows <= limit - 8;
+}
+
+function updateVisualStats() {
+  const el = document.getElementById('visualStats');
+  if (!el || !visualEngine) return;
+  const s = visualEngine.frameStats();
+  el.textContent = 'RUN ' + visualEngine.runningCount() + '  ·  ' + s.frameMs + ' ms  ·  x' + s.scale;
+}
+
+/** 视觉效果的启用状态与参数跟随设置一起保存（不丢配置） */
+function persistVisualState() {
+  if (!visualEngine) return;
+  api.setSettings({ visualState: visualEngine.getState() });
+}
+
+/**
+ * 播放窗口状态过渡动画（最大化 / 还原 / 恢复 / 最小化）。
+ * 窗口尺寸的变化由系统瞬间完成，动画只作用在内容层：
+ * 起始缩放略大于 1，过渡期间不会在窗口四边露出底色缝隙。
+ */
+function playWindowAnim(kind) {
+  if (!document.body) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cls = kind === 'out' ? 'win-anim-out' : 'win-anim-in';
+  document.body.classList.remove('win-anim-in', 'win-anim-out');
+  // 强制一次重排，保证连续触发时动画能从头播放
+  void document.body.offsetWidth;
+  document.body.classList.add(cls);
+  window.setTimeout(() => document.body.classList.remove(cls), kind === 'out' ? 260 : 380);
+}
+
+function setVizPage(page, animate) {
+  const pages = document.querySelectorAll('.viz-page');
+  if (!pages.length) return;
+  const next = page === 1 ? 1 : 0;
+  const prev = currentVizPage;
+  currentVizPage = next;
+  pages.forEach((el) => {
+    const idx = Number(el.dataset.vizPage);
+    el.classList.remove('is-in', 'is-out');
+    el.style.transform = '';
+    el.classList.toggle('is-active', idx === next);
+    if (idx === next) el.removeAttribute('aria-hidden');
+    else el.setAttribute('aria-hidden', 'true');
+  });
+  if (animate && prev !== next) {
+    const incoming = [...pages].find((el) => Number(el.dataset.vizPage) === next);
+    const outgoing = [...pages].find((el) => Number(el.dataset.vizPage) === prev);
+    if (incoming) incoming.classList.add('is-in');
+    if (outgoing) outgoing.classList.add('is-out');
+    window.setTimeout(() => {
+      if (incoming) incoming.classList.remove('is-in');
+      if (outgoing) outgoing.classList.remove('is-out');
+    }, 420);
+  }
+  document.querySelectorAll('.viz-dot').forEach((dot) => {
+    dot.classList.toggle('active', Number(dot.dataset.vizDot) === currentVizPage);
+  });
+  // 页面生命周期：只有活动页运行自己的渲染，另一页立即停表
+  if (visualEngine) visualEngine.setSceneActive(currentVizPage === 1);
+  if (currentVizPage === 0 && state.isPlaying) startVisualizerLoop();
+  updateVisualLayout();
+}
+
+/**
+ * 拖动跟手：只给当前页一个很小的水平位移（百分比），松手后由 setVizPage 复位。
+ * 位移很小（最多 ±6%）且只在拖动期间存在，因此不会影响静止时的文字清晰度。
+ */
+function applyPagerDrag(dxPx) {
+  const pager = document.getElementById('vizPager');
+  const active = document.querySelector('.viz-page.is-active');
+  if (!pager || !active) return;
+  const width = pager.clientWidth || 1;
+  let ratio = dxPx / width;
+  if (ratio > 0.06) ratio = 0.06;
+  if (ratio < -0.06) ratio = -0.06;
+  active.style.transform = 'translate3d(' + (ratio * 100).toFixed(2) + '%, 0, 0)';
+}
+
+/**
+ * 横向滑动切换页面。
+ * - 只在非交互区域起手（滑杆 / 按钮 / 开关 / 下拉上绝不翻页）
+ * - 方向锁定：横向位移明显大于纵向才认定为翻页，纵向滚动不受影响
+ * - 阈值 + 速度双重判定，避免误触
+ */
+function setupVizPager() {
+  const pager = document.getElementById('vizPager');
+  if (!pager) return;
+  const THRESHOLD = 60;
+  const VELOCITY = 0.35;
+  let active = false;
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let lastX = 0;
+  let lastT = 0;
+  let locked = null;
+
+  const isInteractive = (target) => !!target.closest(
+    'input,button,select,textarea,label,.switch,.fx-caret,.viz-dot,a,[contenteditable="true"]'
+  );
+
+  pager.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || isInteractive(event.target)) return;
+    active = true;
+    locked = null;
+    pointerId = event.pointerId;
+    startX = lastX = event.clientX;
+    startY = event.clientY;
+    lastT = event.timeStamp;
+  });
+
+  pager.addEventListener('pointermove', (event) => {
+    if (!active || event.pointerId !== pointerId) return;
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    if (!locked) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      locked = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+      if (locked === 'x') {
+        // 指针捕获失败（例如合成事件 / 指针已释放）不影响翻页逻辑
+        try { pager.setPointerCapture(pointerId); } catch (error) { /* 忽略 */ }
+      } else {
+        active = false;   // 纵向滚动优先，不再参与翻页判定
+        return;
+      }
+    }
+    // 跟手：当前页随手指做小幅位移（最多 ±6%），松手后平滑复位或翻页
+    applyPagerDrag(dx);
+    lastX = event.clientX;
+    lastT = event.timeStamp;
+  });
+
+  const finish = (event) => {
+    if (!active || (pointerId !== null && event.pointerId !== pointerId)) return;
+    const dx = event.clientX - startX;
+    const dt = Math.max(1, event.timeStamp - lastT + 1);
+    const velocity = Math.abs(event.clientX - lastX) / dt;
+    active = false;
+    if (pointerId !== null && pager.hasPointerCapture && pager.hasPointerCapture(pointerId)) {
+      try { pager.releasePointerCapture(pointerId); } catch (error) { /* 忽略 */ }
+    }
+    pointerId = null;
+    if (locked !== 'x') return;
+    const far = Math.abs(dx) > THRESHOLD;
+    const fast = velocity > VELOCITY && Math.abs(dx) > 24;
+    // 松手后统一走 setVizPage：够阈值就翻页，不够就平滑吸附回原页
+    if ((far || fast) && dx < 0 && currentVizPage === 0) setVizPage(1, true);
+    else if ((far || fast) && dx > 0 && currentVizPage === 1) setVizPage(0, true);
+    else setVizPage(currentVizPage, true);
+  };
+
+  pager.addEventListener('pointerup', finish);
+  pager.addEventListener('pointercancel', finish);
+  document.querySelectorAll('.viz-dot').forEach((dot) => {
+    dot.addEventListener('click', () => setVizPage(Number(dot.dataset.vizDot), true));
+  });
+  window.addEventListener('keydown', (event) => {
+    const modal = document.getElementById('effectsModal');
+    if (modal && !modal.hidden) return;
+    if (event.key === 'ArrowRight' && currentVizPage === 0) setVizPage(1, true);
+    if (event.key === 'ArrowLeft' && currentVizPage === 1) setVizPage(0, true);
+  });
+  window.addEventListener('resize', () => {
+    updateVisualLayout();
+    const active = document.querySelector('.viz-page.is-active');
+    if (active) active.style.transform = '';
+  });
+}
+
+function initVisualEngine() {
+  const canvas = document.getElementById('visualCanvas');
+  if (!canvas || !window.RlonVisualEngine) return;
+  buildVisualCards();
+  buildVisualPresets();
+  visualEngine = window.RlonVisualEngine.create({
+    canvas,
+    // 数据全部来自现有分析链路：不做第二次 FFT、不重复计算
+    // 第二页期间由引擎每帧调用 refreshAnalysis()，保证分析数据持续更新
+    beforeFrame: () => refreshAnalysis(),
+    getFreqBytes: () => freqData,
+    getTimeData: () => timeData,
+    getMetrics: () => vizMetrics,
+    onResize: () => updateVisualLayout(),
+    // 自动模式换组合 / 切换预设时，界面上的开关与高亮要跟着变
+    onSceneChange: () => syncVisualScene()
+  });
+  if (state.settings.visualState) visualEngine.applyState(state.settings.visualState);
+  // 老存档里没有「自动 / 固定」这个选择（mode），以及第一次打开时：
+  // 默认进入自动模式，让画面按节拍自动换组合；用户随时可以点某条预设固定下来。
+  if (!state.settings.visualState || !state.settings.visualState.mode) {
+    visualEngine.setAuto(true);
+    persistVisualState();
+  }
+  visualCardEls.forEach((el, id) => {
+    const fx = visualEngine.instances.get(id);
+    if (!fx) return;
+    el.toggle.checked = !!fx.enabled;
+    el.card.classList.toggle('is-enabled', !!fx.enabled);
+    el.card.querySelectorAll('.param').forEach((row) => {
+      const slider = row.querySelector('input[type=range]');
+      if (!slider) return;
+      const key = slider.dataset.vfxParam.split(':')[1];
+      if (fx.state[key] !== undefined) slider.value = String(fx.state[key]);
+    });
+  });
+  setupVizPager();
+  setVizPage(0, false);   // 启动时第一页为活动页（隐藏页不渲染）
+  updateVisualLayout();
+  syncVisualScene();
+  updateVisualStats();
+  window.setInterval(updateVisualStats, 1000);
+}
 
 function openSettings() {
   $('themeSelect').value = state.settings.theme;
   $('languageSelect').value = state.settings.language;
   $('closeToTray').checked = state.settings.closeToTray;
+  syncAlwaysOnTopUI();
   $('settingsModal').hidden = false;
+  // 打开设置时刷新一次版本信息（本地读取，不联网）
+  safeRun('版本信息刷新', initUpdateSection);
+}
+
+/**
+ * 「始终置顶」开关与真实窗口状态保持一致的唯一入口。
+ * 界面永远显示 BrowserWindow 的真实状态（isAlwaysOnTop），
+ * 所以不会出现「开关是开的、窗口其实没置顶」这种不一致。
+ */
+async function syncAlwaysOnTopUI() {
+  if (!api.getAlwaysOnTop) return;
+  try {
+    const real = await api.getAlwaysOnTop();
+    reflectAlwaysOnTop(!!real);
+  } catch (error) {
+    console.warn('读取置顶状态失败', error);
+  }
+}
+
+/**
+ * 把真实的窗口置顶状态同步到界面：
+ * 标题栏右上角的「图钉」按钮（点亮 = 已置顶）。
+ * 界面显示的就是 BrowserWindow 的真实状态，不会出现「按钮亮着其实没置顶」。
+ */
+function reflectAlwaysOnTop(real) {
+  const on = !!real;
+  state.settings.alwaysOnTop = on;
+  const pin = $('pinBtn');
+  if (pin) {
+    pin.classList.toggle('active', on);
+    const label = t('alwaysOnTop') + ' · ' + (on ? t('on') : t('off'));
+    pin.title = label;
+    pin.setAttribute('aria-label', label);
+    pin.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+}
+
+async function applyAlwaysOnTop(enabled) {
+  // 普通模式与迷你模式是同一个窗口，因此这一份状态天然共享
+  const wanted = !!enabled;
+  if (api.setAlwaysOnTop) {
+    const real = await api.setAlwaysOnTop(wanted);
+    // 以真实窗口状态为准回写所有入口，界面与系统层级永远一致
+    reflectAlwaysOnTop(!!real);
+    api.setSettings({ alwaysOnTop: !!real });
+    return;
+  }
+  reflectAlwaysOnTop(wanted);
+  api.setSettings({ alwaysOnTop: wanted });
 }
 
 function renderAbout() {
@@ -2471,11 +3807,170 @@ function openAbout() {
   $('aboutModal').hidden = false;
 }
 
+/* ============================================================================
+ * 版本更新（设置窗口）
+ * --------------------------------------------------------------------------
+ * 这里只做界面与状态显示；联网、下载、校验、安装全部在主进程完成。
+ * 与音频系统完全无关：不改 DSP 图谱、不改音量、不改播放状态、不改预设。
+ * 更新说明只按纯文本显示 —— 远程内容永远不当作 HTML 执行。
+ * ========================================================================== */
+const updateUi = { info: null, result: null, phase: 'idle' };
+
+function updateEl(id) {
+  return document.getElementById(id);
+}
+
+function setUpdateStatusText(text, kind) {
+  const el = updateEl('updateStatusText');
+  if (!el) return;
+  // 状态文字是动态的，去掉 data-i18n 以免语言表把它覆盖回去
+  el.removeAttribute('data-i18n');
+  el.textContent = text;
+  el.className = 'update-status' + (kind ? ' is-' + kind : '');
+}
+
+function setUpdateControls(phase) {
+  const portable = !!(updateUi.info && updateUi.info.mode === 'portable');
+  const set = (id, visible) => {
+    const el = updateEl(id);
+    if (el) el.hidden = !visible;
+  };
+  set('installUpdateBtn', (phase === 'available' || phase === 'ready') && !portable);
+  set('cancelUpdateBtn', phase === 'downloading');
+  set('openReleaseBtn', phase === 'available' || phase === 'ready' || phase === 'portable');
+  set('updateProgressWrap', phase === 'downloading' || phase === 'ready');
+  const check = updateEl('checkUpdateBtn');
+  if (check) check.disabled = phase === 'checking' || phase === 'downloading';
+  const install = updateEl('installUpdateBtn');
+  if (install) {
+    const label = phase === 'ready' ? t('restartNow') : t('installNow');
+    if (install.textContent.trim() !== label) install.textContent = label;
+  }
+}
+
+function renderUpdateNotes(text) {
+  const notes = updateEl('updateNotes');
+  if (!notes) return;
+  notes.textContent = '';
+  if (!text) {
+    notes.hidden = true;
+    return;
+  }
+  // 只写 textContent：远程内容不会被执行，也不会被当成 HTML 渲染
+  notes.textContent = text;
+  notes.hidden = false;
+}
+
+function setUpdateProgress(received, total) {
+  const fill = updateEl('updateProgressFill');
+  const label = updateEl('updateProgressText');
+  if (!fill || !label) return;
+  const percent = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : 0;
+  fill.style.width = percent + '%';
+  const mb = (n) => (n / 1048576).toFixed(1);
+  label.textContent = total > 0 ? percent + '%  ·  ' + mb(received) + ' / ' + mb(total) + ' MB' : mb(received) + ' MB';
+}
+
+async function initUpdateSection() {
+  if (!updateEl('updateBlock')) return;
+  try {
+    const info = await api.updateInfo();
+    updateUi.info = info || null;
+    const versionEl = updateEl('updateCurrentVersion');
+    if (versionEl && info) versionEl.textContent = 'v' + info.version;
+  } catch (error) {
+    console.warn('读取版本信息失败', error);
+  }
+  const auto = updateEl('autoCheckUpdate');
+  if (auto) auto.checked = state.settings.autoCheckUpdate !== false;
+  if (updateUi.phase === 'idle') setUpdateControls('idle');
+}
+
+async function runUpdateCheck(manual) {
+  if (updateUi.phase === 'checking' || updateUi.phase === 'downloading') return;
+  updateUi.phase = 'checking';
+  setUpdateStatusText(t('updateChecking'), 'warn');
+  setUpdateControls('checking');
+  const res = await api.checkUpdate();
+  if (!res || !res.ok) {
+    updateUi.phase = 'failed';
+    const message = res && res.error === 'notfound' ? t('updateNotFound') : t('updateNetError');
+    setUpdateStatusText(message, 'error');
+    setUpdateControls('failed');
+    if (manual) showToast(message);
+    return;
+  }
+  updateUi.result = res;
+  if (res.hasUpdate) {
+    updateUi.phase = 'available';
+    const when = res.publishedAt ? new Date(res.publishedAt).toLocaleDateString() : '';
+    setUpdateStatusText(t('updateAvailable') + '：v' + res.latestVersion + (when ? '  ·  ' + t('updatePublishedAt') + ' ' + when : ''), 'ok');
+    renderUpdateNotes(res.notes);
+    setUpdateControls('available');
+    // 后台自动检查只提示，不打断任何操作
+    if (!manual) showToast(t('updateAvailable') + '：v' + res.latestVersion);
+  } else {
+    updateUi.phase = 'current';
+    setUpdateStatusText(t('updateUpToDate') + '（v' + res.currentVersion + '）', 'ok');
+    renderUpdateNotes('');
+    setUpdateControls('current');
+    if (manual) showToast(t('updateUpToDate'));
+  }
+}
+
+async function runUpdateDownload() {
+  if (updateUi.phase !== 'available') return;
+  updateUi.phase = 'downloading';
+  setUpdateStatusText(t('updateDownloading') + '：v' + updateUi.result.latestVersion, 'warn');
+  setUpdateControls('downloading');
+  setUpdateProgress(0, updateUi.result.asset ? updateUi.result.asset.size : 0);
+  const res = await api.downloadUpdate();
+  if (!res || !res.ok) {
+    if (res && res.error === 'cancelled') {
+      updateUi.phase = 'available';
+      setUpdateStatusText(t('updateCancelled'), '');
+      setUpdateControls('available');
+      return;
+    }
+    updateUi.phase = 'failed';
+    setUpdateStatusText(t('updateFailed'), 'error');
+    setUpdateControls('failed');
+    showToast(t('updateFailed'));
+    return;
+  }
+  setUpdateProgress(res.size, res.size);
+  const expected = (updateUi.result && updateUi.result.assetSha256) || '';
+  if (expected && String(expected).toLowerCase() !== String(res.sha256).toLowerCase()) {
+    // 校验不通过：绝不安装损坏或不完整的更新包
+    updateUi.phase = 'failed';
+    setUpdateStatusText(t('updateChecksumFailed'), 'error');
+    setUpdateControls('failed');
+    showToast(t('updateChecksumFailed'));
+    return;
+  }
+  updateUi.phase = 'ready';
+  setUpdateStatusText(t('updateReady') + (updateUi.info && updateUi.info.mode === 'portable' ? '（' + t('updatePortable') + '）' : ''), 'ok');
+  setUpdateControls('ready');
+}
+
+async function runUpdateInstall() {
+  const res = await api.installUpdate();
+  if (res && res.ok) {
+    setUpdateStatusText(t('restartNow') + '…', 'ok');
+    return;
+  }
+  const portable = res && res.error === 'portable';
+  updateUi.phase = portable ? 'portable' : 'failed';
+  setUpdateStatusText(portable ? t('updatePortable') : t('updateFailed'), portable ? 'warn' : 'error');
+  setUpdateControls(updateUi.phase);
+}
+
 async function saveSettings() {
   const next = {
     theme: $('themeSelect').value,
     language: $('languageSelect').value,
-    closeToTray: $('closeToTray').checked
+    closeToTray: $('closeToTray').checked,
+    autoCheckUpdate: $('autoCheckUpdate') ? $('autoCheckUpdate').checked : true
   };
   state.settings = { ...state.settings, ...next };
   state.settings = await api.setSettings(next);
@@ -2527,14 +4022,20 @@ function bindUI() {
     const modal = $('effectsModal');
     if (modal) modal.hidden = false;
   });
+  // 图标系统自检：只做登记与比对，不改任何画面。
+  // 如果哪天某个按钮引用了不存在的图标，控制台会直接点名，方便定位。
+  if (window.RlonIcons) {
+    const report = window.RlonIcons.audit();
+    if (report.missing.length) {
+      console.warn('[RlonDSP 图标] 引用了但没有绘制的图标:', report.missing.join(', '));
+    }
+  }
   on('closeEffectsBtn', 'click', () => {
     const modal = $('effectsModal');
     if (modal) modal.hidden = true;
   });
   on('resetFxBtn', 'click', resetEffects);
   on('savePresetBtn', 'click', savePreset);
-  on('renamePresetBtn', 'click', renamePreset);
-  on('deletePresetBtn', 'click', deletePreset);
   const presetNameInput = $('presetNameInput');
   if (presetNameInput) {
     // 用户一旦手动改名，就不再自动覆盖
@@ -2553,7 +4054,11 @@ function bindUI() {
   const studioFrame = document.getElementById('irStudioFrame');
   if (studioFrame) studioFrame.addEventListener('load', syncStudioTheme);
   on('settingsBtn', 'click', openSettings);
-  on('winMinBtn', 'click', () => api.minimize());
+  // 最小化：先播放淡出动画，动画结束后再真正最小化（观感连续，不突兀）
+  on('winMinBtn', 'click', () => {
+    playWindowAnim('out');
+    window.setTimeout(() => api.minimize(), 170);
+  });
   on('winMaxBtn', 'click', () => api.maximize());
   on('winCloseBtn', 'click', () => api.close());
   on('winMiniBtn', 'click', toggleMiniMode);
@@ -2571,22 +4076,52 @@ function bindUI() {
       // 最大化时窗口铺满屏幕，四角要恢复直角（见 styles.css 的窗口圆角说明）
       document.documentElement.classList.toggle('is-maximized', !!value);
       const icon = $('winMaxIcon');
-      if (icon) icon.setAttribute('href', value ? '#icon-win-restore' : '#icon-win-max');
+      swapIcon(icon, value ? '#icon-win-restore' : '#icon-win-max');
       const btn = $('winMaxBtn');
       if (btn) btn.title = value ? '还原' : '最大化';
     });
+  }
+  // 最大化 / 还原 / 从任务栏恢复：播放窗口过渡动画
+  if (api.onWindowAnim) {
+    api.onWindowAnim((kind) => playWindowAnim(kind === 'out' ? 'out' : 'in'));
   }
   on('closeSettingsBtn', 'click', () => {
     const modal = $('settingsModal');
     if (modal) modal.hidden = true;
   });
   on('saveSettingsBtn', 'click', saveSettings);
+  // 标题栏右上角的图钉按钮：点一下切换置顶（与设置里的开关是同一个状态）
+  on('pinBtn', 'click', async () => {
+    const now = api.getAlwaysOnTop ? await api.getAlwaysOnTop() : !!state.settings.alwaysOnTop;
+    await applyAlwaysOnTop(!now);
+  });
+  if (api.onAlwaysOnTopChanged) {
+    // 以真实窗口状态为准回写界面（例如系统或其它途径改变了置顶状态）
+    api.onAlwaysOnTopChanged((value) => {
+      reflectAlwaysOnTop(!!value);
+    });
+  }
   on('aboutBtn', 'click', openAbout);
   on('closeAboutBtn', 'click', () => {
     const modal = $('aboutModal');
     if (modal) modal.hidden = true;
   });
   on('viewLicenseBtn', 'click', () => api.openLicense());
+  // 版本更新：检查 / 下载 / 取消 / 安装 / 打开发布页
+  on('checkUpdateBtn', 'click', () => runUpdateCheck(true));
+  on('installUpdateBtn', 'click', () => {
+    if (updateUi.phase === 'ready') return runUpdateInstall();
+    return runUpdateDownload();
+  });
+  on('cancelUpdateBtn', 'click', async () => {
+    await api.cancelUpdate();
+  });
+  on('openReleaseBtn', 'click', () => api.openReleasePage());
+  if (api.onUpdateProgress) {
+    api.onUpdateProgress((payload) => {
+      if (payload) setUpdateProgress(Number(payload.received) || 0, Number(payload.total) || 0);
+    });
+  }
   on('muteBtn', 'click', toggleMute);
   on('modeBtn', 'click', cycleMode);
   window.addEventListener('resize', () => {
@@ -2595,6 +4130,12 @@ function bindUI() {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (state.settings.theme === 'system') applyTheme('system');
   });
+  // 窗口不可见时停掉背景动画，回到前台再继续（避免后台空转）
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) AlbumEnv.stop();
+    else AlbumEnv.start();
+  });
+  window.addEventListener('beforeunload', () => AlbumEnv.stop());
   bindEffectInputs();
   handleDragDrop();
   api.onShortcut((command) => {
@@ -2621,15 +4162,26 @@ async function init() {
   safeRun('主题应用', () => applyTheme(state.settings.theme));
   safeRun('播放模式按钮同步', updateModeButton);
   safeRun('均衡器构建', buildEQ);
+  safeRun('均衡器风格预设构建', buildEqPresets);
   applyEffectsToUI();
   safeRun('DSP 图谱同步', syncDspGraph);
   bindUI();
+  safeRun('效果卡片折叠初始化', setupEffectCards);
   state.favorites = new Set(await api.getFavorites());
   await loadPresets();
   safeRun('播放列表渲染', renderPlaylist);
   safeRun('正在播放信息同步', updateNowPlaying);
   await safeRunAsync('输出设备枚举', enumerateOutputDevices);
   if (state.settings.outputDeviceId) applyOutputDevice(state.settings.outputDeviceId);
+  await safeRunAsync('版本信息初始化', initUpdateSection);
+  await safeRunAsync('置顶状态同步', syncAlwaysOnTopUI);
+  await safeRunAsync('视觉引擎初始化', initVisualEngine);
+  // 后台自动检查更新：默认开启，启动后延迟进行，只提示、不打扰播放
+  if (state.settings.autoCheckUpdate !== false) {
+    window.setTimeout(() => {
+      if (!document.hidden) safeRun('后台检查更新', () => runUpdateCheck(false));
+    }, 12000);
+  }
   drawVisualizer();
 }
 

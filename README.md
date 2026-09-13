@@ -4,146 +4,156 @@
 
 # RlonDSP
 
-**融合 Apple Liquid Glass 设计语言的专业级桌面音频工作站**
+**纯本地的 Windows 桌面音频工作站与音频实验平台**
 
-本地播放 · 实时音效 · 脉冲反馈 · 专业频谱分析
+实时音效处理 · 脉冲响应卷积 · 空间音效 · 专业频谱分析 · 音频反应可视化
 
 [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-lightgrey.svg)](#-系统要求)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.1-green.svg)](CHANGELOG.md)
 [![Electron](https://img.shields.io/badge/Electron-43.6.0-47848F.svg)](https://www.electronjs.org/)
 [![Web Audio](https://img.shields.io/badge/Web%20Audio-AudioWorklet-orange.svg)](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Audio_API)
-[![No Cloud](https://img.shields.io/badge/100%25-%E7%BA%AF%E6%9C%AC%E5%9C%B0-red.svg)](#-核心特性)
 
-[核心特性](#-核心特性) · [音效系统](#-音质与音效) · [频谱可视化](#-可视化与频谱分析) · [下载安装](#-下载与安装) · [路线图](#-路线图) · [鸣谢](#-开源引用与鸣谢)
+[项目简介](#-项目简介) · [核心能力](#-核心能力) · [界面展示](#-界面展示) · [架构](#-架构) · [快速开始](#-快速开始) · [路线图](#-路线图) · [贡献](#-贡献) · [许可证](#-许可证)
 
 </div>
 
 ---
 
-## 📖 这是什么
+## 项目简介
 
-RlonDSP 是一款**纯本地**的 Windows 桌面音频工作站与播放器。它把专业音频机架上的实时效果器、脉冲响应卷积，与一套电影级的实时频谱可视化放进了同一个界面里，并且全部处理都在这台电脑上完成——不联网、不上传、不采集任何音频数据。
+RlonDSP 是一款纯本地的 Windows 桌面音频工作站：实时音效处理、脉冲响应卷积、空间音效与专业频谱可视化全部在本机完成，不联网、不上传任何数据。
 
-界面遵循 Apple **Liquid Glass（动态玻璃）** 设计语言：分层半透明材质、背景模糊、柔和阴影、大圆角、平滑缓动，控制层悬浮于内容层之上。
+它不是为了替代普通音乐播放器，而是把专业音频机架上的实时效果器、脉冲响应卷积，与一套电影级的实时音频可视化放进同一个窗口里。界面遵循 Apple Liquid Glass 设计语言，使用分层半透明材质、背景模糊、柔和阴影、大圆角与平滑缓动，控制层悬浮在内容层之上。
 
-> 本项目基于开源项目 [Echomusic](https://github.com/hoowhoami/EchoMusic) 分支改造与扩展，完整保留上游版权与许可证信息，详见 [NOTICE](NOTICE) 与 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)。
+与普通播放器的区别在于：
 
-## 🖼 界面预览
+- 所有效果器都进入统一的 DSP 图谱，而不是简单的“开关几个音效”；
+- 空间音效与 IR 脉冲响应可实时加载、试听、A/B 对比；
+- 内置 10 路专业音频分析器与独立的沉浸式视觉引擎；
+- 项目以可扩展的 Provider 接口组织 DSP 来源，而不只是固定内置效果链。
 
-<div align="center">
+## 核心能力
 
-### 主界面
+### 已实现
 
-<img src="docs/images/01-main.png" alt="RlonDSP 主界面" width="880" />
+- **本地播放器**：导入文件 / 文件夹 / 拖拽导入，搜索、排序、清空，曲目时长与封面解析。
+- **实时音效**：图示均衡器、压缩、低音增强、立体声增强、虚拟环绕、胆机模拟、混响、噪声门、前瞻限幅，以及动态 EQ、多段压缩、去齿音、扩展器、瞬态整形、削波 / 饱和、延迟 / 回声、合唱、镶边等。
+- **统一 DSP 图谱**：内置 DSP、原生引擎、Provider 与空间音效都是同一张图中的独立节点；节点可启用 / 旁通 / 排序，延迟与尾音如实统计。
+- **空间音效**：加载本地 WAV / AIFF 脉冲响应，实时卷积，支持干湿比、预延迟、高通、低通、A/B 对比与试听。
+- **空间音效制作器（IR Studio）**：内嵌 13 级脉冲响应生成链，可生成并导出 16 / 24 / 32-bit WAV。
+- **专业分析器**：频谱分析仪、示波器、极坐标声场、响度历史、弧形电平表、倍频程频段、相位分析、动态范围、频谱质心、事件检测。
+- **沉浸式视觉引擎**：粒子场、密度场、向量场、程序化条带、流体、等离子、声波图形、电场等多种 Generator 与组合预设，支持自动轮换与音乐节拍驱动。
+- **系统集成**：系统托盘、媒体键、全局快捷键、窗口置顶、迷你窗口模式、深浅主题与中英文实时切换。
+- **版本更新**：应用内检查 GitHub Release、下载、SHA-256 校验，已安装版可自动升级；便携版提供发布页入口。
 
-<sub>左侧播放列表 · 中部十联可视化 · 底部通栏播放控制栏 · 顶部 Liquid Glass 标题栏 · 整窗圆角</sub>
+### 当前正在完善
 
-</div>
+- 更多第三方 Provider 的接入与隔离体验；
+- 外部插件生态的成熟化；
+- 可视化预设与音频参数的更细粒度控制。
 
-### 可视化总览
+### 未来规划
 
-<img src="docs/images/02-visualizations.png" alt="RlonDSP 可视化总览" width="880" />
+下面这些只在路线图中，不代表当前已经实现：
 
-### 实时音效 / 空间音效制作器 / 设置 / 迷你模式
+- 更完整的插件 / Provider 管理界面；
+- Web 版或跨平台实验版本；
+- 更深入的音频分析与可导出报告。
 
-| 实时音效 | 空间音效制作器 |
-| :---: | :---: |
-| <img src="docs/images/13-realtime-effects.png" alt="实时音效" /> | <img src="docs/images/15-pulse-feedback.png" alt="空间音效制作器" /> |
+## 界面展示
 
-| 空间音效 | 设置 |
-| :---: | :---: |
-| <img src="docs/images/14-irs-spatial.png" alt="空间音效" /> | <img src="docs/images/16-settings.png" alt="设置" /> |
+以下截图均来自当前最新版 RlonDSP 的实际运行界面。
 
-| 迷你模式 | 关于 |
-| :---: | :---: |
-| <img src="docs/images/18-mini-mode.png" alt="迷你模式" /> | <img src="docs/images/19-about.png" alt="关于" /> |
+### 主工作区
 
-## ✨ 核心特性
+![RlonDSP Main Workspace](docs/screenshots/main-workspace.png)
 
-- **极致美学：Liquid Glass 动态毛玻璃** — 全局统一的设计令牌（`glass-theme.css`），分层玻璃材质：全局背景层 / 面板层 / 内容层 / 控制层 / 微玻璃。播放控制栏带**跟随鼠标的动态高光**与玻璃边缘折射感，并完整支持*减弱透明*、*减弱动态*、*不支持背景模糊* 三种降级。
-- **实时频谱分析：10 个专业可视化模块** — 频谱分析仪、示波器、极坐标声场、响度历史、弧形电平表、倍频程频段、相位分析、动态范围、频谱质心、事件检测，一屏铺满、互不重复，全部由 `requestAnimationFrame` 驱动，暂停即停笔、画面保留最后一帧。
-- **空间音效制作器：13 级 DSP 链** — 内嵌脉冲响应生成器，信号链为 `IMPULSE → EQ-9 → COMP → BASS → SUR3D → HP-SUR → CLARITY → ULTRA → TUBE → FDN → NORM → WMK → WAV`，可导出 16 / 24 / 32-bit WAV。
-- **9 段图示均衡器** — 每段 ±12 dB，覆盖 65 Hz ~ 16 kHz，配合总增益（-120 ~ +120 dB）与实时参数反馈。
-- **空间音效** — 加载本地 WAV / AIFF 脉冲响应文件，实时卷积，支持干湿比、预延迟、高通、低通、A/B 对比、试听与旁路；制作器保存的脉冲与外部加载的脉冲都会进入同一份列表，可重命名、删除、逐个开关。
-- **统一 DSP 图谱** — 内置 DSP、原生引擎、第三方 Provider 与自研空间音效都是同一张图里的独立节点，可同时启用、按合法顺序串联或并行工作，延迟与尾音如实统计。
-- **播放列表管理** — 导入文件 / 文件夹 / 拖拽导入，搜索、排序、清空，曲目时长与封面解析。
-- **系统集成** — 系统托盘、媒体键（播放/暂停、上一曲、下一曲）、`Ctrl+Alt+P / ← / →` 全局快捷键、关闭时最小化到托盘、迷你窗口模式（360 × 64）。
-- **多语言** — 界面文字全部走语言表，中文 / English 实时切换，包含画布内绘制的标注文字。
+展示主播放器、左侧播放列表、中部 10 路专业分析器与底部通栏播放控制栏。这是 RlonDSP 打开后的默认产品视图。
 
-## 🎚 音质与音效
+### DSP 工作区
 
-所有音频处理都在 **AudioWorklet** 中完成，运行于独立的音频渲染线程，不阻塞界面。
+![RlonDSP DSP Workspace](docs/screenshots/dsp-workspace.png)
 
-| 模块 | 关键参数 |
-| :--- | :--- |
-| 图示均衡器 | 9 段，每段 ±12 dB（65 / 125 / 250 / 500 / 1k / 2k / 4k / 8k / 16k Hz） |
-| 总增益 | -120 ~ +120 dB |
-| 压缩器 | 阈值 -60 ~ 0 dB、压缩比 1:1 ~ 12:1、启动 1 ~ 50 ms、释放 20 ~ 600 ms |
-| 低音增强 | 增益 0 ~ +12 dB、分频点 40 / 60 / 80 / 120 Hz |
-| 立体声增强 | 宽度 0 ~ 1.50 |
-| 虚拟环绕 | 空间感 0 ~ 2.00 |
-| 清晰度增强 | 强度 0 ~ 1.00 |
-| 超高频净化 | 开关式 |
-| 胆机模拟 | 驱动 0 ~ 1.00 |
-| 混响（FDN） | 混响时间 0.10 ~ 5.00 s、高频阻尼、湿声比例、预延迟、房间大小 |
-| 降噪（噪声门） | 阈值 -80 ~ -20 dB、释放 20 ~ 500 ms |
-| 限幅 | 上限 -12 ~ 0 dB |
-| 空间音效 | 干湿比、预延迟、高通 10 ~ 500 Hz、低通 1 k ~ 20 kHz、A/B 对比、脉冲列表（重命名 / 删除 / 开关） |
-| 差分环绕 | 延迟声道（左 / 右）、延迟 0 ~ 30 ms，实时作用于当前播放 |
-| 预设系统 | 保存 / 删除 / 导出 / 导入 |
+展示实时音效面板中的统一 DSP 环境。多个效果器以卡片形式组织，可启用、旁通、折叠并实时调整参数。
 
-## 📊 可视化与频谱分析
+### 分析器
 
-全部 10 个模块共用同一份每帧计算的音频度量（`computeVizMetrics`），因此不会重复解析音频数据、不产生额外开销。
+![RlonDSP Analyzer](docs/screenshots/analyzer.png)
 
-| 面板 | 数据来源 | 说明 |
+展示 10 路实时音频分析器，全部由 `requestAnimationFrame` 驱动，播放时持续刷新，暂停时保留最后一帧。
+
+### 空间音效
+
+![RlonDSP Spatial Audio](docs/screenshots/spatial-audio.png)
+
+展示实时脉冲响应卷积的控制区：加载脉冲、清除、A/B、试听，以及干湿比、预延迟、高通、低通等参数。
+
+### IR Studio / 脉冲反馈
+
+![RlonDSP IR Studio](docs/screenshots/ir-studio.png)
+
+展示空间音效制作器，用于生成、预览与管理脉冲响应 WAV 文件。
+
+### 沉浸式视觉引擎
+
+![RlonDSP Visualization](docs/screenshots/visualization.png)
+
+展示第二页的音频反应视觉引擎。当前版本提供多种 Generator 与组合预设，并支持自动轮换。
+
+### 设置
+
+![RlonDSP Settings](docs/screenshots/settings.png)
+
+展示主题、语言、输出设备与版本更新入口。
+
+### 关于 RlonDSP
+
+![RlonDSP About](docs/screenshots/about-rlondsp.png)
+
+展示软件内「设置 → 关于 RlonDSP」页面，也是本仓库项目身份与核心文案的来源。
+
+## 架构
+
+```text
+UI
+ │
+ ├── Renderer（播放器、列表、音效面板、设置、关于）
+ │
+ ├── DSP Host / Worklet
+ │    ├── 统一 DSP 图谱
+ │    ├── 内置 DSP 节点
+ │    ├── Native / Provider 实现
+ │    ├── 延迟 / 尾音 / 旁通 / 排序
+ │    └── AudioWorklet 实时处理
+ │
+ ├── Analyzer
+ │    └── 10 路专业音频可视化
+ │
+ ├── Visual Engine
+ │    └── 粒子、流体、等离子、电场等音频反应生成器
+ │
+ ├── Spatial Audio
+ │    └── IR 加载与实时卷积
+ │
+ └── IR / Convolution
+      └── IR Studio、WAV 导出
+```
+
+源码运行在 Electron 桌面运行时中。渲染进程使用原生 HTML5、CSS3 与 JavaScript；音频处理运行在独立 `AudioWorklet` 线程中；DSP 图谱由 `src/dsp-host.js` 统一管理，第三方能力通过 Provider 接口接入。
+
+## 技术栈
+
+| 层 | 技术 | 说明 |
 | :--- | :--- | :--- |
-| 频谱分析仪 | `getByteFrequencyData()` | 对数频率刻度的柱状频谱 + 峰值保持线 |
-| 示波器 | `getFloatTimeDomainData()` | 双声道时域波形，含时间刻度与触发稳定 |
-| 极坐标声场 | 声道相关度 | 立体声像定位、声场宽度、移动光斑 |
-| 响度历史 | RMS 累积 | LUFS 随时间变化曲线 + 参考线 |
-| 弧形电平表 | 峰值 / RMS | 实时 dBFS、峰值与过载预警 |
-| 倍频程频段 | 5 段能量统计 | 低频 / 中低频 / 中频 / 中高频 / 高频 |
-| 相位分析 | 声道相关度 | 相关度数值、立体声宽度、正反相位指示 |
-| 动态范围 | 统计值 | 整体 LUFS、峰值 dBFS、动态范围、失真度 |
-| 频谱质心 | 频域加权重心 | 重心频率与音色明暗度 |
-| 事件检测 | 频段能量突变 | Beat / Bass / Vocal / High Freq / Overload 事件灯带 |
+| 桌面运行时 | Electron 43.6.0 / Chromium 150 | 窗口、托盘、媒体键、全局快捷键 |
+| 界面 | 原生 HTML5 + CSS3 + JavaScript | 无前端框架，无构建步骤 |
+| 音频引擎 | Web Audio API + AudioWorklet | 实时 DSP 链与参数平滑 |
+| 可视化 | Canvas 2D + `requestAnimationFrame` | 10 路分析器与沉浸式视觉引擎 |
+| 元数据 | music-metadata | 本地音频标签、封面、时长解析 |
+| 打包 | 7-Zip SFX + 项目配方 | 便携 zip 与安装包 exe |
 
-<details>
-<summary>展开查看各面板单独截图</summary>
-
-| 频谱分析仪 | 示波器 | 极坐标声场 |
-| :---: | :---: | :---: |
-| <img src="docs/images/03-spectrum-analyzer.png" /> | <img src="docs/images/04-oscilloscope.png" /> | <img src="docs/images/05-polar-field.png" /> |
-
-| 响度历史 | 弧形电平表 | 倍频程频段 |
-| :---: | :---: | :---: |
-| <img src="docs/images/06-loudness-history.png" /> | <img src="docs/images/07-arc-meter.png" /> | <img src="docs/images/08-octave-bands.png" /> |
-
-| 相位分析 | 动态范围 | 频谱质心 | 事件检测 |
-| :---: | :---: | :---: | :---: |
-| <img src="docs/images/09-phase-analysis.png" /> | <img src="docs/images/10-dynamics.png" /> | <img src="docs/images/11-spectral-centroid.png" /> | <img src="docs/images/12-events.png" /> |
-
-</details>
-
-## 🧱 技术栈
-
-> 以下为 RlonDSP **本项目实际使用** 的技术，均为实测确认。
-
-| 层 | 技术 | 版本 | 用途 |
-| :--- | :--- | :--- | :--- |
-| 桌面运行时 | [Electron](https://www.electronjs.org/) | 43.6.0（Chromium 150） | 桌面外壳、窗口、托盘、全局快捷键 |
-| 界面 | 原生 HTML5 + CSS3 + JavaScript（ES2020+） | — | 渲染进程界面与交互 |
-| 音频引擎 | [Web Audio API](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Audio_API) + AudioWorklet | — | 实时 DSP 处理链、参数平滑 |
-| 可视化 | Canvas 2D + `requestAnimationFrame` | — | 10 路实时音频可视化 |
-| 元数据 | [music-metadata](https://github.com/Borewit/music-metadata) | ^11.0.0 | 本地音频标签、封面、时长解析 |
-| 音效容器 | 浮层玻璃材质（自研 CSS 令牌系统） | 1.0.0 | Liquid Glass 视觉体系 |
-| 打包 | [electron-builder](https://www.electron.build/) + 7-Zip | ^26.0.12 | 便携版 / 安装包 |
-
-**界面与业务全部由原生 Web 技术实现**，没有引入前端框架与构建工具链，因此没有构建产物、没有编译步骤，源码即成品。
-
-## 💻 系统要求
+## 系统要求
 
 | 项目 | 要求 |
 | :--- | :--- |
@@ -151,143 +161,101 @@ RlonDSP 是一款**纯本地**的 Windows 桌面音频工作站与播放器。�
 | 处理器 | x64 |
 | 内存 | 建议 4 GB 及以上 |
 | 磁盘 | 约 350 MB 可用空间（便携版解压后） |
-| 音频 | 任意 Windows 可识别的输出设备（支持设备枚举与切换） |
-| 网络 | **不需要**，程序全程离线运行 |
+| 音频 | 任意 Windows 可识别的输出设备 |
+| 网络 | 不需要，程序全程离线运行 |
 
-## 📦 下载与安装
+## 快速开始
 
-前往 [Releases](https://github.com/EzRlon/RlonDSP/releases) 页面下载：
+### 直接使用发布包
+
+前往 [Releases](https://github.com/EzRlon/RlonDSP/releases) 下载：
 
 | 版本 | 文件名 | 说明 |
 | :--- | :--- | :--- |
-| 便携版 | `RlonDSP-1.0.0-portable-x64.zip` | 解压后双击 `RlonDSP.exe` 即可使用，**免安装** |
-| 安装版 | `RlonDSP-1.0.0-setup-x64.exe` | 向导式安装，可选安装目录，自动创建桌面与开始菜单快捷方式 |
+| 便携版 | `RlonDSP-1.0.1-portable-x64.zip` | 解压后双击 `RlonDSP.exe`，免安装 |
+| 安装版 | `RlonDSP-1.0.1-setup-x64.exe` | 可选安装目录，创建桌面与开始菜单快捷方式 |
 
-**零基础三步走：**
+### 源码开发
 
-1. 下载并解压便携版压缩包；
-2. 双击 `RlonDSP.exe`；
-3. 点「导入文件」选择本地音乐，双击歌曲开始播放。
-
-详细图文说明见程序目录内的 `使用说明.txt`。
-
-## 🚀 快速开始（开发）
+要求：Node.js 18+ 与 npm；仅开发、测试和打包需要，运行发布包不需要。
 
 ```bash
-# 1. 获取源码
 git clone https://github.com/EzRlon/RlonDSP.git
 cd RlonDSP
-
-# 2. 安装依赖（仅开发需要；运行成品不需要）
 npm install
-
-# 3. 启动调试
 npm start
-
-# 4. 打包
-npm run dist:portable   # 便携版
-npm run dist:nsis       # 安装包
 ```
 
-> 本项目的界面代码是纯 Web 技术，**改完源码刷新窗口即可生效**，无需编译。打包产物的源码副本位于 `release/RlonDSP-portable/resources/app/`。
+发布打包以 `tools/installer/README.md` 中的 7-Zip SFX 配方为准，不依赖 electron-builder 的 NSIS 流程。
 
-## 📁 项目结构
+## 项目结构
 
 ```text
-RlonDSP/
-├── main.js                  # Electron 主进程：窗口、托盘、菜单、IPC 注册、快捷键
-├── preload.js               # 主窗口预加载桥接（contextBridge，仅暴露必要能力）
-├── lyrics-preload.js        # 桌面歌词窗口预加载桥接（该窗口入口已移除，文件暂留）
-├── package.json             # 项目元信息与打包配置
-├── src/
-│   ├── index.html           # 主界面结构 + 内联 SVG 图标雪碧图
-│   ├── renderer.js          # 渲染进程：播放器、列表、音效、可视化、i18n
-│   ├── dsp-host.js          # 统一 DSP 图谱：多引擎节点的编排 / 延迟 / 尾音
-│   ├── styles.css           # 基础样式与布局
-│   ├── glass-theme.css      # Liquid Glass 设计令牌（--lg-* 命名空间）
-│   ├── glass-components.css # 玻璃组件类（.lg-surface / .lg-player-bar 等）
-│   ├── glass-motion.js      # 播放栏跟随鼠标的动态高光
-│   ├── dsp-worklet.js       # AudioWorklet 实时 DSP 处理链
-│   ├── ir-studio.html       # 空间音效制作器（脉冲反馈生成器）
-│   ├── ir-generator.js      # 脉冲响应生成与 WAV 导出
-│   └── lyrics.html/.css/.js # 桌面歌词窗口（该窗口入口已移除，文件暂留）
-├── assets/                  # 应用图标（ico / png / 托盘图标）
-├── docs/                    # 文档与截图
-│   ├── images/              # README 使用的界面与功能截图
-│   ├── ARCHITECTURE.md      # 架构说明
-│   ├── RELEASING.md         # 发布流程
-│   ├── GITHUB.md            # GitHub 账户与仓库信息
-│   └── GITHUB_WORKFLOW.md   # Git / GitHub 操作规范
-├── tools/                   # 开发与打包辅助脚本
-│   └── tests/smoke.test.js  # 冒烟测试（播放/暂停、切歌、音量、主题）
-├── vendor/echomusic/        # 上游 Echomusic 参考源码与原生音频模块
-├── release/                 # 打包产物（不入版本库）
-├── ACKNOWLEDGEMENTS.md      # 开源引用与鸣谢
-├── CONTRIBUTING.md          # 贡献指南
-├── CHANGELOG.md             # 更新日志
-├── NOTICE / NOTICE-RlonDSP  # 版权与分支说明
-└── LICENSE                  # GPL-3.0-only
+src/                          # 渲染进程源码
+  ├── index.html              # 主界面结构
+  ├── renderer.js             # 播放器、列表、音效、可视化、i18n
+  ├── dsp-host.js             # 统一 DSP 图谱与 Provider 接口
+  ├── dsp-worklet.js          # AudioWorklet 实时 DSP
+  ├── visual-engine.js        # 音频反应可视化引擎
+  ├── ir-studio.html          # 空间音效制作器
+  ├── ir-generator.js         # 脉冲响应生成与 WAV 导出
+  └── styles / glass-*.css    # 布局与 Liquid Glass 视觉体系
+assets/                       # 应用图标与托盘图标
+docs/                         # 文档、架构说明、真实截图
+tools/                        # 开发、测试、打包辅助脚本
+vendor/echomusic/             # 上游参考源码与原生模块（只读，不参与构建运行）
+release/                      # 本地打包产物（不入版本库）
 ```
 
-更详细的模块划分与数据流见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+## 路线图
 
-## 🗺 路线图
+### 已完成
 
-### 已完成（v1.0.0）
+- [x] 本地音乐播放与播放列表
+- [x] 10 路专业音频分析器
+- [x] 实时音效与统一 DSP 图谱
+- [x] 空间音效与 IR 脉冲响应
+- [x] IR Studio / 脉冲响应生成与 WAV 导出
+- [x] 沉浸式音频反应视觉引擎
+- [x] 主题、语言、托盘、媒体键与更新系统
+- [x] v1.0.0 与 v1.0.1 正式 Release
 
-- [x] Liquid Glass 设计令牌与玻璃组件体系
-- [x] 无边框窗口、自定义标题栏、迷你窗口模式
-- [x] 10 路专业音频可视化（每帧共享度量，暂停即停笔）
-- [x] AudioWorklet 实时音效链（均衡、压缩、混响、降噪、限幅等）
-- [x] 脉冲反馈生成器（13 级 DSP 链、WAV 导出、脉冲列表管理）
-- [x] 空间音效（本地 IR 加载、卷积、干湿比、A/B 对比、脉冲列表管理）
-- [x] 统一 DSP 图谱（多引擎节点共存、延迟统计、尾音标记、并行分支）
-- [x] 整窗圆角、通栏播放栏与跟随封面的毛玻璃底
-- [x] 中英双语（含画布内文字）
-- [x] 系统托盘、媒体键与全局快捷键
-- [x] 冒烟测试与便携版 / 安装包发布
+### 进行中
 
-### 规划中
+- [ ] Provider / 第三方 DSP 接入体验
+- [ ] 视觉预设与音频参数的更细粒度控制
 
-- [ ] 播放列表与会话状态持久化（跨启动保留）
-- [ ] 更多 EQ 形态（31 段图形均衡器）
-- [ ] 脉冲反馈预设的导入 / 导出（`.wav` + 元数据打包）
-- [ ] 可视化布局自定义（面板显示 / 隐藏与顺序调整）
-- [ ] 频谱截图导出与分享
-- [ ] 无障碍增强（完整键盘导航与屏幕阅读器标注）
-- [ ] 自动更新通道
+### 计划
 
-## 📜 开源引用与鸣谢
+- [ ] 更完整的插件 / Provider 管理界面
+- [ ] Web 版或跨平台实验版本
+- [ ] 更深入的音频分析与可导出报告
 
-本项目站在这些优秀开源项目的肩膀上：
+## 贡献
 
-| 名称 | 许可证 | 用途 |
-| :--- | :--- | :--- |
-| [Echomusic](https://github.com/hoowhoami/EchoMusic) | GPL-3.0-only | 本项目分支来源，提供音频播放与音效框架 |
-| [Electron](https://www.electronjs.org/) | MIT | 桌面应用运行时 |
-| [Chromium](https://www.chromium.org/) / [FFmpeg](https://ffmpeg.org/) | BSD-3-Clause / LGPL-2.1+ | 媒体解码与渲染，随 Electron 分发 |
-| [music-metadata](https://github.com/Borewit/music-metadata) | MIT | 本地音频元数据解析 |
-| [electron-builder](https://www.electron.build/) | MIT | 安装包与便携版打包 |
-| [dsp-ir-1200](https://github.com/EzRlon/dsp-ir-1200) | GPL-3.0 | 脉冲响应生成 DSP 链参考实现 |
+欢迎通过 GitHub Issue 和 Pull Request 参与：
 
-完整的许可证清单、必需署名与感谢名单见 **[ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)**。
+1. Fork 本仓库；
+2. 创建功能分支；
+3. 安装依赖并运行项目；
+4. 修改代码并运行测试；
+5. 提交并创建 Pull Request。
 
-特别感谢 **Apple Human Interface Guidelines** 中 Liquid Glass 材质的设计思想，为本项目的视觉体系提供了灵感。
+Bug Report 与 Feature Request 请在 [Issues](https://github.com/EzRlon/RlonDSP/issues) 提交。更完整的约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## 🤝 贡献
+## 许可证
 
-欢迎提交 Issue 与 Pull Request。开始之前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解分支规范、提交信息格式与自测要求。
+本仓库根目录的 [LICENSE](LICENSE) 为 GPL-3.0-only。
 
-## ⚖️ 许可证
+> 注意：当前 `package.json` 中的 `license` 字段仍为 `MIT`，与仓库 `LICENSE` 文件不一致。此项尚未自动决定，需在后续维护中统一。
 
-本项目遵循 **GNU General Public License v3.0 only（GPL-3.0-only）**，与上游 Echomusic 的许可证保持一致。完整条款见 [LICENSE](LICENSE)。
+## 上游致谢
 
-由于上游 Echomusic 原生音频模块以 GPL-3.0-only 分发，本项目作为其衍生作品同样以 GPL-3.0-only 发布。
+RlonDSP 在以下部分参考并借鉴了 [Echomusic](https://github.com/hoowhoami/EchoMusic) 开源项目：
 
-<div align="center">
+- 主界面框架与功能分区（播放列表、播放控制栏、音效面板、迷你窗口）
+- 原生音频模块的调用接口设计
 
-**RlonDSP** · Copyright © 2026 RlonDSP
+Echomusic 的参考源码与原生模块以只读形式保留在 `vendor/echomusic`，不参与本项目的构建与运行。界面、可视化、脉冲反馈生成器、空间音效与统一 DSP 图谱均为本项目自行实现。
 
-基于 [Echomusic](https://github.com/hoowhoami/EchoMusic) 开源项目分支改造与扩展
-
-</div>
+感谢 Echomusic 作者、全体贡献者与所有开源项目的支持。

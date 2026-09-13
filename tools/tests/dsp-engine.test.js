@@ -324,3 +324,249 @@ test('差分环绕：延迟时间与设定值成比例', () => {
     assert.strictEqual(p.idx, p.expected, p.ms + ' ms 应对应 ' + p.expected + ' 帧，实际 ' + p.idx);
   });
 });
+
+/* ===================== 延迟 / 合唱 / 镶边 / 削波 ===================== */
+
+test('新增效果器默认关闭时完全透明', () => {
+  const proc = makeProc({});
+  const n = 4096;
+  const sig = sine(n, 330, 0.3);
+  const { outL, outR } = run(proc, sig, sig);
+  const skip = proc.limLen;
+  let maxDiff = 0;
+  for (let i = skip + 256; i < n; i++) {
+    maxDiff = Math.max(maxDiff, Math.abs(outL[i] - sig[i - skip]), Math.abs(outR[i] - sig[i - skip]));
+  }
+  assert.ok(maxDiff < 1e-6, '四个新效果器默认关闭时不应改变声音，实际偏差 ' + maxDiff);
+});
+
+test('延迟：脉冲在设定的延迟时间后出现回声', () => {
+  [120, 320, 600].forEach((timeMs) => {
+    const proc = makeProc({
+      enabled: { limiter: false, delay: true },
+      delay: { timeMs, feedback: 0, mix: 1 }
+    });
+    const n = FS_RATE; // 1 秒，足够覆盖 600 ms
+    const imp = new Float32Array(n);
+    imp[0] = 1;
+    const { outL } = run(proc, imp, imp);
+    let idx = -1;
+    // 跳过开头：干信号（直达声）本身也在输出里，要测的是回声的位置
+    for (let i = 200; i < n; i++) if (Math.abs(outL[i]) > 0.5) { idx = i; break; }
+    const expected = Math.round(FS_RATE * timeMs / 1000);
+    assert.ok(Math.abs(idx - expected) <= 2, timeMs + ' ms 回声应出现在约 ' + expected + ' 帧，实际 ' + idx);
+  });
+});
+
+test('延迟：反馈会产生多次回声，且不会失控（<= 0.9）', () => {
+  const proc = makeProc({
+    enabled: { limiter: false, delay: true },
+    delay: { timeMs: 100, feedback: 0.9, mix: 1 }
+  });
+  const n = FS_RATE;
+  const imp = new Float32Array(n);
+  imp[0] = 1;
+  const { outL } = run(proc, imp, imp);
+  const step = Math.round(FS_RATE * 0.1);
+  let echoes = 0;
+  for (let k = 1; k <= 5; k++) {
+    // 在期望位置附近取窗口，避免因整数取整差 1 个样点而漏判
+    let local = 0;
+    // 反馈路径每绕一圈会多出 1 个样点的延迟，所以窗口取宽一点
+    for (let i = step * k - 10; i <= step * k + 10; i++) local = Math.max(local, Math.abs(outL[i]));
+    if (local > 0.05) echoes++;
+  }
+  assert.ok(echoes >= 4, '反馈应产生多次回声，实际 ' + echoes + ' 次');
+  assert.ok(peakOf(outL) <= 1.01, '反馈不得导致增益失控，实际峰值 ' + peakOf(outL));
+});
+
+test('合唱：左右两路被调制得不一样，且湿声参与输出', () => {
+  const proc = makeProc({
+    enabled: { limiter: false, chorus: true },
+    chorus: { rateHz: 2, depthMs: 8, mix: 0.5, spread: 0.5 }
+  });
+  const n = 8192;
+  const sig = sine(n, 1000, 0.4);
+  const { outL, outR } = run(proc, sig, sig);
+  let diffLR = 0;
+  let diffDry = 0;
+  for (let i = 2000; i < n; i++) {
+    diffLR = Math.max(diffLR, Math.abs(outL[i] - outR[i]));
+    diffDry = Math.max(diffDry, Math.abs(outL[i] - sig[i]));
+  }
+  assert.ok(diffDry > 1e-3, '合唱应改变声音，实际偏差 ' + diffDry);
+  assert.ok(diffLR > 1e-3, '左右两路应有不同调制，实际差值 ' + diffLR);
+});
+
+test('镶边：短延迟 + 反馈产生梳状滤波，关闭即还原', () => {
+  const on = makeProc({
+    enabled: { limiter: false, flanger: true },
+    flanger: { rateHz: 0.5, depthMs: 3, feedback: 0.6, mix: 0.5 }
+  });
+  const off = makeProc({ enabled: { limiter: false } });
+  const n = 8192;
+  const sig = sine(n, 800, 0.4);
+  const a = run(on, sig, sig).outL;
+  const b = run(off, sig, sig).outL;
+  let diff = 0;
+  for (let i = 2000; i < n; i++) diff = Math.max(diff, Math.abs(a[i] - b[i]));
+  assert.ok(diff > 1e-3, '镶边开启后应与关闭时明显不同，实际偏差 ' + diff);
+});
+
+test('削波：软 / 硬两种模式都把过载信号压回 1 以内，关闭时不动', () => {
+  ['soft', 'hard'].forEach((mode) => {
+    const proc = makeProc({
+      enabled: { limiter: false, clipper: true },
+      clipper: { drive: 8, mode, outputDB: 0 }
+    });
+    const n = 8192;
+    const loud = sine(n, 440, 1.0);
+    const { outL } = run(proc, loud, loud);
+    const p = peakOf(outL);
+    assert.ok(p <= 1.0001, mode + ' 削波后峰值应 <= 1，实际 ' + p.toFixed(4));
+    assert.ok(p > 0.3, mode + ' 削波不应把信号压没，实际 ' + p.toFixed(4));
+  });
+
+  const bypass = makeProc({ enabled: { limiter: false } });
+  const n2 = 2048;
+  const sig = sine(n2, 440, 0.5);
+  const { outL } = run(bypass, sig, sig);
+  let diff = 0;
+  for (let i = 0; i < n2; i++) diff = Math.max(diff, Math.abs(outL[i] - sig[i]));
+  assert.ok(diff < 1e-6, '削波关闭时不应改变声音，实际偏差 ' + diff);
+});
+
+test('新增效果器：非法参数（NaN / Infinity / 越界）不会产生 NaN 输出', () => {
+  const proc = makeProc({
+    enabled: { limiter: false, delay: true, chorus: true, flanger: true, clipper: true },
+    delay: { timeMs: NaN, feedback: Infinity, mix: -5, pingPong: true },
+    chorus: { rateHz: NaN, depthMs: Infinity, mix: 99, spread: -3 },
+    flanger: { rateHz: Infinity, depthMs: NaN, feedback: 50, mix: NaN },
+    clipper: { drive: NaN, mode: 'hard', outputDB: Infinity }
+  });
+  const n = 8192;
+  const sig = sine(n, 440, 0.6);
+  const { outL, outR } = run(proc, sig, sig);
+  for (let i = 0; i < n; i++) {
+    assert.ok(Number.isFinite(outL[i]) && Number.isFinite(outR[i]), '第 ' + i + ' 个样点出现非有限值');
+  }
+  assert.ok(peakOf(outL) < 100, '非法参数下不应出现异常增益');
+});
+
+/* ============ 追加效果器：扩展器 / 瞬态整形 / 去齿音 / 动态 EQ / 多段压缩 ============ */
+
+test('扩展器：阈值以下的低电平被进一步压低，关闭时完全透明', () => {
+  const n = 8192;
+  const quiet = sine(n, 440, 0.002); // ≈ -54 dBFS，低于 -40 dB 阈值
+  const on = makeProc({
+    enabled: { limiter: false, expander: true },
+    expander: { threshold: -40, ratio: 2, attackMs: 1, releaseMs: 20, range: 24 }
+  });
+  const off = makeProc({ enabled: { limiter: false } });
+  const a = peakOf(run(on, quiet, quiet).outL.subarray(3000));
+  const b = peakOf(run(off, quiet, quiet).outL.subarray(3000));
+  assert.ok(a < b * 0.5, '扩展器应明显压低阈值以下的信号：' + a.toFixed(5) + ' vs ' + b.toFixed(5));
+  assert.ok(a > 0, '不应把信号完全压没');
+});
+
+test('瞬态整形：提高「起音」会放大瞬态，设为 0 时不处理', () => {
+  const n = 16384;
+  const burst = new Float32Array(n);
+  for (let i = 4096; i < n; i++) burst[i] = 0.4 * Math.sin(2 * Math.PI * 1000 * (i - 4096) / FS_RATE);
+  const boost = makeProc({
+    enabled: { limiter: false, transient: true },
+    transient: { attack: 1, sustain: 0, mix: 1, outputDB: 0 }
+  });
+  const flat = makeProc({
+    enabled: { limiter: false, transient: true },
+    transient: { attack: 0, sustain: 0, mix: 1, outputDB: 0 }
+  });
+  const a = peakOf(run(boost, burst, burst).outL.subarray(4096, 4600));
+  const b = peakOf(run(flat, burst, burst).outL.subarray(4096, 4600));
+  assert.ok(a > b * 1.2, '起音拉满时瞬态应明显更大：' + a.toFixed(4) + ' vs ' + b.toFixed(4));
+});
+
+test('去齿音：齿音频段超过阈值被衰减，非齿音频段基本不动', () => {
+  const n = 8192;
+  const sibilant = sine(n, 6000, 0.5);
+  const low = sine(n, 200, 0.5);
+  const on = makeProc({
+    enabled: { limiter: false, deesser: true },
+    deesser: { freq: 6000, threshold: -24, range: 12, attackMs: 1, releaseMs: 40 }
+  });
+  const off = makeProc({ enabled: { limiter: false } });
+  const sibOn = peakOf(run(on, sibilant, sibilant).outL.subarray(4000));
+  const sibOff = peakOf(run(off, sibilant, sibilant).outL.subarray(4000));
+  assert.ok(sibOn < sibOff * 0.7, '齿音频段应被衰减：' + sibOn.toFixed(4) + ' vs ' + sibOff.toFixed(4));
+
+  const lowOn = peakOf(run(on, low, low).outL.subarray(4000));
+  const lowOff = peakOf(run(off, low, low).outL.subarray(4000));
+  assert.ok(Math.abs(lowOn - lowOff) < lowOff * 0.15, '低频不应被明显改动：' + lowOn.toFixed(4) + ' vs ' + lowOff.toFixed(4));
+});
+
+test('动态 EQ：该频段超阈值时施加设定增益，关闭时不动', () => {
+  const n = 8192;
+  const tone = sine(n, 200, 0.5);
+  const on = makeProc({
+    enabled: { limiter: false, dynEq: true },
+    dynEq: { freq: 200, q: 1.2, gainDB: -12, threshold: -30, range: 12, attackMs: 1, releaseMs: 40 }
+  });
+  const off = makeProc({ enabled: { limiter: false } });
+  const a = peakOf(run(on, tone, tone).outL.subarray(4000));
+  const b = peakOf(run(off, tone, tone).outL.subarray(4000));
+  assert.ok(a < b * 0.8, '动态 EQ 应把该频段压低：' + a.toFixed(4) + ' vs ' + b.toFixed(4));
+});
+
+test('多段压缩：过载的低频被压缩，关闭时不受影响', () => {
+  const n = 8192;
+  const loudLow = sine(n, 100, 0.9);
+  const on = makeProc({
+    enabled: { limiter: false, mbComp: true },
+    mbComp: { lowXover: 200, highXover: 3000, lowGainDB: 0, midGainDB: 0, highGainDB: 0, threshold: -20, ratio: 6, attackMs: 2, releaseMs: 60 }
+  });
+  const off = makeProc({ enabled: { limiter: false } });
+  const a = peakOf(run(on, loudLow, loudLow).outL.subarray(4000));
+  const b = peakOf(run(off, loudLow, loudLow).outL.subarray(4000));
+  assert.ok(a < b * 0.8, '多段压缩应压低过载低频：' + a.toFixed(4) + ' vs ' + b.toFixed(4));
+  assert.ok(a > 0.05, '不应把信号压没：' + a.toFixed(4));
+});
+
+test('削波：阈值以下不动，阈值以上被限制在上限内', () => {
+  const n = 8192;
+  const loud = sine(n, 440, 1.0);
+  const on = makeProc({
+    enabled: { limiter: false, clipper: true },
+    clipper: { drive: 6, mode: 'soft', thresholdDB: -6, ceilingDB: -3, mix: 1, outputDB: 0 }
+  });
+  const ceiling = Math.pow(10, -3 / 20);
+  const a = peakOf(run(on, loud, loud).outL.subarray(3000));
+  assert.ok(a <= ceiling + 1e-3, '削波后峰值应不超过上限：' + a.toFixed(4) + ' > ' + ceiling.toFixed(4));
+
+  const quiet = sine(n, 440, 0.1);
+  const b = peakOf(run(on, quiet, quiet).outL.subarray(3000));
+  assert.ok(Math.abs(b - 0.1) < 0.02, '阈值以下应保持原样：' + b.toFixed(4));
+});
+
+test('延迟：反馈滤波会削弱回声的高频，但保留回声本身', () => {
+  const n = FS_RATE;
+  const imp = new Float32Array(n);
+  imp[0] = 1;
+  const dark = makeProc({
+    enabled: { limiter: false, delay: true },
+    delay: { timeMs: 100, feedback: 0.6, mix: 1, filterHz: 1000 }
+  });
+  const bright = makeProc({
+    enabled: { limiter: false, delay: true },
+    delay: { timeMs: 100, feedback: 0.6, mix: 1, filterHz: 20000 }
+  });
+  const step = Math.round(FS_RATE * 0.1);
+  const findPeak = (arr) => {
+    let p = 0;
+    for (let i = step - 20; i <= step + 20; i++) p = Math.max(p, Math.abs(arr[i]));
+    return p;
+  };
+  const darkPeak = findPeak(run(dark, imp, imp).outL);
+  const brightPeak = findPeak(run(bright, imp, imp).outL);
+  assert.ok(darkPeak > 0.05, '滤波后仍应有回声');
+  assert.ok(darkPeak < brightPeak, '滤波应削弱回声：' + darkPeak.toFixed(4) + ' vs ' + brightPeak.toFixed(4));
+});
