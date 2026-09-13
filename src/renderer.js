@@ -3172,7 +3172,6 @@ function openSettings() {
  * 所以不会出现「开关是开的、窗口其实没置顶」这种不一致。
  */
 async function syncAlwaysOnTopUI() {
-  const box = $('alwaysOnTop');
   if (!api.getAlwaysOnTop) return;
   try {
     const real = await api.getAlwaysOnTop();
@@ -3183,16 +3182,13 @@ async function syncAlwaysOnTopUI() {
 }
 
 /**
- * 把真实的窗口置顶状态同步到所有入口：
- *   - 标题栏右上角的「图钉」按钮（点亮 = 已置顶）
- *   - 设置里的「始终置顶」开关
- * 两个入口共用同一份状态（就是 BrowserWindow 的真实状态），不会各说各话。
+ * 把真实的窗口置顶状态同步到界面：
+ * 标题栏右上角的「图钉」按钮（点亮 = 已置顶）。
+ * 界面显示的就是 BrowserWindow 的真实状态，不会出现「按钮亮着其实没置顶」。
  */
 function reflectAlwaysOnTop(real) {
   const on = !!real;
   state.settings.alwaysOnTop = on;
-  const box = $('alwaysOnTop');
-  if (box) box.checked = on;
   const pin = $('pinBtn');
   if (pin) {
     pin.classList.toggle('active', on);
@@ -3514,8 +3510,6 @@ function bindUI() {
     if (modal) modal.hidden = true;
   });
   on('saveSettingsBtn', 'click', saveSettings);
-  // 始终置顶：立即生效 + 立即保存（关掉设置窗口也不会丢）
-  on('alwaysOnTop', 'change', (event) => applyAlwaysOnTop(event.target.checked));
   // 标题栏右上角的图钉按钮：点一下切换置顶（与设置里的开关是同一个状态）
   on('pinBtn', 'click', async () => {
     const now = api.getAlwaysOnTop ? await api.getAlwaysOnTop() : !!state.settings.alwaysOnTop;
