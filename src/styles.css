@@ -89,7 +89,15 @@ body {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+  /* 关键：这是「贴屏幕」的固定层，不受 body 圆角裁剪。
+     必须让它自己带上与窗口一致的圆角，否则不透明的背景会填满
+     窗口四角的圆弧缺口，看起来就是四个角变回直角。
+     最大化时窗口没有圆角，这里也要跟着取消。 */
+  border-radius: 12px;
 }
+
+html.is-maximized .album-env { border-radius: 0; }
+body.mini-mode .album-env { border-radius: 10px; }
 
 .album-env__layer {
   position: absolute;

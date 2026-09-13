@@ -721,7 +721,7 @@ function updateNowPlaying() {
  *
  * 关键约束：
  *   - 运动只写 transform / opacity（GPU 合成）：不重绘图片、不重复模糊、不重新解码；
- *   - 轨迹由多组低频正弦叠加，周期 20～60 秒，连续且不可预测，不是左右往返；
+ *   - 轨迹由多组低频正弦叠加（主周期约 7～20 秒），连续且不可预测，不是左右往返；
  *   - 切歌先预加载新封面，加载成功才交叉淡化（1.1 s），失败保持旧背景不闪；
  *   - 无封面时整体淡出，回退到原有渐变背景（不出现破图 / 黑框）；
  *   - 暂停播放时运动幅度平滑降到 30%，恢复播放平滑回到 100%，位置不跳变；
@@ -729,7 +729,7 @@ function updateNowPlaying() {
  *   - 只属于渲染层，完全不接触音频链路（DSP / AudioWorklet / 引擎均不涉及）。
  * ========================================================================== */
 const AlbumEnv = (() => {
-  const TARGET_FPS = 24;      // 运动很慢，24 帧足够平滑，同时显著降低开销
+  const TARGET_FPS = 30;      // 漂移速度调快后，30 帧写入足以保持顺滑
   const PAUSED_AMP = 0.3;     // 暂停时的运动幅度
   const layers = [];
   let frontIndex = 0;
@@ -737,7 +737,8 @@ const AlbumEnv = (() => {
   let pendingCover = '';
   let rafId = 0;
   let lastApply = 0;
-  let startTime = 0;
+  let clock = 0;        // 累计运行时间（秒）；窗口不可见时不推进，避免回到前台突然跳位
+  let lastTick = 0;
   let ampTarget = 1;
   let ampNow = 1;
   let running = false;
@@ -749,7 +750,8 @@ const AlbumEnv = (() => {
     const b = document.getElementById('albumEnvB');
     if (!a || !b) return false;
     layers.push(a, b);
-    startTime = performance.now();
+    clock = 0;
+    lastTick = 0;
     try {
       reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     } catch (error) {
@@ -764,15 +766,16 @@ const AlbumEnv = (() => {
   }
 
   /** 把运动轨迹写到两个图层：这样新图层在淡入前就已经处于正确位置，不会跳 */
-  function applyTransform(now) {
+  function applyTransform() {
     if (!layers.length) return;
-    const t = (now - startTime) / 1000;
+    const t = clock;
     const amp = reduceMotion ? 0 : ampNow;
-    // 多组低频正弦叠加：连续、缓慢、没有明显规律
-    const x = (Math.sin(t * 0.105) * 1.8 + Math.sin(t * 0.261 + 1.7) * 1.2) * amp;
-    const y = (Math.sin(t * 0.087 + 0.9) * 1.7 + Math.sin(t * 0.213 + 2.6) * 1.1) * amp;
-    const scale = 1.13 + (Math.sin(t * 0.062 + 0.4) * 0.03 + Math.sin(t * 0.145 + 1.1) * 0.018) * amp;
-    const rotate = (Math.sin(t * 0.055 + 2.2) * 0.22 + Math.sin(t * 0.131 + 0.3) * 0.1) * amp;
+    // 多组低频正弦叠加：连续、平滑、没有明显规律。
+    // 主周期约 7～20 秒（此前 20～60 秒偏慢），所以整体漂移明显更活。
+    const x = (Math.sin(t * 0.38) * 1.8 + Math.sin(t * 0.85 + 1.7) * 1.2) * amp;
+    const y = (Math.sin(t * 0.31 + 0.9) * 1.7 + Math.sin(t * 0.71 + 2.6) * 1.1) * amp;
+    const scale = 1.13 + (Math.sin(t * 0.22 + 0.4) * 0.03 + Math.sin(t * 0.52 + 1.1) * 0.018) * amp;
+    const rotate = (Math.sin(t * 0.19 + 2.2) * 0.22 + Math.sin(t * 0.47 + 0.3) * 0.1) * amp;
     const value = 'translate3d(' + x.toFixed(3) + '%, ' + y.toFixed(3) + '%, 0) '
       + 'scale(' + scale.toFixed(4) + ') rotate(' + rotate.toFixed(3) + 'deg)';
     for (let i = 0; i < layers.length; i++) layers[i].style.transform = value;
@@ -781,11 +784,15 @@ const AlbumEnv = (() => {
   function tick(now) {
     rafId = 0;
     if (!running) return;
+    // 用「只在运行时推进」的时间轴：窗口被遮挡或最小化时系统会节流，
+    // 回到前台时从这里接着走，不会因为跳过大段实时时间而突然跳位。
+    if (lastTick) clock += Math.min(0.25, (now - lastTick) / 1000);
+    lastTick = now;
     // 幅度平滑靠拢目标值：暂停 / 恢复不会突然跳变（约 2 秒过渡）
     ampNow += (ampTarget - ampNow) * 0.045;
     if (now - lastApply >= 1000 / TARGET_FPS) {
       lastApply = now;
-      applyTransform(now);
+      applyTransform();
     }
     rafId = requestAnimationFrame(tick);
   }
@@ -798,6 +805,7 @@ const AlbumEnv = (() => {
 
   function stop() {
     running = false;
+    lastTick = 0;      // 停表：下次恢复时从当前时间点继续，不补跳
     if (rafId) {
       cancelAnimationFrame(rafId);
       rafId = 0;
@@ -830,7 +838,7 @@ const AlbumEnv = (() => {
       if (pendingCover !== url) return;             // 期间又切歌，丢弃这次结果
       const target = layers[1 - frontIndex];
       target.style.backgroundImage = 'url("' + url + '")';
-      applyTransform(performance.now());            // 先摆到当前运动位置，避免跳变
+      applyTransform();                             // 先摆到当前运动位置，避免跳变
       target.classList.add('is-visible');
       const previous = layers[frontIndex];
       previous.classList.remove('is-visible');
