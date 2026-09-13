@@ -3173,13 +3173,33 @@ function openSettings() {
  */
 async function syncAlwaysOnTopUI() {
   const box = $('alwaysOnTop');
-  if (!box || !api.getAlwaysOnTop) return;
+  if (!api.getAlwaysOnTop) return;
   try {
     const real = await api.getAlwaysOnTop();
-    box.checked = !!real;
-    state.settings.alwaysOnTop = !!real;
+    reflectAlwaysOnTop(!!real);
   } catch (error) {
     console.warn('读取置顶状态失败', error);
+  }
+}
+
+/**
+ * 把真实的窗口置顶状态同步到所有入口：
+ *   - 标题栏右上角的「图钉」按钮（点亮 = 已置顶）
+ *   - 设置里的「始终置顶」开关
+ * 两个入口共用同一份状态（就是 BrowserWindow 的真实状态），不会各说各话。
+ */
+function reflectAlwaysOnTop(real) {
+  const on = !!real;
+  state.settings.alwaysOnTop = on;
+  const box = $('alwaysOnTop');
+  if (box) box.checked = on;
+  const pin = $('pinBtn');
+  if (pin) {
+    pin.classList.toggle('active', on);
+    const label = t('alwaysOnTop') + ' · ' + (on ? t('on') : t('off'));
+    pin.title = label;
+    pin.setAttribute('aria-label', label);
+    pin.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
 }
 
@@ -3188,14 +3208,12 @@ async function applyAlwaysOnTop(enabled) {
   const wanted = !!enabled;
   if (api.setAlwaysOnTop) {
     const real = await api.setAlwaysOnTop(wanted);
-    // 以真实窗口状态为准回写开关，界面与系统层级永远一致
-    const box = $('alwaysOnTop');
-    if (box) box.checked = !!real;
-    state.settings.alwaysOnTop = !!real;
+    // 以真实窗口状态为准回写所有入口，界面与系统层级永远一致
+    reflectAlwaysOnTop(!!real);
     api.setSettings({ alwaysOnTop: !!real });
     return;
   }
-  state.settings.alwaysOnTop = wanted;
+  reflectAlwaysOnTop(wanted);
   api.setSettings({ alwaysOnTop: wanted });
 }
 
@@ -3498,12 +3516,15 @@ function bindUI() {
   on('saveSettingsBtn', 'click', saveSettings);
   // 始终置顶：立即生效 + 立即保存（关掉设置窗口也不会丢）
   on('alwaysOnTop', 'change', (event) => applyAlwaysOnTop(event.target.checked));
+  // 标题栏右上角的图钉按钮：点一下切换置顶（与设置里的开关是同一个状态）
+  on('pinBtn', 'click', async () => {
+    const now = api.getAlwaysOnTop ? await api.getAlwaysOnTop() : !!state.settings.alwaysOnTop;
+    await applyAlwaysOnTop(!now);
+  });
   if (api.onAlwaysOnTopChanged) {
     // 以真实窗口状态为准回写界面（例如系统或其它途径改变了置顶状态）
     api.onAlwaysOnTopChanged((value) => {
-      const box = $('alwaysOnTop');
-      if (box) box.checked = !!value;
-      state.settings.alwaysOnTop = !!value;
+      reflectAlwaysOnTop(!!value);
     });
   }
   on('aboutBtn', 'click', openAbout);
