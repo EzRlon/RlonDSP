@@ -28,6 +28,8 @@
     <symbol id="icon-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/></symbol>
     <symbol id="icon-wave" viewBox="0 0 24 24"><path d="M3 12h2l2-6 4 12 3-9 2 5 2-2h3"/></symbol>
     <symbol id="icon-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 3-8 2 5 2-2h3"/></symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
     <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
     <symbol id="icon-save" viewBox="0 0 24 24"><path d="M5 3h11l4 4v14H5z"/><path d="M8 3v6h7V3M8 21v-7h8v7"/></symbol>
     <symbol id="icon-note" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></symbol>
@@ -154,25 +156,29 @@
           <div class="fx-section-title">
             <span data-i18n="preset">预设</span>
             <div class="preset-actions">
+              <button class="mini-btn lg-button" id="savePresetBtn"><svg class="icon icon-sm"><use href="#icon-save"></use></svg><span data-i18n="save">保存</span></button>
               <button class="mini-btn lg-button" id="resetFxBtn"><svg class="icon icon-sm"><use href="#icon-reset"></use></svg><span data-i18n="reset">重置</span></button>
               <button class="mini-btn lg-button" id="exportPresetBtn"><svg class="icon icon-sm"><use href="#icon-export"></use></svg><span data-i18n="export">导出</span></button>
               <button class="mini-btn lg-button" id="importPresetBtn"><svg class="icon icon-sm"><use href="#icon-import"></use></svg><span data-i18n="import">导入</span></button>
             </div>
           </div>
           <div class="preset-list" id="presetList"></div>
+          <!-- 这一行是「新建预设」的输入行，不是一条已保存的预设：
+               所以只保留「名称 + 保存」，并带明显的「＋ 新建预设」标记，
+               不再放重命名 / 删除 / 开关（那三项对新建行没有意义，
+               放在这里只会让人以为是一条点不动的坏条目）。 -->
           <div class="preset-row preset-row--new">
             <input type="text" id="presetNameInput" class="preset-name-input" maxlength="40" spellcheck="false" data-i18n-ph="presetNamePlaceholder" placeholder="RlonIR_">
-            <div class="preset-row-actions">
-              <button class="mini-btn lg-button" id="savePresetBtn"><svg class="icon icon-sm"><use href="#icon-save"></use></svg><span data-i18n="save">保存</span></button>
-              <button class="mini-btn lg-button" id="renamePresetBtn" disabled><svg class="icon icon-sm"><use href="#icon-edit"></use></svg><span data-i18n="rename">重命名</span></button>
-              <button class="mini-btn lg-button" id="deletePresetBtn" disabled><svg class="icon icon-sm"><use href="#icon-trash"></use></svg><span data-i18n="delete">删除</span></button>
-            </div>
-            <label class="switch"><input type="checkbox" id="presetNewToggle" disabled></label>
+            <span class="preset-new-tag"><svg class="icon icon-sm"><use href="#icon-plus"></use></svg><span data-i18n="newPreset">新建预设</span></span>
           </div>
         </div>
 
-        <div class="fx-section">
-          <div class="fx-section-title"><span data-i18n="equalizer">均衡器</span></div>
+        <!-- 均衡器卡片不参与折叠：它是常驻的主要调节区，始终完整展开 -->
+        <div class="fx-section" id="eqSection">
+          <div class="fx-section-title">
+            <span data-i18n="equalizer">均衡器</span>
+            <div class="eq-presets" id="eqPresets"></div>
+          </div>
           <div class="eq-bands" id="eqBands"></div>
         </div>
 
@@ -217,6 +223,37 @@
         <div class="fx-section" id="tubeParams">
           <div class="fx-section-title"><span data-i18n="tube">胆机模拟</span><label class="switch"><input type="checkbox" id="fxTube"></label></div>
           <div class="param"><label data-i18n="drive">驱动</label><input type="range" id="tubeDrive" min="0" max="100" value="30" step="1"><span id="tubeDriveVal">0.30</span></div>
+        </div>
+
+        <div class="fx-section" id="clipperParams">
+          <div class="fx-section-title"><span data-i18n="clipper">削波 / 饱和</span><label class="switch"><input type="checkbox" id="fxClipper"></label></div>
+          <div class="param"><label data-i18n="drive">驱动</label><input type="range" id="clipDrive" min="1" max="12" value="2" step="0.1"><span id="clipDriveVal">2.0</span></div>
+          <div class="param"><label data-i18n="mode">模式</label><select id="clipMode" class="full-select"><option value="soft" selected data-i18n="clipSoft">软削波</option><option value="hard" data-i18n="clipHard">硬削波</option></select></div>
+          <div class="param"><label data-i18n="outputGain">输出</label><input type="range" id="clipOutput" min="-24" max="12" value="0" step="0.5"><span id="clipOutputVal">0.0 dB</span></div>
+        </div>
+
+        <div class="fx-section" id="delayParams">
+          <div class="fx-section-title"><span data-i18n="delay">延迟 / 回声</span><label class="switch"><input type="checkbox" id="fxDelay"></label></div>
+          <div class="param"><label data-i18n="delayTime">延迟时间</label><input type="range" id="delayTime" min="20" max="1000" value="320" step="5"><span id="delayTimeVal">320 ms</span></div>
+          <div class="param"><label data-i18n="feedback">反馈</label><input type="range" id="delayFeedback" min="0" max="90" value="35" step="1"><span id="delayFeedbackVal">0.35</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="delayMix" min="0" max="100" value="25" step="1"><span id="delayMixVal">0.25</span></div>
+          <div class="param"><label data-i18n="pingPong">乒乓</label><select id="delayPingPong" class="full-select"><option value="off" selected data-i18n="off">关</option><option value="on" data-i18n="on">开</option></select></div>
+        </div>
+
+        <div class="fx-section" id="chorusParams">
+          <div class="fx-section-title"><span data-i18n="chorus">合唱</span><label class="switch"><input type="checkbox" id="fxChorus"></label></div>
+          <div class="param"><label data-i18n="rate">速率</label><input type="range" id="chorusRate" min="5" max="800" value="60" step="5"><span id="chorusRateVal">0.60 Hz</span></div>
+          <div class="param"><label data-i18n="depth">深度</label><input type="range" id="chorusDepth" min="0" max="15" value="6" step="0.5"><span id="chorusDepthVal">6.0 ms</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="chorusMix" min="0" max="100" value="40" step="1"><span id="chorusMixVal">0.40</span></div>
+          <div class="param"><label data-i18n="spread">左右错开</label><input type="range" id="chorusSpread" min="0" max="100" value="50" step="1"><span id="chorusSpreadVal">0.50</span></div>
+        </div>
+
+        <div class="fx-section" id="flangerParams">
+          <div class="fx-section-title"><span data-i18n="flanger">镶边</span><label class="switch"><input type="checkbox" id="fxFlanger"></label></div>
+          <div class="param"><label data-i18n="rate">速率</label><input type="range" id="flangerRate" min="5" max="500" value="25" step="5"><span id="flangerRateVal">0.25 Hz</span></div>
+          <div class="param"><label data-i18n="depth">深度</label><input type="range" id="flangerDepth" min="0" max="6" value="3" step="0.1"><span id="flangerDepthVal">3.0 ms</span></div>
+          <div class="param"><label data-i18n="feedback">反馈</label><input type="range" id="flangerFeedback" min="-90" max="90" value="40" step="1"><span id="flangerFeedbackVal">0.40</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="flangerMix" min="0" max="100" value="45" step="1"><span id="flangerMixVal">0.45</span></div>
         </div>
 
         <div class="fx-section" id="reverbParams">

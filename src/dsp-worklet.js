@@ -254,6 +254,51 @@ class NoiseGate {
   }
 }
 
+/** 把参数夹到安全范围：非法值一律回落到默认值，防止 NaN / Infinity 进入音频路径 */
+function clampNum(v, lo, hi, fallback) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  if (n < lo) return lo;
+  if (n > hi) return hi;
+  return n;
+}
+
+/* ===== 延迟线：延迟 / 合唱 / 镶边 三段效果共用的一套基础设施 =====
+   环形缓冲 + 线性插值读取，可以读「小数个样点之前」的值 —— 调制类
+   效果（合唱、镶边）必须要这个能力。
+   写入前把 NaN / Infinity 一律换成 0，避免脏数据被反馈循环放大。 */
+class DelayLine {
+  constructor(maxSamples) {
+    this.max = Math.max(8, Math.round(maxSamples) + 8);
+    this.buf = new Float32Array(this.max);
+    this.w = 0;
+  }
+  push(x) {
+    this.buf[this.w] = Number.isFinite(x) ? x : 0;
+    this.w++;
+    if (this.w >= this.max) this.w = 0;
+  }
+  /** 读取 delaySamples 个样点之前的值（支持小数，线性插值） */
+  read(delaySamples) {
+    const maxDelay = this.max - 2;
+    let d = Number.isFinite(delaySamples) ? delaySamples : 0;
+    if (d < 0) d = 0;
+    if (d > maxDelay) d = maxDelay;
+    let p = this.w - 1 - d;
+    while (p < 0) p += this.max;
+    const i0 = Math.floor(p);
+    const frac = p - i0;
+    const a = this.buf[i0 % this.max];
+    const b = this.buf[(i0 + 1) % this.max];
+    const y = a + (b - a) * frac;
+    return Number.isFinite(y) ? y : 0;
+  }
+  clear() {
+    this.buf.fill(0);
+    this.w = 0;
+  }
+}
+
 class RlonDSPDSP extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -293,6 +338,16 @@ class RlonDSPDSP extends AudioWorkletProcessor {
     this.cdBufR = null;
     this.cdWrite = 0;
     this.cdSamples = 0;
+    // 延迟 / 合唱 / 镶边：延迟线在首次用到时按最大长度一次性分配，
+    // 之后音频线程内不再分配内存（实时安全）
+    this.dlL = null;
+    this.dlR = null;
+    this.chL = null;
+    this.chR = null;
+    this.flL = null;
+    this.flR = null;
+    this.modPhase = 0;
+    this.modPhase2 = 0.5;
     this.params = this.defaultParams();
     this.applyParams(this.params);
     this.port.onmessage = (event) => {
@@ -315,7 +370,11 @@ class RlonDSPDSP extends AudioWorkletProcessor {
         tube: false,
         reverb: false,
         noiseGate: false,
-        limiter: true
+        limiter: true,
+        delay: false,
+        chorus: false,
+        flanger: false,
+        clipper: false
       },
       gainDB: 0,
       compressor: { thresholdDB: -24, ratio: 4, attackMs: 10, releaseMs: 120 },
@@ -328,7 +387,15 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       gate: { threshold: -52, releaseMs: 180 },
       limiter: { ceilingDB: -1, lookaheadMs: 2, releaseMs: 60 },
       // 差分环绕：把一个声道整体延后，制造左右时间差（Haas 效应），影响人声定位
-      channelDelay: { enabled: false, channel: 'R', ms: 0 }
+      channelDelay: { enabled: false, channel: 'R', ms: 0 },
+      // 延迟 / 回声（可交叉反馈做乒乓）
+      delay: { enabled: false, timeMs: 320, feedback: 0.35, mix: 0.25, pingPong: false },
+      // 合唱：短延迟 + 缓慢调制，制造「多个人同时唱」的厚度
+      chorus: { enabled: false, rateHz: 0.6, depthMs: 6, mix: 0.4, spread: 0.5 },
+      // 镶边：更短的延迟 + 反馈，产生梳状滤波的扫频效果
+      flanger: { enabled: false, rateHz: 0.25, depthMs: 3, mix: 0.45, feedback: 0.4 },
+      // 削波 / 饱和：软削波（tanh）或硬削波
+      clipper: { enabled: false, drive: 2, mode: 'soft', outputDB: 0 }
     };
   }
 
@@ -346,7 +413,11 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       reverb: { ...this.defaultParams().reverb, ...(p.reverb || {}) },
       gate: { ...this.defaultParams().gate, ...(p.gate || {}) },
       limiter: { ...this.defaultParams().limiter, ...(p.limiter || {}) },
-      channelDelay: { ...this.defaultParams().channelDelay, ...(p.channelDelay || {}) }
+      channelDelay: { ...this.defaultParams().channelDelay, ...(p.channelDelay || {}) },
+      delay: { ...this.defaultParams().delay, ...(p.delay || {}) },
+      chorus: { ...this.defaultParams().chorus, ...(p.chorus || {}) },
+      flanger: { ...this.defaultParams().flanger, ...(p.flanger || {}) },
+      clipper: { ...this.defaultParams().clipper, ...(p.clipper || {}) }
     };
 
     // 内置引擎开关表：被第三方 Provider 接管的类型，内置引擎必须跳过，避免重复处理。
@@ -414,6 +485,42 @@ class RlonDSPDSP extends AudioWorkletProcessor {
     }
     const cdMs = Math.max(0, Math.min(cdMaxMs, Number(cd.ms) || 0));
     this.cdSamples = Math.max(0, Math.min(cdSize - 1, Math.round(this.fs * cdMs / 1000)));
+
+    // ---- 延迟 / 合唱 / 镶边 / 削波 参数（全部夹到安全范围）----
+    const dl = this.params.delay;
+    this.delayTimeSamples = Math.max(1, Math.round(clampNum(dl.timeMs, 20, 1000, 320) * this.fs / 1000));
+    this.delayFeedback = clampNum(dl.feedback, 0, 0.9, 0.35);
+    this.delayMix = clampNum(dl.mix, 0, 1, 0.25);
+    this.delayPingPong = !!dl.pingPong;
+
+    const cho = this.params.chorus;
+    this.chorusRate = clampNum(cho.rateHz, 0.05, 8, 0.6);
+    this.chorusDepth = clampNum(cho.depthMs, 0, 15, 6) * this.fs / 1000;
+    this.chorusBase = 18 * this.fs / 1000;
+    this.chorusMix = clampNum(cho.mix, 0, 1, 0.4);
+    this.chorusSpread = clampNum(cho.spread, 0, 1, 0.5);
+
+    const flg = this.params.flanger;
+    this.flangerRate = clampNum(flg.rateHz, 0.05, 5, 0.25);
+    this.flangerDepth = clampNum(flg.depthMs, 0, 6, 3) * this.fs / 1000;
+    this.flangerBase = 2 * this.fs / 1000;
+    this.flangerMix = clampNum(flg.mix, 0, 1, 0.45);
+    this.flangerFeedback = clampNum(flg.feedback, -0.9, 0.9, 0.4);
+
+    const clip = this.params.clipper;
+    this.clipDrive = clampNum(clip.drive, 1, 12, 2);
+    this.clipHard = clip.mode === 'hard';
+    this.clipOut = Math.pow(10, clampNum(clip.outputDB, -24, 24, 0) / 20);
+
+    if (!this.dlL) {
+      // 一次性分配：延迟最长 1.2 s，合唱 60 ms，镶边 25 ms
+      this.dlL = new DelayLine(this.fs * 1.2);
+      this.dlR = new DelayLine(this.fs * 1.2);
+      this.chL = new DelayLine(this.fs * 0.06);
+      this.chR = new DelayLine(this.fs * 0.06);
+      this.flL = new DelayLine(this.fs * 0.025);
+      this.flR = new DelayLine(this.fs * 0.025);
+    }
     this.reverb.setParams({
       enabled: this.params.enabled.reverb,
       roomSize: this.params.reverb.roomSize,
@@ -527,6 +634,20 @@ class RlonDSPDSP extends AudioWorkletProcessor {
         r = this.ultraR.process(r);
       }
 
+      // 削波 / 饱和：驱动增益 + 软削波（tanh）或硬削波，再按输出增益补回电平
+      if (this.on('clipper') && this.params.enabled.clipper) {
+        const d = this.clipDrive;
+        if (this.clipHard) {
+          l = Math.max(-1, Math.min(1, l * d));
+          r = Math.max(-1, Math.min(1, r * d));
+        } else {
+          l = Math.tanh(l * d);
+          r = Math.tanh(r * d);
+        }
+        l *= this.clipOut;
+        r *= this.clipOut;
+      }
+
       outL[i] = l;
       outR[i] = r;
     }
@@ -573,6 +694,76 @@ class RlonDSPDSP extends AudioWorkletProcessor {
         if (w >= size) w = 0;
       }
       this.cdWrite = w;
+    }
+
+    // ---- 延迟 / 回声：时间 20~1000 ms、反馈 0~0.9、干湿混合，可开乒乓 ----
+    if (this.on('delay') && this.params.enabled.delay && this.dlL) {
+      const t = this.delayTimeSamples;
+      const fb = this.delayFeedback;
+      const mix = this.delayMix;
+      const pp = this.delayPingPong;
+      for (let i = 0; i < n; i++) {
+        const xl = outL[i];
+        const xr = outR[i];
+        const wetL = this.dlL.read(t);
+        const wetR = this.dlR.read(t);
+        // 乒乓：两条延迟线的反馈互相交叉，回声在左右之间来回跳
+        this.dlL.push(xl + (pp ? wetR : wetL) * fb);
+        this.dlR.push(xr + (pp ? wetL : wetR) * fb);
+        outL[i] = xl + wetL * mix;
+        outR[i] = xr + wetR * mix;
+      }
+    }
+
+    // ---- 合唱：18 ms 基准延迟 + 缓慢调制，左右两路相位错开产生厚度 ----
+    if (this.on('chorus') && this.params.enabled.chorus && this.chL) {
+      const base = this.chorusBase;
+      const depth = this.chorusDepth;
+      const mix = this.chorusMix;
+      const spread = this.chorusSpread;
+      const inc = this.chorusRate / this.fs;
+      let p = this.modPhase;
+      for (let i = 0; i < n; i++) {
+        const p2 = p + spread >= 1 ? p + spread - 1 : p + spread;
+        const mL = 0.5 + 0.5 * Math.sin(p * 6.283185307179586);
+        const mR = 0.5 + 0.5 * Math.sin(p2 * 6.283185307179586);
+        p += inc;
+        if (p >= 1) p -= 1;
+        const xl = outL[i];
+        const xr = outR[i];
+        const wetL = this.chL.read(base + mL * depth);
+        const wetR = this.chR.read(base + mR * depth);
+        this.chL.push(xl);
+        this.chR.push(xr);
+        outL[i] = xl * (1 - mix) + wetL * mix;
+        outR[i] = xr * (1 - mix) + wetR * mix;
+      }
+      this.modPhase = p;
+    }
+
+    // ---- 镶边：2 ms 级短延迟 + 反馈，形成梳状滤波的扫频 ----
+    if (this.on('flanger') && this.params.enabled.flanger && this.flL) {
+      const base = this.flangerBase;
+      const depth = this.flangerDepth;
+      const mix = this.flangerMix;
+      const fb = this.flangerFeedback;
+      const inc = this.flangerRate / this.fs;
+      let p = this.modPhase2;
+      for (let i = 0; i < n; i++) {
+        const m = 0.5 + 0.5 * Math.sin(p * 6.283185307179586);
+        p += inc;
+        if (p >= 1) p -= 1;
+        const xl = outL[i];
+        const xr = outR[i];
+        const d = base + m * depth;
+        const wetL = this.flL.read(d);
+        const wetR = this.flR.read(d);
+        this.flL.push(xl + wetL * fb);
+        this.flR.push(xr + wetR * fb);
+        outL[i] = xl * (1 - mix) + wetL * mix;
+        outR[i] = xr * (1 - mix) + wetR * mix;
+      }
+      this.modPhase2 = p;
     }
 
     const masterGain = this.on('gain') ? this.masterGain : 1;

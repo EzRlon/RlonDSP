@@ -530,7 +530,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
   border-bottom: 1px solid var(--line);
 }
 
-.fx-section-title > span:first-child {
+.fx-section-title > span:first-of-type {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -623,6 +623,75 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
 .fx-section .ir-actions,
 .fx-section .preset-actions { gap: 6px; }
 
+/* ===== 统一效果卡片：折叠 / 展开 =====
+   所有 DSP 卡片共用同一套标题栏（折叠箭头 + 名称 + 开关）。
+   折叠只影响界面显示，开关才真正改变音频处理 —— 两者严格分离。
+   折叠后只留标题栏，参数整体收起，几十个效果也不会把面板撑得很长。 */
+.fx-section-title > .switch,
+.fx-section-title > .preset-actions,
+.fx-section-title > .value { margin-left: auto; }
+
+.fx-caret {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0 2px 0 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: transform 0.18s var(--ease), background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.fx-caret .icon { width: 13px; height: 13px; }
+.fx-caret:hover { background: var(--hover); color: var(--text); }
+.fx-section.collapsed .fx-caret { transform: rotate(-90deg); }
+
+/* 折叠时只保留标题栏：参数、按钮、列表全部收起 */
+.fx-section.collapsed > *:not(.fx-section-title) { display: none; }
+.fx-section.collapsed .fx-section-title {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.fx-section.collapsed { padding: 8px 12px; }
+
+/* 均衡器风格预设：固定 8 种风格按钮，排在「均衡器」标题右侧。
+   点击即把 10 段 EQ 调成该风格曲线，当前生效的风格会点亮。 */
+.eq-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.eq-preset-btn {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--lg-micro-bg);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.eq-preset-btn:hover { background: var(--hover); color: var(--text); }
+.eq-preset-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* 实时音效面板：每个功能区块之间补一条可见的分割线。
    原先各区块只有一层近乎透明的白色描边，浅色背景下几乎看不见，
    区块之间糊在一起；这里在间距中间补一条实色细线作为区隔。 */
@@ -650,7 +719,29 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
   background: var(--lg-bg-content);
   border: 1px solid var(--lg-content-border);
 }
-.preset-row--new { margin-top: 6px; }
+/* 「新建预设」行：与已保存的预设行刻意做出区分。
+   虚线描边 + 透明底 + 右侧「＋ 新建预设」标记，
+   让人一眼看出这是「在这里新建一条」，而不是一条用不了的预设。 */
+.preset-row--new {
+  margin-top: 6px;
+  border-style: dashed;
+  background: transparent;
+}
+
+.preset-new-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  margin-left: auto;
+  padding-right: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.preset-new-tag .icon { width: 14px; height: 14px; }
 .preset-name-input {
   flex: 0 1 168px;
   min-width: 0;

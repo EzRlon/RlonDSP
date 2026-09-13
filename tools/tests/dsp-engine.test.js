@@ -324,3 +324,131 @@ test('差分环绕：延迟时间与设定值成比例', () => {
     assert.strictEqual(p.idx, p.expected, p.ms + ' ms 应对应 ' + p.expected + ' 帧，实际 ' + p.idx);
   });
 });
+
+/* ===================== 延迟 / 合唱 / 镶边 / 削波 ===================== */
+
+test('新增效果器默认关闭时完全透明', () => {
+  const proc = makeProc({});
+  const n = 4096;
+  const sig = sine(n, 330, 0.3);
+  const { outL, outR } = run(proc, sig, sig);
+  const skip = proc.limLen;
+  let maxDiff = 0;
+  for (let i = skip + 256; i < n; i++) {
+    maxDiff = Math.max(maxDiff, Math.abs(outL[i] - sig[i - skip]), Math.abs(outR[i] - sig[i - skip]));
+  }
+  assert.ok(maxDiff < 1e-6, '四个新效果器默认关闭时不应改变声音，实际偏差 ' + maxDiff);
+});
+
+test('延迟：脉冲在设定的延迟时间后出现回声', () => {
+  [120, 320, 600].forEach((timeMs) => {
+    const proc = makeProc({
+      enabled: { limiter: false, delay: true },
+      delay: { timeMs, feedback: 0, mix: 1 }
+    });
+    const n = FS_RATE; // 1 秒，足够覆盖 600 ms
+    const imp = new Float32Array(n);
+    imp[0] = 1;
+    const { outL } = run(proc, imp, imp);
+    let idx = -1;
+    // 跳过开头：干信号（直达声）本身也在输出里，要测的是回声的位置
+    for (let i = 200; i < n; i++) if (Math.abs(outL[i]) > 0.5) { idx = i; break; }
+    const expected = Math.round(FS_RATE * timeMs / 1000);
+    assert.ok(Math.abs(idx - expected) <= 2, timeMs + ' ms 回声应出现在约 ' + expected + ' 帧，实际 ' + idx);
+  });
+});
+
+test('延迟：反馈会产生多次回声，且不会失控（<= 0.9）', () => {
+  const proc = makeProc({
+    enabled: { limiter: false, delay: true },
+    delay: { timeMs: 100, feedback: 0.9, mix: 1 }
+  });
+  const n = FS_RATE;
+  const imp = new Float32Array(n);
+  imp[0] = 1;
+  const { outL } = run(proc, imp, imp);
+  const step = Math.round(FS_RATE * 0.1);
+  let echoes = 0;
+  for (let k = 1; k <= 5; k++) {
+    // 在期望位置附近取窗口，避免因整数取整差 1 个样点而漏判
+    let local = 0;
+    // 反馈路径每绕一圈会多出 1 个样点的延迟，所以窗口取宽一点
+    for (let i = step * k - 10; i <= step * k + 10; i++) local = Math.max(local, Math.abs(outL[i]));
+    if (local > 0.05) echoes++;
+  }
+  assert.ok(echoes >= 4, '反馈应产生多次回声，实际 ' + echoes + ' 次');
+  assert.ok(peakOf(outL) <= 1.01, '反馈不得导致增益失控，实际峰值 ' + peakOf(outL));
+});
+
+test('合唱：左右两路被调制得不一样，且湿声参与输出', () => {
+  const proc = makeProc({
+    enabled: { limiter: false, chorus: true },
+    chorus: { rateHz: 2, depthMs: 8, mix: 0.5, spread: 0.5 }
+  });
+  const n = 8192;
+  const sig = sine(n, 1000, 0.4);
+  const { outL, outR } = run(proc, sig, sig);
+  let diffLR = 0;
+  let diffDry = 0;
+  for (let i = 2000; i < n; i++) {
+    diffLR = Math.max(diffLR, Math.abs(outL[i] - outR[i]));
+    diffDry = Math.max(diffDry, Math.abs(outL[i] - sig[i]));
+  }
+  assert.ok(diffDry > 1e-3, '合唱应改变声音，实际偏差 ' + diffDry);
+  assert.ok(diffLR > 1e-3, '左右两路应有不同调制，实际差值 ' + diffLR);
+});
+
+test('镶边：短延迟 + 反馈产生梳状滤波，关闭即还原', () => {
+  const on = makeProc({
+    enabled: { limiter: false, flanger: true },
+    flanger: { rateHz: 0.5, depthMs: 3, feedback: 0.6, mix: 0.5 }
+  });
+  const off = makeProc({ enabled: { limiter: false } });
+  const n = 8192;
+  const sig = sine(n, 800, 0.4);
+  const a = run(on, sig, sig).outL;
+  const b = run(off, sig, sig).outL;
+  let diff = 0;
+  for (let i = 2000; i < n; i++) diff = Math.max(diff, Math.abs(a[i] - b[i]));
+  assert.ok(diff > 1e-3, '镶边开启后应与关闭时明显不同，实际偏差 ' + diff);
+});
+
+test('削波：软 / 硬两种模式都把过载信号压回 1 以内，关闭时不动', () => {
+  ['soft', 'hard'].forEach((mode) => {
+    const proc = makeProc({
+      enabled: { limiter: false, clipper: true },
+      clipper: { drive: 8, mode, outputDB: 0 }
+    });
+    const n = 8192;
+    const loud = sine(n, 440, 1.0);
+    const { outL } = run(proc, loud, loud);
+    const p = peakOf(outL);
+    assert.ok(p <= 1.0001, mode + ' 削波后峰值应 <= 1，实际 ' + p.toFixed(4));
+    assert.ok(p > 0.3, mode + ' 削波不应把信号压没，实际 ' + p.toFixed(4));
+  });
+
+  const bypass = makeProc({ enabled: { limiter: false } });
+  const n2 = 2048;
+  const sig = sine(n2, 440, 0.5);
+  const { outL } = run(bypass, sig, sig);
+  let diff = 0;
+  for (let i = 0; i < n2; i++) diff = Math.max(diff, Math.abs(outL[i] - sig[i]));
+  assert.ok(diff < 1e-6, '削波关闭时不应改变声音，实际偏差 ' + diff);
+});
+
+test('新增效果器：非法参数（NaN / Infinity / 越界）不会产生 NaN 输出', () => {
+  const proc = makeProc({
+    enabled: { limiter: false, delay: true, chorus: true, flanger: true, clipper: true },
+    delay: { timeMs: NaN, feedback: Infinity, mix: -5, pingPong: true },
+    chorus: { rateHz: NaN, depthMs: Infinity, mix: 99, spread: -3 },
+    flanger: { rateHz: Infinity, depthMs: NaN, feedback: 50, mix: NaN },
+    clipper: { drive: NaN, mode: 'hard', outputDB: Infinity }
+  });
+  const n = 8192;
+  const sig = sine(n, 440, 0.6);
+  const { outL, outR } = run(proc, sig, sig);
+  for (let i = 0; i < n; i++) {
+    assert.ok(Number.isFinite(outL[i]) && Number.isFinite(outR[i]), '第 ' + i + ' 个样点出现非有限值');
+  }
+  assert.ok(peakOf(outL) < 100, '非法参数下不应出现异常增益');
+});

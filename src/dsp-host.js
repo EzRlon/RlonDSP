@@ -44,11 +44,15 @@
     'spatial',     // 空间音效 / 环绕
     'tube',        // 胆机模拟
     'ultrasonic',  // 超高频净化
+    'clipper',     // 削波 / 饱和
     'reverb',      // 混响
     'gate',        // 降噪
     'limiter',     // 限幅
     'convolution', // 脉冲响应卷积
     'channel-delay', // 差分环绕（声道延迟 / Haas 效应）
+    'delay',       // 延迟 / 回声
+    'chorus',      // 合唱
+    'flanger',     // 镶边
     'analyzer'     // 分析（不影响声音，但同样作为节点存在）
   ];
 

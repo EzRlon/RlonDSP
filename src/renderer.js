@@ -24,6 +24,32 @@ const I18N = {
     pulseFeedback: '脉冲反馈',
     reset: '重置',
     preset: '预设',
+    newPreset: '新建预设',
+    clipper: '削波 / 饱和',
+    delay: '延迟 / 回声',
+    chorus: '合唱',
+    flanger: '镶边',
+    delayTime: '延迟时间',
+    feedback: '反馈',
+    pingPong: '乒乓',
+    rate: '速率',
+    depth: '深度',
+    spread: '左右错开',
+    mode: '模式',
+    clipSoft: '软削波',
+    clipHard: '硬削波',
+    outputGain: '输出',
+    off: '关',
+    on: '开',
+    collapse: '折叠 / 展开',
+    eqPresetDefault: '默认',
+    eqPresetClassical: '古典',
+    eqPresetHeavyMetal: '重金属',
+    eqPresetPop: '流行',
+    eqPresetJazz: '爵士',
+    eqPresetFolk: '民谣',
+    eqPresetRock: '摇滚',
+    eqPresetElectronic: '电子',
     save: '保存',
     delete: '删除',
     export: '导出',
@@ -143,6 +169,32 @@ const I18N = {
     pulseFeedback: 'Pulse Feedback',
     reset: 'Reset',
     preset: 'Presets',
+    newPreset: 'New preset',
+    clipper: 'Clipper / Saturation',
+    delay: 'Delay / Echo',
+    chorus: 'Chorus',
+    flanger: 'Flanger',
+    delayTime: 'Delay time',
+    feedback: 'Feedback',
+    pingPong: 'Ping-pong',
+    rate: 'Rate',
+    depth: 'Depth',
+    spread: 'Stereo spread',
+    mode: 'Mode',
+    clipSoft: 'Soft clip',
+    clipHard: 'Hard clip',
+    outputGain: 'Output',
+    off: 'Off',
+    on: 'On',
+    collapse: 'Collapse / expand',
+    eqPresetDefault: 'Default',
+    eqPresetClassical: 'Classical',
+    eqPresetHeavyMetal: 'Heavy Metal',
+    eqPresetPop: 'Pop',
+    eqPresetJazz: 'Jazz',
+    eqPresetFolk: 'Folk',
+    eqPresetRock: 'Rock',
+    eqPresetElectronic: 'Electronic',
     save: 'Save',
     delete: 'Delete',
     export: 'Export',
@@ -259,7 +311,11 @@ const defaultEffects = {
     tube: false,
     reverb: false,
     noiseGate: false,
-    limiter: true
+    limiter: true,
+    delay: false,
+    chorus: false,
+    flanger: false,
+    clipper: false
   },
   compressor: { thresholdDB: -24, ratio: 4, attackMs: 10, releaseMs: 120 },
   bass: { gainDB: 6, crossoverHz: 80 },
@@ -272,6 +328,14 @@ const defaultEffects = {
   limiter: { ceilingDB: -1, lookaheadMs: 2, releaseMs: 60 },
   // 差分环绕：延迟声道（L/R）与延迟毫秒数
   channelDelay: { enabled: false, channel: 'R', ms: 15 },
+  // 延迟 / 回声（可交叉反馈做乒乓）
+  delay: { timeMs: 320, feedback: 0.35, mix: 0.25, pingPong: false },
+  // 合唱：速率 / 深度 / 干湿 / 左右错开
+  chorus: { rateHz: 0.6, depthMs: 6, mix: 0.4, spread: 0.5 },
+  // 镶边：速率 / 深度 / 反馈 / 干湿
+  flanger: { rateHz: 0.25, depthMs: 3, feedback: 0.4, mix: 0.45 },
+  // 削波 / 饱和：驱动 / 模式 / 输出补偿
+  clipper: { drive: 2, mode: 'soft', outputDB: 0 },
   ir: { enabled: false, filePath: '', wet: 0.35, predelay: 0.02, highpass: 20, lowpass: 20000, ab: false }
 };
 
@@ -310,12 +374,17 @@ const DSP_BUILTIN_SPECS = [
   { type: 'spatial', name: '空间音效', latencyFrames: 0, tailFrames: 2048, key: 'surround' },
   { type: 'tube', name: '胆机模拟', latencyFrames: 0, tailFrames: 0, key: 'tube' },
   { type: 'ultrasonic', name: '超高频净化', latencyFrames: 0, tailFrames: 0, key: 'ultrasonic' },
+  { type: 'clipper', name: '削波 / 饱和', latencyFrames: 0, tailFrames: 0, key: 'clipper' },
   { type: 'reverb', name: '混响', latencyFrames: 0, tailFrames: 24000, key: 'reverb' },
   { type: 'gate', name: '降噪', latencyFrames: 0, tailFrames: 0, key: 'noiseGate' },
   { type: 'gain', name: '总增益', latencyFrames: 0, tailFrames: 0, key: 'gain' },
   { type: 'limiter', name: '限幅', latencyFrames: 96, tailFrames: 0, key: 'limiter' },
   // 差分环绕：把选定声道整体延后，制造左右时间差（Haas 效应）
   { type: 'channel-delay', name: '差分环绕（声道延迟）', latencyFrames: 0, tailFrames: 0, key: 'channelDelay' },
+  // 时间 / 调制类：延迟线共用同一套基础设施（DelayLine），延迟与尾音如实上报
+  { type: 'delay', name: '延迟 / 回声', latencyFrames: 0, tailFrames: 96000, key: 'delay' },
+  { type: 'chorus', name: '合唱', latencyFrames: 0, tailFrames: 4096, key: 'chorus' },
+  { type: 'flanger', name: '镶边', latencyFrames: 0, tailFrames: 4096, key: 'flanger' },
   // 卷积在渲染进程的 Web Audio 图里执行，位于内置链条之后
   { type: 'convolution', name: '脉冲卷积（IRS）', latencyFrames: 0, tailFrames: 48000, key: 'ir' }
 ];
@@ -743,6 +812,8 @@ function applyEffectsToUIRaw() {
     slider.value = String(Math.round(fx.eqGains[index] * 10));
     slider.parentElement.querySelector('.eq-db').textContent = `${fx.eqGains[index].toFixed(1)} dB`;
   });
+  // 均衡器风格高亮：与曲线一致才点亮，手动拖动后自动取消
+  syncEqPresetButtons();
   $('fxCompressor').checked = fx.enabled.compressor;
   $('fxBass').checked = fx.enabled.bass;
   $('fxStereo').checked = fx.enabled.stereo;
@@ -753,6 +824,38 @@ function applyEffectsToUIRaw() {
   $('fxReverb').checked = fx.enabled.reverb;
   $('fxNoiseGate').checked = fx.enabled.noiseGate;
   $('fxLimiter').checked = fx.enabled.limiter;
+  $('fxDelay').checked = fx.enabled.delay;
+  $('fxChorus').checked = fx.enabled.chorus;
+  $('fxFlanger').checked = fx.enabled.flanger;
+  $('fxClipper').checked = fx.enabled.clipper;
+  $('clipDrive').value = String(fx.clipper.drive);
+  $('clipDriveVal').textContent = fx.clipper.drive.toFixed(1);
+  $('clipMode').value = fx.clipper.mode;
+  $('clipOutput').value = String(fx.clipper.outputDB);
+  $('clipOutputVal').textContent = `${fx.clipper.outputDB.toFixed(1)} dB`;
+  $('delayTime').value = String(fx.delay.timeMs);
+  $('delayTimeVal').textContent = `${fx.delay.timeMs} ms`;
+  $('delayFeedback').value = String(Math.round(fx.delay.feedback * 100));
+  $('delayFeedbackVal').textContent = fx.delay.feedback.toFixed(2);
+  $('delayMix').value = String(Math.round(fx.delay.mix * 100));
+  $('delayMixVal').textContent = fx.delay.mix.toFixed(2);
+  $('delayPingPong').value = fx.delay.pingPong ? 'on' : 'off';
+  $('chorusRate').value = String(Math.round(fx.chorus.rateHz * 100));
+  $('chorusRateVal').textContent = `${fx.chorus.rateHz.toFixed(2)} Hz`;
+  $('chorusDepth').value = String(fx.chorus.depthMs);
+  $('chorusDepthVal').textContent = `${fx.chorus.depthMs.toFixed(1)} ms`;
+  $('chorusMix').value = String(Math.round(fx.chorus.mix * 100));
+  $('chorusMixVal').textContent = fx.chorus.mix.toFixed(2);
+  $('chorusSpread').value = String(Math.round(fx.chorus.spread * 100));
+  $('chorusSpreadVal').textContent = fx.chorus.spread.toFixed(2);
+  $('flangerRate').value = String(Math.round(fx.flanger.rateHz * 100));
+  $('flangerRateVal').textContent = `${fx.flanger.rateHz.toFixed(2)} Hz`;
+  $('flangerDepth').value = String(fx.flanger.depthMs);
+  $('flangerDepthVal').textContent = `${fx.flanger.depthMs.toFixed(1)} ms`;
+  $('flangerFeedback').value = String(Math.round(fx.flanger.feedback * 100));
+  $('flangerFeedbackVal').textContent = fx.flanger.feedback.toFixed(2);
+  $('flangerMix').value = String(Math.round(fx.flanger.mix * 100));
+  $('flangerMixVal').textContent = fx.flanger.mix.toFixed(2);
   $('compThreshold').value = String(fx.compressor.thresholdDB);
   $('compThresholdVal').textContent = `${fx.compressor.thresholdDB} dB`;
   $('compRatio').value = String(fx.compressor.ratio);
@@ -833,6 +936,25 @@ function updateEffectsFromUIRaw() {
   fx.enabled.reverb = $('fxReverb').checked;
   fx.enabled.noiseGate = $('fxNoiseGate').checked;
   fx.enabled.limiter = $('fxLimiter').checked;
+  fx.enabled.delay = $('fxDelay').checked;
+  fx.enabled.chorus = $('fxChorus').checked;
+  fx.enabled.flanger = $('fxFlanger').checked;
+  fx.enabled.clipper = $('fxClipper').checked;
+  fx.clipper.drive = Number($('clipDrive').value);
+  fx.clipper.mode = $('clipMode').value === 'hard' ? 'hard' : 'soft';
+  fx.clipper.outputDB = Number($('clipOutput').value);
+  fx.delay.timeMs = Number($('delayTime').value);
+  fx.delay.feedback = Number($('delayFeedback').value) / 100;
+  fx.delay.mix = Number($('delayMix').value) / 100;
+  fx.delay.pingPong = $('delayPingPong').value === 'on';
+  fx.chorus.rateHz = Number($('chorusRate').value) / 100;
+  fx.chorus.depthMs = Number($('chorusDepth').value);
+  fx.chorus.mix = Number($('chorusMix').value) / 100;
+  fx.chorus.spread = Number($('chorusSpread').value) / 100;
+  fx.flanger.rateHz = Number($('flangerRate').value) / 100;
+  fx.flanger.depthMs = Number($('flangerDepth').value);
+  fx.flanger.feedback = Number($('flangerFeedback').value) / 100;
+  fx.flanger.mix = Number($('flangerMix').value) / 100;
   fx.compressor.thresholdDB = Number($('compThreshold').value);
   fx.compressor.ratio = Number($('compRatio').value);
   fx.compressor.attackMs = Number($('compAttack').value);
@@ -868,6 +990,42 @@ function bindEffectInputs() {
   safeRun('音效控件绑定', bindEffectInputsRaw);
 }
 
+/**
+ * 统一效果卡片：给实时音效里的每个区块加上「折叠 / 展开」。
+ *
+ * 关键点：折叠只影响界面显示，与开关（Enable）完全无关。
+ *   - 折叠 = 把参数收起来，不动音频；
+ *   - 开关 = 真正在图谱里启用/停用该节点。
+ * 所有区块共用同一套标题栏结构（名称 + 开关），不针对某个效果单独写组件，
+ * 以后新增效果只要用同样的 .fx-section 结构就自动获得折叠能力。
+ * 默认除第一块（预设）外全部收起，几十个效果也不会把面板撑得很长。
+ */
+function setupEffectCards() {
+  const sections = document.querySelectorAll('#effectsModal .fx-section');
+  sections.forEach((section, index) => {
+    const title = section.querySelector('.fx-section-title');
+    if (!title || title.querySelector('.fx-caret')) return;
+    // 均衡器是常驻的主要调节区，不参与折叠，始终保持完整展开
+    if (section.id === 'eqSection') return;
+    const label = t('collapse') || '折叠 / 展开';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fx-caret lg-button';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = '<svg class="icon"><use href="#icon-caret"></use></svg>';
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const collapsed = section.classList.toggle('collapsed');
+      btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+    title.insertBefore(btn, title.firstChild);
+    const startCollapsed = index > 0;
+    section.classList.toggle('collapsed', startCollapsed);
+    btn.setAttribute('aria-expanded', startCollapsed ? 'false' : 'true');
+  });
+}
+
 function bindEffectInputsRaw() {
   const valueBindings = {
     masterGain: () => `${(Number($('masterGain').value) / 10).toFixed(1)} dB`,
@@ -890,6 +1048,19 @@ function bindEffectInputsRaw() {
     limiterCeiling: () => `${(Number($('limiterCeiling').value)).toFixed(1)} dB`,
     limiterLookahead: () => `${(Number($('limiterLookahead').value)).toFixed(1)} ms`,
     limiterRelease: () => `${$('limiterRelease').value} ms`,
+    clipDrive: () => Number($('clipDrive').value).toFixed(1),
+    clipOutput: () => `${Number($('clipOutput').value).toFixed(1)} dB`,
+    delayTime: () => `${$('delayTime').value} ms`,
+    delayFeedback: () => (Number($('delayFeedback').value) / 100).toFixed(2),
+    delayMix: () => (Number($('delayMix').value) / 100).toFixed(2),
+    chorusRate: () => `${(Number($('chorusRate').value) / 100).toFixed(2)} Hz`,
+    chorusDepth: () => `${Number($('chorusDepth').value).toFixed(1)} ms`,
+    chorusMix: () => (Number($('chorusMix').value) / 100).toFixed(2),
+    chorusSpread: () => (Number($('chorusSpread').value) / 100).toFixed(2),
+    flangerRate: () => `${(Number($('flangerRate').value) / 100).toFixed(2)} Hz`,
+    flangerDepth: () => `${Number($('flangerDepth').value).toFixed(1)} ms`,
+    flangerFeedback: () => (Number($('flangerFeedback').value) / 100).toFixed(2),
+    flangerMix: () => (Number($('flangerMix').value) / 100).toFixed(2),
     irWet: () => (Number($('irWet').value) / 100).toFixed(2),
     irPredelay: () => `${(Number($('irPredelay').value) / 100).toFixed(2)} s`,
     irHighpass: () => `${$('irHighpass').value} Hz`,
@@ -903,8 +1074,14 @@ function bindEffectInputsRaw() {
   // 各效果开关已下放到对应子卡片的标题栏，这里按 id 直接绑定，不再依赖容器结构
   [
     'fxCompressor', 'fxBass', 'fxStereo', 'fxSurround', 'fxClarity',
-    'fxUltrasonic', 'fxTube', 'fxReverb', 'fxNoiseGate', 'fxLimiter'
+    'fxUltrasonic', 'fxTube', 'fxReverb', 'fxNoiseGate', 'fxLimiter',
+    'fxDelay', 'fxChorus', 'fxFlanger', 'fxClipper'
   ].forEach((id) => {
+    const el = $(id);
+    if (el) el.addEventListener('change', updateEffectsFromUI);
+  });
+  // 下拉/勾选类参数（模式、乒乓）改动后同样立即生效
+  ['clipMode', 'delayPingPong'].forEach((id) => {
     const el = $(id);
     if (el) el.addEventListener('change', updateEffectsFromUI);
   });
@@ -937,6 +1114,60 @@ function buildEQ() {
     band.append(slider, db, label);
     container.appendChild(band);
   });
+}
+
+/* ============================================================================
+ * 均衡器风格预设：固定这 8 种，点击即把 10 段 EQ 调成对应曲线。
+ * 频点顺序与 buildEQ 一致：31 / 62 / 125 / 250 / 500 / 1k / 2k / 4k / 8k / 16k Hz
+ * 单位 dB，全部落在 EQ 的可调范围（±12 dB）之内。
+ * ========================================================================== */
+const EQ_PRESET_STYLES = [
+  { id: 'default', i18n: 'eqPresetDefault', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { id: 'classical', i18n: 'eqPresetClassical', gains: [4, 3, 2, 0, 0, 0, -1, 0, 2, 3] },
+  { id: 'heavyMetal', i18n: 'eqPresetHeavyMetal', gains: [6, 5, 3, 1, -2, -3, -1, 2, 4, 5] },
+  { id: 'pop', i18n: 'eqPresetPop', gains: [-1, -1, 0, 2, 3, 3, 1, 0, -1, -1] },
+  { id: 'jazz', i18n: 'eqPresetJazz', gains: [3, 2, 1, 0, -1, -1, 0, 1, 2, 3] },
+  { id: 'folk', i18n: 'eqPresetFolk', gains: [2, 1, 0, 1, 2, 2, 1, 1, 2, 2] },
+  { id: 'rock', i18n: 'eqPresetRock', gains: [5, 4, 2, -1, -3, -2, 0, 2, 4, 5] },
+  { id: 'electronic', i18n: 'eqPresetElectronic', gains: [6, 5, 2, 0, -2, -1, 1, 2, 4, 6] }
+];
+
+/** 当前高亮的风格（与曲线自动比对得出，手动拖动滑杆后会自动取消高亮） */
+function syncEqPresetButtons() {
+  const box = $('eqPresets');
+  if (!box) return;
+  const gains = state.effects.eqGains || [];
+  box.querySelectorAll('[data-eq-preset]').forEach((btn) => {
+    const style = EQ_PRESET_STYLES.find((s) => s.id === btn.dataset.eqPreset);
+    const match = !!style && style.gains.every((g, i) => Math.abs((Number(gains[i]) || 0) - g) < 0.05);
+    btn.classList.toggle('active', match);
+  });
+}
+
+function applyEqPreset(style) {
+  state.effects.eqGains = style.gains.slice();
+  applyEffectsToUI();
+  syncDspGraph();
+  sendDSPParams();
+  syncEqPresetButtons();
+  showToast(`${t('equalizer')} · ${t(style.i18n)}`);
+}
+
+function buildEqPresets() {
+  const box = $('eqPresets');
+  if (!box) return;
+  box.innerHTML = '';
+  EQ_PRESET_STYLES.forEach((style) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'eq-preset-btn lg-button';
+    btn.dataset.eqPreset = style.id;
+    btn.textContent = t(style.i18n);
+    btn.title = t(style.i18n);
+    btn.addEventListener('click', () => applyEqPreset(style));
+    box.appendChild(btn);
+  });
+  syncEqPresetButtons();
 }
 
 function resetEffects() {
@@ -992,7 +1223,6 @@ function renderPresets() {
       row.innerHTML = `
         <input type="text" class="preset-name-input" maxlength="40" spellcheck="false" data-preset-name="${preset.id}">
         <div class="preset-row-actions">
-          <button class="mini-btn lg-button" data-preset-save="${preset.id}"><svg class="icon icon-sm"><use href="#icon-save"></use></svg><span></span></button>
           <button class="mini-btn lg-button" data-preset-rename="${preset.id}"><svg class="icon icon-sm"><use href="#icon-edit"></use></svg><span></span></button>
           <button class="mini-btn lg-button" data-preset-del="${preset.id}"><svg class="icon icon-sm"><use href="#icon-trash"></use></svg><span></span></button>
         </div>
@@ -1000,15 +1230,11 @@ function renderPresets() {
       `;
       row.querySelector('[data-preset-name]').value = preset.name || DEFAULT_PRESET_NAME;
       const labels = row.querySelectorAll('.preset-row-actions span');
-      labels[0].textContent = t('save');
-      labels[1].textContent = t('rename');
-      labels[2].textContent = t('delete');
+      labels[0].textContent = t('rename');
+      labels[1].textContent = t('delete');
       list.appendChild(row);
     });
 
-    list.querySelectorAll('[data-preset-save]').forEach((btn) => {
-      btn.addEventListener('click', () => overwritePreset(btn.dataset.presetSave));
-    });
     list.querySelectorAll('[data-preset-rename]').forEach((btn) => {
       btn.addEventListener('click', () => renamePreset(btn.dataset.presetRename));
     });
@@ -1043,11 +1269,27 @@ function syncPresetCard() {
 }
 
 /**
- * 点击顶部条目的「保存」：按当前音效新建一条预设。
+ * 顶部的「保存」：整个实时音效区只有这一个保存入口。
+ * - 若有已开启（开关打开）的预设：把当前完整状态覆盖写回该预设；
+ * - 否则：按名称输入框里的名字新建一条（名称默认自动升序编号）。
+ * 保存的是完整状态（各效果开关、参数、差分环绕、空间音效等），
+ * 复用同一个 Preset 存储，不另建第二套保存系统。
  * 注意：不使用 window.prompt —— Electron 中该弹窗不可用（会直接返回空值），
- * 名称一律取自条目里的输入框。
+ * 名称一律取自「新建预设」行里的输入框。
  */
 async function savePreset() {
+  const active = state.presets.find((item) => item.id === activePresetId && item.type !== 'pulse');
+  if (active) {
+    const row = document.querySelector(`[data-preset-name="${active.id}"]`);
+    const rowName = row ? String(row.value || '').trim() : '';
+    active.name = rowName || active.name || DEFAULT_PRESET_NAME;
+    active.effects = collectEffects();
+    active.updatedAt = Date.now();
+    state.presets = await api.savePreset(active);
+    renderPresets();
+    showToast(t('toastPresetSaved'));
+    return;
+  }
   const input = $('presetNameInput');
   const name = ((input && input.value) || '').trim() || suggestedPresetName();
   const preset = { id: `preset-${Date.now()}`, name, effects: collectEffects(), updatedAt: Date.now() };
@@ -2533,8 +2775,6 @@ function bindUI() {
   });
   on('resetFxBtn', 'click', resetEffects);
   on('savePresetBtn', 'click', savePreset);
-  on('renamePresetBtn', 'click', renamePreset);
-  on('deletePresetBtn', 'click', deletePreset);
   const presetNameInput = $('presetNameInput');
   if (presetNameInput) {
     // 用户一旦手动改名，就不再自动覆盖
@@ -2621,9 +2861,11 @@ async function init() {
   safeRun('主题应用', () => applyTheme(state.settings.theme));
   safeRun('播放模式按钮同步', updateModeButton);
   safeRun('均衡器构建', buildEQ);
+  safeRun('均衡器风格预设构建', buildEqPresets);
   applyEffectsToUI();
   safeRun('DSP 图谱同步', syncDspGraph);
   bindUI();
+  safeRun('效果卡片折叠初始化', setupEffectCards);
   state.favorites = new Set(await api.getFavorites());
   await loadPresets();
   safeRun('播放列表渲染', renderPlaylist);
