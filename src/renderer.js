@@ -1568,10 +1568,12 @@ async function registerExternalPulse(filePath, decoded) {
     (item) => item.type === 'pulse' && item.source === 'external' && item.filePath === filePath
   );
   const baseName = String(filePath).split(/[\\/]/).pop().replace(/\.[^.]+$/, '') || '外部脉冲';
+  let activeId = null;
   if (existing) {
     existing.enabled = true;
     existing.updatedAt = Date.now();
     state.presets = await api.savePreset(existing);
+    activeId = existing.id;
   } else {
     const preset = {
       id: `pulse-ext-${Date.now()}`,
@@ -1584,8 +1586,18 @@ async function registerExternalPulse(filePath, decoded) {
       enabled: true
     };
     state.presets = await api.savePreset(preset);
+    activeId = preset.id;
   }
-  renderPulseList();
+  // 外部加载的脉冲同样是独占的：其余脉冲自动关闭
+  if (activeId) {
+    const active = state.presets.find((p) => p.id === activeId);
+    // 蓝边（当前使用标记）按名称比对，外部脉冲也统一用名称标记，
+    // 否则它虽然被加载了却不会高亮
+    if (active) state.effects.ir.filePath = active.name;
+    await activatePulsePreset(activeId);
+  } else {
+    renderPulseList();
+  }
 }
 
 function clearIR() {
@@ -1595,6 +1607,10 @@ function clearIR() {
   $('fxIR').checked = false;
   applyEffectsToUI();
   updateIRGraph();
+  // 卷积器已经空了，脉冲列表里的开关也要跟着关掉，
+  // 否则会出现「列表显示已启用、实际没有加载」的状态不一致。
+  renderPulseList();
+  void deactivateAllPulses();
   showToast(state.settings.language === 'zh' ? 'IR 已清除' : 'IR cleared');
 }
 
@@ -1636,6 +1652,38 @@ function base64ToArrayBuffer(base64) {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
+}
+
+/* ============================================================================
+ * 脉冲（空间音效）的启用是「独占」的：
+ * 卷积器同一时刻只能加载一条脉冲，所以任意时刻只允许一条脉冲处于启用状态。
+ * 之前只把被点的那条置为启用、没有关掉其它的，于是列表里会出现两个开关
+ * 同时打开，而蓝边（当前使用标记）只落在真正加载的那一条上 —— 看起来就像
+ * 「多出一个蓝色边框」。现在统一由下面两个函数维护，两者永远一致。
+ * ========================================================================== */
+
+/** 把某条脉冲设为当前使用，其余脉冲自动关闭（并写回存储） */
+async function activatePulsePreset(id) {
+  const pulses = state.presets.filter((p) => p.type === 'pulse');
+  for (const pulse of pulses) {
+    const want = pulse.id === id;
+    if (!!pulse.enabled === want) continue;
+    pulse.enabled = want;
+    pulse.updatedAt = Date.now();
+    state.presets = await api.savePreset(pulse);
+  }
+  renderPulseList();
+}
+
+/** 关闭全部脉冲（用于「清除」：卷积器已空，列表不应再有启用项） */
+async function deactivateAllPulses() {
+  const pulses = state.presets.filter((p) => p.type === 'pulse' && p.enabled);
+  for (const pulse of pulses) {
+    pulse.enabled = false;
+    pulse.updatedAt = Date.now();
+    state.presets = await api.savePreset(pulse);
+  }
+  renderPulseList();
 }
 
 async function applyPulsePreset(preset) {
@@ -1783,14 +1831,19 @@ function renderPulseList() {
   const pulses = state.presets.filter((preset) => preset.type === 'pulse');
   list.innerHTML = '';
   pulses.forEach((preset) => {
+    // 「是否在使用」只有唯一判据：当前加载进卷积器的那条脉冲名称。
+    // 开关与蓝边都由它决定，所以两者永远一致 —— 不会再出现
+    // 「开关是打开的、却没有蓝边（或反过来）」这种看起来多一个边框的情况。
+    // 重启后 IR 尚未加载，列表因此全部显示为关闭。
+    const isActive = !!state.effects.ir.filePath && state.effects.ir.filePath === preset.name;
     const item = document.createElement('div');
-    item.className = 'pulse-item' + (state.effects.ir.filePath === preset.name ? ' active' : '');
+    item.className = 'pulse-item' + (isActive ? ' active' : '');
     item.innerHTML = `
       <span class="pulse-name"></span>
       <span class="pulse-badge" hidden></span>
       <button data-pulse-rename="${preset.id}">重命名</button>
       <button data-pulse-del="${preset.id}">删除</button>
-      <label class="switch"><input type="checkbox" data-pulse-toggle="${preset.id}" ${preset.enabled ? 'checked' : ''}></label>
+      <label class="switch"><input type="checkbox" data-pulse-toggle="${preset.id}" ${isActive ? 'checked' : ''}></label>
     `;
     item.querySelector('.pulse-name').textContent = preset.name;
     if (preset.source === 'external') {
@@ -1802,12 +1855,21 @@ function renderPulseList() {
   });
   list.querySelectorAll('[data-pulse-toggle]').forEach((toggle) => {
     toggle.addEventListener('change', async (event) => {
-      const preset = state.presets.find((p) => p.id === event.target.dataset.pulseToggle);
+      const id = event.target.dataset.pulseToggle;
+      const preset = state.presets.find((p) => p.id === id);
       if (!preset) return;
-      preset.enabled = event.target.checked;
-      await api.savePreset(preset);
-      if (preset.enabled) await applyPulsePreset(preset);
-      else clearIR();
+      if (event.target.checked) {
+        // 打开一条 = 独占：其余脉冲自动关闭，蓝边只会落在真正加载的这一条上
+        await activatePulsePreset(id);
+        await applyPulsePreset(preset);
+      } else {
+        preset.enabled = false;
+        preset.updatedAt = Date.now();
+        state.presets = await api.savePreset(preset);
+        // 只有关掉的正好是当前加载的那条时才清空卷积（clearIR 内部会同步列表）
+        if (state.effects.ir.filePath === preset.name) clearIR();
+        else renderPulseList();
+      }
     });
   });
   list.querySelectorAll('[data-pulse-del]').forEach((btn) => {
