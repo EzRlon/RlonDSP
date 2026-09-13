@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RLONMUSIC DSP-IR 1200 · 脉冲响应生成器</title>
+<title>空间音效制作器 · 脉冲响应生成器</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230e0f11'/%3E%3Ctext x='1' y='13' font-size='12' fill='%23ffb000' font-family='monospace'%3ER%3C/text%3E%3C/svg%3E">
 <style>
 /* ============================================================
-   RLONMUSIC DSP-IR 1200 — Classic Audio Gear 复古专业机架
+    空间音效制作器 — Classic Audio Gear 复古专业机架
    ============================================================ */
 :root{
   --bg:#0e0f11;
@@ -181,9 +181,10 @@ body{
 .p-in{grid-column:span 3}
 .p-eq{grid-column:span 6}
 .p-comp{grid-column:span 3}
-.p-bass{grid-column:span 4}
-.p-sur{grid-column:span 4}
-.p-hps{grid-column:span 4}
+.p-bass{grid-column:span 3}
+.p-sur{grid-column:span 3}
+.p-hps{grid-column:span 3}
+.p-cdelay{grid-column:span 3}
 .p-clar{grid-column:span 4}
 .p-ultra{grid-column:span 4}
 .p-tube{grid-column:span 4}
@@ -226,7 +227,12 @@ input[type=text]:focus{outline:1px solid var(--amber)}
 /* 垂直推子（EQ） */
 .fader-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:0}
 .fader-v{
-  appearance:none;-webkit-appearance:none;position:relative;width:132px;height:132px;
+  appearance:none;-webkit-appearance:none;position:relative;
+  /* 旋转 90° 的推子：宽度是旋转后的视觉高度，高度是旋转后的视觉宽度。
+     这里把高度压到 24px，让「可点击区域」与「看得见的推子」一样宽；
+     若仍用 132px 正方形，相邻推子的点击区会互相重叠一倍多，
+     点下去会落到旁边的推子上，导致无法准确选中。 */
+  width:132px;height:24px;margin:54px 0;
   background:transparent;cursor:pointer;transform:rotate(-90deg);
 }
 .fader-v::-webkit-slider-runnable-track{height:5px;border-radius:2px;
@@ -305,11 +311,11 @@ canvas{width:100%;height:118px;display:block;background:#07090a;border-radius:3p
 
 /* ---------- 响应式 ---------- */
 @media (max-width:1080px){
-  .p-in,.p-eq,.p-comp,.p-bass,.p-sur,.p-hps,.p-clar,.p-ultra,.p-tube,.p-fdn,.p-norm,.p-wmk,.p-info{grid-column:span 6}
+  .p-in,.p-eq,.p-comp,.p-bass,.p-sur,.p-hps,.p-cdelay,.p-clar,.p-ultra,.p-tube,.p-fdn,.p-norm,.p-wmk,.p-info{grid-column:span 6}
 }
 @media (max-width:760px){
   body{padding:10px 8px 30px}
-  .p-in,.p-eq,.p-comp,.p-bass,.p-sur,.p-hps,.p-clar,.p-ultra,.p-tube,.p-fdn,.p-norm,.p-wmk,.p-info{grid-column:span 12}
+  .p-in,.p-eq,.p-comp,.p-bass,.p-sur,.p-hps,.p-cdelay,.p-clar,.p-ultra,.p-tube,.p-fdn,.p-norm,.p-wmk,.p-info{grid-column:span 12}
   .brand,.head-lcd{min-width:0;flex:1 1 auto}
   .head-right{flex-wrap:wrap;gap:6px}
   .brand .logo{font-size:20px}
@@ -340,7 +346,7 @@ canvas{width:100%;height:118px;display:block;background:#07090a;border-radius:3p
   --lg-glass-2:rgba(255,255,255,0.34);
   --lg-line:rgba(0,0,0,0.10);
   --lg-text:#1d222c;
-  --lg-muted:#6d7483;
+  --lg-muted:#4d5665;
   --lg-accent:#4c7dff;
   --lg-accent-2:#7a5cff;
   --lg-good:#12a37a;
@@ -355,7 +361,7 @@ canvas{width:100%;height:118px;display:block;background:#07090a;border-radius:3p
   --lg-glass-2:rgba(38,40,48,0.52);
   --lg-line:rgba(255,255,255,0.10);
   --lg-text:#f1f4fa;
-  --lg-muted:#9098a8;
+  --lg-muted:#c3cad6;
   --lg-accent:#6f92ff;
   --lg-accent-2:#9b82ff;
   --lg-good:#3fd6a5;
@@ -402,8 +408,10 @@ body{color:var(--lg-text);}
 .panel::before,.panel::after{display:none !important;}
 .panel{padding:12px 13px 13px;}
 
+.brand .title-row{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
 .brand .logo{font-family:inherit;letter-spacing:.06em;color:var(--lg-text);text-shadow:none;font-weight:800;}
 .brand .logo b{color:var(--lg-accent);}
+.brand .title-row .btn{padding:6px 14px;font-size:11px;flex:none}
 .brand .sub{font-family:inherit;letter-spacing:.16em;color:var(--lg-muted);}
 .brand .sub i{color:var(--lg-muted);}
 
@@ -440,6 +448,15 @@ body{color:var(--lg-text);}
 
 .ctag,.hrow .tag,.power span,.fv-label,.pstatus,.graph .gt,.road .ri,.road .ri .rnum,.road .ri .rstat{
   font-family:inherit;
+  color:var(--lg-muted);
+}
+/* 参数标签（模式/强度/延迟…）原先被更具体的选择器盖住，
+   一直沿用复古机架的 9px 细体等宽字，在玻璃底上显得发虚。
+   这里把它拉回界面字体并略微放大，笔画才扎实。 */
+.ctl .ctag{
+  font-family:inherit;
+  font-size:10px;
+  letter-spacing:.02em;
   color:var(--lg-muted);
 }
 select,input[type=text]{
@@ -520,8 +537,11 @@ canvas{background:transparent !important;}
 <!-- ================= 头部主机板 ================= -->
 <header class="header">
   <div class="brand">
-    <div class="logo">RLON<b>MUSIC</b> DSP-IR</div>
-    <div class="sub">IMPULSE&nbsp;RESPONSE&nbsp;PROCESSOR&nbsp;&nbsp;<i>·&nbsp;MODEL&nbsp;1200</i></div>
+    <div class="title-row">
+      <div class="logo"><b>Spatial&nbsp;Audio&nbsp;Studio</b></div>
+      <button class="btn small" id="btn-studio-reset">⟲&nbsp;RESET</button>
+    </div>
+    <div class="sub">Powered&nbsp;by&nbsp;Rlon</div>
   </div>
   <div class="head-right">
     <div class="head-lcd">
@@ -737,6 +757,25 @@ canvas{background:transparent !important;}
     <div class="ctl"><span class="ctag">ENGINE</span><div class="lcd">X-FEED + LP + DELAY</div></div>
   </section>
 
+  <!-- ─── 模块 RT · 差分环绕（实时生效，不参与 IR 离线渲染） ─── -->
+  <section class="panel p-cdelay" id="mod-cdelay">
+    <div class="phead">
+      <div class="ptitle"><span class="pnum">RT</span>CHANNEL&nbsp;DELAY</div>
+      <div class="bp"><label>BYPASS</label><input type="checkbox" class="rock" id="cd-en"></div>
+    </div>
+    <div class="ctl"><span class="ctag">DELAY&nbsp;CH</span>
+      <select id="cd-channel">
+        <option value="R" selected>R（右声道）</option>
+        <option value="L">L（左声道）</option>
+      </select>
+    </div>
+    <div class="ctl"><span class="ctag">DELAY</span>
+      <input type="range" class="slider" id="cd-ms" min="0" max="30" step="0.5" value="15">
+      <div class="lcd" id="lcd-cd-ms">15.0 ms</div>
+    </div>
+    <div class="ctl"><span class="ctag">TYPE</span><div class="lcd">HAAS&nbsp;·&nbsp;差分环绕</div></div>
+  </section>
+
   <!-- ─── 模块 7 · 清晰度 ─── -->
   <section class="panel p-clar" id="mod-clar">
     <div class="phead">
@@ -848,7 +887,7 @@ canvas{background:transparent !important;}
     <div style="display:flex;gap:18px;flex-wrap:wrap">
       <div style="flex:1;min-width:180px">
         <div class="ctl"><span class="ctag">MESSAGE</span>
-          <input type="text" id="wmk-msg" value="RLONMUSIC DSP-IR" maxlength="24" spellcheck="false">
+          <input type="text" id="wmk-msg" value="RlonDSP" maxlength="24" spellcheck="false">
         </div>
         <div class="ctl"><span class="ctag">CHIP&nbsp;RATE</span><div class="lcd">×64 PN / BIT</div></div>
       </div>
@@ -1544,7 +1583,8 @@ var FMT={
   'fdn-t60':function(v){return v.toFixed(1)+' s';},
   'fdn-damp':function(v){return v.toFixed(0)+' Hz';},
   'fdn-wet':function(v){return v.toFixed(0)+' %';},
-  'wmk-depth':function(v){return v.toFixed(0)+' LSB';}
+  'wmk-depth':function(v){return v.toFixed(0)+' LSB';},
+  'cd-ms':function(v){return v.toFixed(1)+' ms';}
 };
 Object.keys(FMT).forEach(function(id){
   var el=document.getElementById(id), lcd=document.getElementById('lcd-'+id);
@@ -1552,6 +1592,73 @@ Object.keys(FMT).forEach(function(id){
   function upd(){ lcd.textContent=FMT[id](parseFloat(el.value)); }
   el.addEventListener('input',upd); upd();
 });
+/* ---------------- 脉冲名称：默认名与升序编号 ----------------
+   默认名称由主程序统一生成（RlonDSP_ + 升序编号）。
+   用户手动改过就保留用户的名字；保存成功后自动推进到下一个编号。 */
+(function(){
+  var el=document.getElementById('rlondsp-pulse-name');
+  if(!el){ return; }
+  el.addEventListener('input',function(){ el.dataset.touched='1'; });
+  window.addEventListener('message',function(ev){
+    var d=ev.data;
+    if(!d||d.type!=='rlondsp-pulse-name'){ return; }
+    if(!el.dataset.touched||!el.value.trim()){ el.value=d.name||''; }
+  });
+})();
+
+/* ---------------- 制作器整体重置 ----------------
+   把面板里所有控件恢复到页面初始值（HTML 里写的默认值），
+   并派发 input / change 事件，让数值显示与上层联动同步刷新。 */
+(function(){
+  var btn=document.getElementById('btn-studio-reset');
+  if(!btn){ return; }
+  function fire(el){
+    try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(e){}
+    try{ el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){}
+  }
+  btn.addEventListener('click',function(){
+    var inputs=document.querySelectorAll('input');
+    for(var i=0;i<inputs.length;i++){
+      var el=inputs[i];
+      if(el.type==='checkbox'||el.type==='radio'){ el.checked=el.defaultChecked; }
+      else if(el.type!=='file'){ el.value=el.defaultValue; }
+      fire(el);
+    }
+    var selects=document.querySelectorAll('select');
+    for(var j=0;j<selects.length;j++){
+      var sel=selects[j], restored=false;
+      for(var k=0;k<sel.options.length;k++){
+        if(sel.options[k].defaultSelected){ sel.selectedIndex=k; restored=true; break; }
+      }
+      if(!restored){ sel.selectedIndex=0; }
+      fire(sel);
+    }
+  });
+})();
+
+/* ---------------- 差分环绕（实时模块）----------------
+   这个模块不参与 IR 离线渲染，而是把参数发给主程序，
+   直接作用到当前正在播放的音频上（实时声道延迟 / Haas 效应）。 */
+(function(){
+  var en=document.getElementById('cd-en');
+  var ch=document.getElementById('cd-channel');
+  var ms=document.getElementById('cd-ms');
+  if(!en||!ch||!ms){ return; }
+  function push(){
+    if(!window.parent||window.parent===window){ return; }
+    try{
+      window.parent.postMessage({
+        type:'rlondsp-live-channel-delay',
+        enabled: !!en.checked,
+        channel: ch.value==='L'?'L':'R',
+        ms: parseFloat(ms.value)||0
+      },'*');
+    }catch(e){}
+  }
+  en.addEventListener('change',push);
+  ch.addEventListener('change',push);
+  ms.addEventListener('input',push);
+})();
 /* EQ 推子数值 */
 $$('#eq-bands input').forEach(function(f){
   var lcd=document.getElementById('eqv-'+f.dataset.band);
@@ -1608,7 +1715,7 @@ function collectConfig(){
   var gains=[];
   $$('#eq-bands input').forEach(function(f){ gains.push(parseFloat(f.value)); });
   var fs=val('in-rate'), bits=val('in-bits'), len=val('in-len');
-  var msg=($('#wmk-msg').value||'RLONMUSIC').replace(/[^\x00-\xff\w\u4e00-\u9fa5 -]/g,'').slice(0,24);
+  var msg=($('#wmk-msg').value||'RlonDSP_').replace(/[^\x00-\xff\w\u4e00-\u9fa5 -]/g,'').slice(0,24);
   var comment='CHAIN:IMPULSE>EQ9>COMP>BASS>SUR3D>HPSUR>CLARITY>ULTRA>TUBE>FDN>NORM>WMK | '
     +fs+'Hz/'+bits+'bit | EQ:['+gains.join(',')+'] | COMP:T'+val('comp-thr')+'dB R'+val('comp-ratio')+':1 | '
     +'BASS:XO'+val('bass-xo')+'Hz '+$('#bass-mode').value+' | FDN:T60 '+val('fdn-t60')+'s WET'+val('fdn-wet')+'% | WMK:'+msg;
@@ -1652,17 +1759,17 @@ function uiState(s){
     pfill.style.width='0%'; ppct.textContent='00 %';
     pmsg.textContent='INITIALIZING DSP CHAIN…';
     pwrTxt.textContent='RENDER';
-    document.title='⏳ RENDERING… · RLONMUSIC DSP-IR';
+    document.title='⏳ RENDERING… · 空间音效制作器';
   } else if(s==='done'){
     btnRender.disabled=false; ledRender.className='led green on';
     pmsg.textContent='RENDER COMPLETE — 文件已就绪';
     pwrTxt.textContent='READY';
     window.__vuSet(100); setTimeout(window.__vuIdle,900);
-    document.title='✅ DONE · RLONMUSIC DSP-IR';
+    document.title='✅ DONE · 空间音效制作器';
   } else {
     btnRender.disabled=false; ledRender.className='led red on';
     pwrTxt.textContent='ERROR';
-    document.title='❌ ERROR · RLONMUSIC DSP-IR';
+    document.title='❌ ERROR · 空间音效制作器';
     window.__vuIdle();
   }
 }
@@ -1833,6 +1940,12 @@ $('#btn-save-app').addEventListener('click',function(){
       wavBase64:arrayBufToB64(lastWav)
     },'*');
     flash('已保存到 RlonDSP: '+nm);
+    // 保存成功：清掉「用户改过」标记并申请下一个建议名称（RlonDSP_ 递增）
+    var nameInput=document.getElementById('rlondsp-pulse-name');
+    if(nameInput){ nameInput.dataset.touched='0'; }
+    setTimeout(function(){
+      try{ window.parent.postMessage({type:'rlondsp-pulse-name-request'},'*'); }catch(e){}
+    },200);
   }catch(e){ flash('SAVE ERROR: '+e.message); }
 });
 var audioCtx=null, acBuffer=null;
@@ -1882,8 +1995,9 @@ btnRender.addEventListener('click',startRender);
 /* RlonDSP 界面文字双语化（只替换显示文字，不涉及任何功能/DSP 逻辑） */
 (function(){
   var DICT = {
-    'IMPULSE RESPONSE PROCESSOR':'脉冲响应处理器',
-    'MODEL 1200':'型号 1200',
+    'Spatial Audio Studio':'空间音效制作器',
+    '⟲ RESET':'⟲ 重置',
+    'Powered by Rlon':'由 Rlon 音频驱动',
     'PROJ RATE':'采样率',
     'LENGTH':'长度',
     'CHAIN':'信号链',
@@ -1930,6 +2044,9 @@ btnRender.addEventListener('click',startRender);
     'AMOUNT':'强度',
     'FREQ':'频率',
     'DELAY':'延迟',
+    'CHANNEL DELAY':'声道延迟',
+    'DELAY CH':'延迟声道',
+    'HAAS':'哈斯',
     'ENGINE':'引擎',
     'X-FEED + LP + DELAY':'交叉馈送 + 低通 + 延迟',
     'CLARITY':'清晰度',

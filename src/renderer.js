@@ -20,7 +20,6 @@ const I18N = {
     sortDuration: '按时长',
     clear: '清空',
     noTrack: '未播放',
-    noLyrics: '暂无歌词',
     soundEffects: '实时音效',
     pulseFeedback: '脉冲反馈',
     reset: '重置',
@@ -41,6 +40,7 @@ const I18N = {
     reverb: '混响',
     noiseGate: '降噪',
     limiter: '限幅',
+    lookahead: '前瞻',
     threshold: '阈值',
     ratio: '压缩比',
     attack: '启动',
@@ -65,6 +65,11 @@ const I18N = {
     toastLoading: '正在读取音乐信息…',
     toastPresetSaved: '预设已保存',
     toastPresetDeleted: '预设已删除',
+    toastPresetRenamed: '预设已重命名',
+    externalLoaded: '外部加载',
+    rename: '重命名',
+    presetName: '名称',
+    presetNamePlaceholder: 'RlonIR_',
     toastPresetExported: '预设已导出',
     toastPresetImported: '预设已导入',
     toastReset: '音效已重置',
@@ -72,7 +77,7 @@ const I18N = {
     toastNoTrack: '请先导入本地音乐',
     toastUnsupported: '该文件格式暂不支持，可尝试转换后导入',
     about: '关于 RlonDSP',
-    upstreamProject: '上游项目：Echomusic',
+    upstreamProject: '开源致谢',
     thirdParty: '第三方依赖',
     license: '许可证',
     viewLicense: '查看许可证',
@@ -92,7 +97,7 @@ const I18N = {
     vizDynamics: '动态范围',
     vizCentroid: '频谱质心',
     vizEvents: '事件检测',
-    irsSection: 'IRS 空间音效',
+    irsSection: '空间音效',
     loadPulse: '加载脉冲',
     pulseClear: '清除',
     audition: '试听',
@@ -134,7 +139,6 @@ const I18N = {
     sortDuration: 'Duration',
     clear: 'Clear',
     noTrack: 'Nothing Playing',
-    noLyrics: 'No lyrics',
     soundEffects: 'Real-time Effects',
     pulseFeedback: 'Pulse Feedback',
     reset: 'Reset',
@@ -155,6 +159,7 @@ const I18N = {
     reverb: 'Reverb',
     noiseGate: 'Noise Gate',
     limiter: 'Limiter',
+    lookahead: 'Lookahead',
     threshold: 'Threshold',
     ratio: 'Ratio',
     attack: 'Attack',
@@ -179,6 +184,11 @@ const I18N = {
     toastLoading: 'Reading track info…',
     toastPresetSaved: 'Preset saved',
     toastPresetDeleted: 'Preset deleted',
+    toastPresetRenamed: 'Preset renamed',
+    externalLoaded: 'External',
+    rename: 'Rename',
+    presetName: 'Name',
+    presetNamePlaceholder: 'RlonIR_',
     toastPresetExported: 'Preset exported',
     toastPresetImported: 'Preset imported',
     toastReset: 'Effects reset',
@@ -186,7 +196,7 @@ const I18N = {
     toastNoTrack: 'Import local music first',
     toastUnsupported: 'This format is not supported, please convert it first',
     about: 'About RlonDSP',
-    upstreamProject: 'Upstream: Echomusic',
+    upstreamProject: 'Acknowledgements',
     thirdParty: 'Third-party dependencies',
     license: 'License',
     viewLicense: 'View License',
@@ -206,7 +216,7 @@ const I18N = {
     vizDynamics: 'Dynamics',
     vizCentroid: 'Spectral Centroid',
     vizEvents: 'Events',
-    irsSection: 'IRS Spatial',
+    irsSection: 'Spatial Audio',
     loadPulse: 'Load Pulse',
     pulseClear: 'Clear',
     audition: 'Audition',
@@ -259,9 +269,102 @@ const defaultEffects = {
   tube: { drive: 0.3 },
   reverb: { roomSize: 1, t60: 2.6, damping: 0.55, wet: 0.32, predelay: 0.02 },
   gate: { threshold: -52, releaseMs: 180 },
-  limiter: { ceilingDB: -1 },
+  limiter: { ceilingDB: -1, lookaheadMs: 2, releaseMs: 60 },
+  // 差分环绕：延迟声道（L/R）与延迟毫秒数
+  channelDelay: { enabled: false, channel: 'R', ms: 15 },
   ir: { enabled: false, filePath: '', wet: 0.35, predelay: 0.02, highpass: 20, lowpass: 20000, ab: false }
 };
+
+/* ============================================================================
+ * Unified DSP Graph —— 统一 DSP 图谱
+ *
+ * RlonDSP 内置 DSP、原生引擎、第三方 Provider、空间音效、卷积、分析器
+ * 都是同一张图里的节点，可以同时启用、按图里的顺序共同工作。
+ *
+ * 规则：
+ *   - 同一种功能可以存在多个独立节点（例如两个均衡器），由用户明确加入；
+ *   - 只有用户加进图里、且启用未旁通的节点才会进入执行计划；
+ *   - 每个进入计划的节点恰好执行一次，不存在隐式的重复处理；
+ *   - 每个节点自带延迟、尾音、通道要求，整图延迟与尾音由图谱汇总。
+ * ========================================================================== */
+const dspHost = (window.RlonDspHost && typeof window.RlonDspHost.createDspHost === 'function')
+  ? window.RlonDspHost.createDspHost({
+      onLog: (entry) => {
+        if (window.__rlondspDebug) console.debug('[DSP Graph]', entry.type, entry.detail);
+      }
+    })
+  : null;
+
+/**
+ * RlonDSP 内置 DSP 的节点清单。
+ * owner 固定为 rlondsp；将来原生引擎与第三方 Provider 会用各自的 owner
+ * 注册同名类型的实现，它们与内置节点并存、互不排斥。
+ */
+const DSP_BUILTIN_SPECS = [
+  // 顺序与音频线程里的实际处理顺序一致
+  { type: 'bass', name: '低音增强', latencyFrames: 0, tailFrames: 0, key: 'bass' },
+  { type: 'eq', name: '均衡器', latencyFrames: 0, tailFrames: 0, key: 'eq' },
+  { type: 'compressor', name: '压缩器', latencyFrames: 0, tailFrames: 0, key: 'compressor' },
+  { type: 'clarity', name: '清晰度增强', latencyFrames: 0, tailFrames: 0, key: 'clarity' },
+  { type: 'stereo', name: '立体声增强', latencyFrames: 0, tailFrames: 0, key: 'stereo' },
+  { type: 'spatial', name: '空间音效', latencyFrames: 0, tailFrames: 2048, key: 'surround' },
+  { type: 'tube', name: '胆机模拟', latencyFrames: 0, tailFrames: 0, key: 'tube' },
+  { type: 'ultrasonic', name: '超高频净化', latencyFrames: 0, tailFrames: 0, key: 'ultrasonic' },
+  { type: 'reverb', name: '混响', latencyFrames: 0, tailFrames: 24000, key: 'reverb' },
+  { type: 'gate', name: '降噪', latencyFrames: 0, tailFrames: 0, key: 'noiseGate' },
+  { type: 'gain', name: '总增益', latencyFrames: 0, tailFrames: 0, key: 'gain' },
+  { type: 'limiter', name: '限幅', latencyFrames: 96, tailFrames: 0, key: 'limiter' },
+  // 差分环绕：把选定声道整体延后，制造左右时间差（Haas 效应）
+  { type: 'channel-delay', name: '差分环绕（声道延迟）', latencyFrames: 0, tailFrames: 0, key: 'channelDelay' },
+  // 卷积在渲染进程的 Web Audio 图里执行，位于内置链条之后
+  { type: 'convolution', name: '脉冲卷积（IRS）', latencyFrames: 0, tailFrames: 48000, key: 'ir' }
+];
+
+if (dspHost) {
+  DSP_BUILTIN_SPECS.forEach((spec) => {
+    dspHost.defineNode({
+      type: spec.type,
+      owner: 'rlondsp',
+      name: spec.name,
+      implementation: 'builtin',
+      latencyFrames: spec.latencyFrames,
+      tailFrames: spec.tailFrames,
+      realtimeSafe: true,
+      capabilities: ['serial', 'runtime-editable']
+    });
+    dspHost.addNode({ type: spec.type, owner: 'rlondsp', id: 'rlondsp:' + spec.type });
+  });
+  window.__dspHost = dspHost;
+}
+
+/** 某个内置节点是否仍在执行计划里（被停用、旁通或被 Provider 顶掉时为 false） */
+function builtinActive(type) {
+  if (!dspHost) return true;
+  return dspHost.activeNodeIds().indexOf('rlondsp:' + type) >= 0;
+}
+
+/**
+ * 把当前音效状态同步到图谱：启用状态、参数、以及卷积资源。
+ * 图谱只反映用户的实际选择，不会自行添加节点。
+ */
+function syncDspGraph() {
+  if (!dspHost) return;
+  const fx = state.effects;
+  DSP_BUILTIN_SPECS.forEach((spec) => {
+    const id = 'rlondsp:' + spec.type;
+    const on = spec.type === 'gain'
+      ? Math.abs(fx.masterGain) > 0.05
+      : spec.type === 'eq'
+        ? fx.eqGains.some((g) => Math.abs(g) > 0.05)
+        : spec.type === 'convolution'
+          ? !!fx.ir.enabled
+          : spec.type === 'channel-delay'
+            ? !!fx.channelDelay.enabled
+            : !!fx.enabled[spec.key];
+    dspHost.setEnabled(id, on || spec.type === 'limiter');
+    dspHost.setParam(id, 'enabled', on);
+  });
+}
 
 const state = {
   tracks: [],
@@ -274,7 +377,6 @@ const state = {
     theme: 'system',
     volume: 0.8,
     closeToTray: true,
-    desktopLyrics: false,
     outputDeviceId: '',
     playbackMode: 'list'
   },
@@ -361,7 +463,6 @@ function applyLanguage(lang) {
   });
   renderPlaylist();
   updateNowPlaying();
-  updateLyricsDisplay();
   syncStudioTheme();
 }
 
@@ -383,6 +484,8 @@ function syncStudioTheme() {
       theme: document.documentElement.dataset.theme || 'light',
       lang: state.settings.language || 'zh'
     }, '*');
+    // 制作器加载/切主题时同步一次「脉冲名称」的建议默认名
+    pushPulseNameSuggestion();
   }
 }
 
@@ -413,7 +516,6 @@ function setCurrentIndex(index) {
   state.currentTrack = state.tracks[index] || null;
   updateNowPlaying();
   renderPlaylist();
-  loadLyricsForCurrent();
   if (state.currentTrack) {
     api.addHistory({ path: state.currentTrack.path, title: state.currentTrack.title, artist: state.currentTrack.artist });
   }
@@ -429,6 +531,18 @@ function updateNowPlaying() {
   } else {
     $('miniCover').innerHTML = `<svg class="icon icon-lg"><use href="#icon-note"></use></svg>`;
   }
+  applyCoverBackground(track);
+}
+
+/**
+ * 把当前歌曲的专辑封面送到最底层作为背景。
+ * 封面本身不做处理，柔化由上层遮罩的高斯模糊完成；
+ * 没有封面时置为 none，自动回退到原本的渐变背景。
+ */
+function applyCoverBackground(track) {
+  const cover = track && track.cover ? `url("${track.cover}")` : 'none';
+  if (document.documentElement.style.getPropertyValue('--app-cover') === cover) return;
+  document.documentElement.style.setProperty('--app-cover', cover);
 }
 
 function renderPlaylist() {
@@ -674,6 +788,10 @@ function applyEffectsToUIRaw() {
   $('gateReleaseVal').textContent = `${fx.gate.releaseMs} ms`;
   $('limiterCeiling').value = String(fx.limiter.ceilingDB);
   $('limiterCeilingVal').textContent = `${fx.limiter.ceilingDB.toFixed(1)} dB`;
+  $('limiterLookahead').value = String(fx.limiter.lookaheadMs);
+  $('limiterLookaheadVal').textContent = `${fx.limiter.lookaheadMs.toFixed(1)} ms`;
+  $('limiterRelease').value = String(fx.limiter.releaseMs);
+  $('limiterReleaseVal').textContent = `${fx.limiter.releaseMs} ms`;
   $('fxIR').checked = fx.ir.enabled;
   $('irWet').value = String(Math.round(fx.ir.wet * 100));
   $('irWetVal').textContent = fx.ir.wet.toFixed(2);
@@ -688,7 +806,12 @@ function applyEffectsToUIRaw() {
 
 function sendDSPParams() {
   if (dspNode) {
-    dspNode.port.postMessage({ type: 'params', params: collectEffects() });
+    dspNode.port.postMessage({
+      type: 'params',
+      params: collectEffects(),
+      // 统一图谱的执行计划：音频线程按这个顺序执行节点，每个节点一次
+      plan: dspHost ? dspHost.executionPlan() : null
+    });
   }
 }
 
@@ -728,12 +851,15 @@ function updateEffectsFromUIRaw() {
   fx.gate.threshold = Number($('gateThreshold').value);
   fx.gate.releaseMs = Number($('gateRelease').value);
   fx.limiter.ceilingDB = Number($('limiterCeiling').value);
+  fx.limiter.lookaheadMs = Number($('limiterLookahead').value);
+  fx.limiter.releaseMs = Number($('limiterRelease').value);
   fx.ir.enabled = $('fxIR').checked;
   fx.ir.wet = Number($('irWet').value) / 100;
   fx.ir.predelay = Number($('irPredelay').value) / 100;
   fx.ir.highpass = Number($('irHighpass').value);
   fx.ir.lowpass = Number($('irLowpass').value);
   applyEffectsToUI();
+  syncDspGraph();
   sendDSPParams();
   updateIRGraph();
 }
@@ -762,6 +888,8 @@ function bindEffectInputsRaw() {
     gateThreshold: () => `${$('gateThreshold').value} dB`,
     gateRelease: () => `${$('gateRelease').value} ms`,
     limiterCeiling: () => `${(Number($('limiterCeiling').value)).toFixed(1)} dB`,
+    limiterLookahead: () => `${(Number($('limiterLookahead').value)).toFixed(1)} ms`,
+    limiterRelease: () => `${$('limiterRelease').value} ms`,
     irWet: () => (Number($('irWet').value) / 100).toFixed(2),
     irPredelay: () => `${(Number($('irPredelay').value) / 100).toFixed(2)} s`,
     irHighpass: () => `${$('irHighpass').value} Hz`,
@@ -772,14 +900,21 @@ function bindEffectInputsRaw() {
     const out = $(`${id}Val`);
     if (el && out) el.addEventListener('input', () => { out.textContent = formatter(); updateEffectsFromUI(); });
   });
-  document.querySelectorAll('.switches-grid input[type="checkbox"]').forEach((el) => el.addEventListener('change', updateEffectsFromUI));
+  // 各效果开关已下放到对应子卡片的标题栏，这里按 id 直接绑定，不再依赖容器结构
+  [
+    'fxCompressor', 'fxBass', 'fxStereo', 'fxSurround', 'fxClarity',
+    'fxUltrasonic', 'fxTube', 'fxReverb', 'fxNoiseGate', 'fxLimiter'
+  ].forEach((id) => {
+    const el = $(id);
+    if (el) el.addEventListener('change', updateEffectsFromUI);
+  });
   $('fxIR').addEventListener('change', updateEffectsFromUI);
 }
 
 function buildEQ() {
   const container = $('eqBands');
   container.innerHTML = '';
-  const freqs = [60, 120, 250, 500, 1000, 2000, 4000, 8000, 12000, 16000];
+  const freqs = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
   freqs.forEach((freq, index) => {
     const band = document.createElement('div');
     band.className = 'eq-band';
@@ -816,56 +951,177 @@ async function loadPresets() {
   renderPresets();
 }
 
-function renderPresets() {
-  const select = $('presetSelect');
-  select.innerHTML = '<option value="">--</option>';
-  state.presets.filter((preset) => preset.type !== 'pulse').forEach((preset) => {
-    const option = document.createElement('option');
-    option.value = preset.id;
-    option.textContent = preset.name || preset.id;
-    select.appendChild(option);
+/** 预设默认名称的前缀；实际默认名称为「前缀 + 升序编号」，例如 RlonIR_1 */
+const DEFAULT_PRESET_NAME = 'RlonIR_';
+
+/**
+ * 依据已有名称生成「前缀 + 升序编号」的下一个可用名称。
+ * 例如已有 RlonIR_1 / RlonIR_3，则返回 RlonIR_4。
+ */
+function nextNumberedName(prefix, names) {
+  let max = 0;
+  (names || []).forEach((item) => {
+    const text = String(item || '');
+    if (!text.startsWith(prefix)) return;
+    const num = parseInt(text.slice(prefix.length).trim(), 10);
+    if (Number.isFinite(num) && num > max) max = num;
   });
+  return prefix + (max + 1);
+}
+
+/** 当前应使用的默认预设名称 */
+function suggestedPresetName() {
+  return nextNumberedName(DEFAULT_PRESET_NAME, state.presets.filter((p) => p.type !== 'pulse').map((p) => p.name));
+}
+
+/** 当前已开启的预设（由条目最右侧的开关切换） */
+let activePresetId = null;
+
+/**
+ * 渲染预设列表。
+ * 每一行都是一张独立卡片：名称输入框 + 保存 / 重命名 / 删除 + 最右侧开关。
+ * 顶部另有一行「新建条目」，点击它的保存即按当前音效新增一条，列表随之增加一行。
+ */
+function renderPresets() {
+  const list = $('presetList');
+  if (list) {
+    list.innerHTML = '';
+    state.presets.filter((preset) => preset.type !== 'pulse').forEach((preset) => {
+      const row = document.createElement('div');
+      row.className = 'preset-row';
+      row.innerHTML = `
+        <input type="text" class="preset-name-input" maxlength="40" spellcheck="false" data-preset-name="${preset.id}">
+        <div class="preset-row-actions">
+          <button class="mini-btn lg-button" data-preset-save="${preset.id}"><svg class="icon icon-sm"><use href="#icon-save"></use></svg><span></span></button>
+          <button class="mini-btn lg-button" data-preset-rename="${preset.id}"><svg class="icon icon-sm"><use href="#icon-edit"></use></svg><span></span></button>
+          <button class="mini-btn lg-button" data-preset-del="${preset.id}"><svg class="icon icon-sm"><use href="#icon-trash"></use></svg><span></span></button>
+        </div>
+        <label class="switch"><input type="checkbox" data-preset-toggle="${preset.id}"${activePresetId === preset.id ? ' checked' : ''}></label>
+      `;
+      row.querySelector('[data-preset-name]').value = preset.name || DEFAULT_PRESET_NAME;
+      const labels = row.querySelectorAll('.preset-row-actions span');
+      labels[0].textContent = t('save');
+      labels[1].textContent = t('rename');
+      labels[2].textContent = t('delete');
+      list.appendChild(row);
+    });
+
+    list.querySelectorAll('[data-preset-save]').forEach((btn) => {
+      btn.addEventListener('click', () => overwritePreset(btn.dataset.presetSave));
+    });
+    list.querySelectorAll('[data-preset-rename]').forEach((btn) => {
+      btn.addEventListener('click', () => renamePreset(btn.dataset.presetRename));
+    });
+    list.querySelectorAll('[data-preset-del]').forEach((btn) => {
+      btn.addEventListener('click', () => deletePreset(btn.dataset.presetDel));
+    });
+    list.querySelectorAll('[data-preset-toggle]').forEach((toggle) => {
+      toggle.addEventListener('change', () => togglePreset(toggle.dataset.presetToggle, toggle.checked));
+    });
+    list.querySelectorAll('[data-preset-name]').forEach((input) => {
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') { event.preventDefault(); renamePreset(input.dataset.presetName); }
+      });
+    });
+  }
   renderPulseList();
+  syncPresetCard();
 }
 
-function currentPresetId() {
-  return $('presetSelect').value;
+/**
+ * 顶部「新建条目」的名称框：只要用户没有手动改过，就始终填入
+ * 「RlonIR_ + 下一个升序编号」，保证每次保存都是不重名的新条目。
+ */
+function syncPresetCard() {
+  const input = $('presetNameInput');
+  if (!input) return;
+  const auto = input.dataset.auto !== '0';
+  if (auto || !input.value.trim()) {
+    input.value = suggestedPresetName();
+    input.dataset.auto = '1';
+  }
 }
 
+/**
+ * 点击顶部条目的「保存」：按当前音效新建一条预设。
+ * 注意：不使用 window.prompt —— Electron 中该弹窗不可用（会直接返回空值），
+ * 名称一律取自条目里的输入框。
+ */
 async function savePreset() {
-  const name = prompt(state.settings.language === 'zh' ? '输入预设名称' : 'Enter preset name', '我的预设');
-  if (!name) return;
-  const preset = {
-    id: `preset-${Date.now()}`,
-    name,
-    effects: collectEffects(),
-    updatedAt: Date.now()
-  };
+  const input = $('presetNameInput');
+  const name = ((input && input.value) || '').trim() || suggestedPresetName();
+  const preset = { id: `preset-${Date.now()}`, name, effects: collectEffects(), updatedAt: Date.now() };
   state.presets = await api.savePreset(preset);
+  activePresetId = preset.id;
+  // 保存后立刻推进到下一个编号，下一次保存不会重名
+  if (input) {
+    input.dataset.auto = '1';
+    input.value = suggestedPresetName();
+  }
   renderPresets();
-  $('presetSelect').value = preset.id;
   showToast(t('toastPresetSaved'));
 }
 
-async function deletePreset() {
-  const id = currentPresetId();
-  if (!id) {
+/** 点击已保存条目里的「保存」：把当前音效覆盖写入该预设 */
+async function overwritePreset(id) {
+  const preset = state.presets.find((item) => item.id === id);
+  if (!preset) return;
+  const input = document.querySelector(`[data-preset-name="${id}"]`);
+  const name = ((input && input.value) || '').trim() || preset.name || DEFAULT_PRESET_NAME;
+  preset.name = name;
+  preset.effects = collectEffects();
+  preset.updatedAt = Date.now();
+  state.presets = await api.savePreset(preset);
+  renderPresets();
+  showToast(t('toastPresetSaved'));
+}
+
+/** 重命名：名称取自该条目自己的输入框 */
+async function renamePreset(id) {
+  const preset = state.presets.find((item) => item.id === id);
+  if (!preset) return;
+  const input = document.querySelector(`[data-preset-name="${id}"]`);
+  const name = ((input && input.value) || '').trim();
+  if (!name) {
     showToast(t('toastNoPreset'));
     return;
   }
+  preset.name = name;
+  preset.updatedAt = Date.now();
+  state.presets = await api.savePreset(preset);
+  renderPresets();
+  showToast(t('toastPresetRenamed'));
+}
+
+/** 删除指定预设 */
+async function deletePreset(id) {
+  if (!id) return;
+  if (activePresetId === id) activePresetId = null;
   state.presets = await api.deletePreset(id);
   renderPresets();
   showToast(t('toastPresetDeleted'));
 }
 
+/** 条目最右侧的开关：开启即把该预设应用到当前音效 */
+function togglePreset(id, on) {
+  if (on) {
+    const preset = state.presets.find((item) => item.id === id);
+    if (!preset) return;
+    activePresetId = id;
+    applyPreset(preset);
+  } else if (activePresetId === id) {
+    activePresetId = null;
+  }
+  renderPresets();
+}
+
+/** 导出 / 导入：针对当前已开启的预设 */
 async function exportPreset() {
-  const id = currentPresetId();
-  if (!id) {
+  const preset = state.presets.find((item) => item.id === activePresetId);
+  if (!preset) {
     showToast(t('toastNoPreset'));
     return;
   }
-  const preset = state.presets.find((item) => item.id === id);
-  if (!preset) return;
   await api.exportPreset(preset);
   showToast(t('toastPresetExported'));
 }
@@ -874,10 +1130,10 @@ async function importPreset() {
   const preset = await api.importPreset();
   if (!preset || !preset.effects) return;
   preset.id = `preset-${Date.now()}`;
-  preset.name = preset.name || '导入预设';
+  preset.name = preset.name || DEFAULT_PRESET_NAME;
   state.presets = await api.savePreset(preset);
+  activePresetId = preset.id;
   renderPresets();
-  $('presetSelect').value = preset.id;
   applyPreset(preset);
   showToast(t('toastPresetImported'));
 }
@@ -889,72 +1145,6 @@ function applyPreset(preset) {
   state.effects.enabled = { ...state.effects.enabled, ...(preset.effects.enabled || {}) };
   applyEffectsToUI();
   sendDSPParams();
-}
-
-function parseLRC(text) {
-  const lines = [];
-  text.split(/\r?\n/).forEach((line) => {
-    const match = line.match(/\[(\d{1,2}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g);
-    if (!match) return;
-    const content = line.replace(/\[[^\]]*\]/g, '').trim();
-    match.forEach((tag) => {
-      const timeMatch = tag.match(/\[(\d{1,2}):(\d{1,2})(?:[.:](\d{1,3}))?\]/);
-      const minutes = Number(timeMatch[1]);
-      const seconds = Number(timeMatch[2]);
-      const fraction = timeMatch[3] ? Number(`0.${timeMatch[3]}`) : 0;
-      lines.push({ time: minutes * 60 + seconds + fraction, text: content || '' });
-    });
-  });
-  lines.sort((a, b) => a.time - b.time);
-  return lines;
-}
-
-async function loadLyricsForCurrent() {
-  state.lyrics = [];
-  state.lyricsIndex = -1;
-  if (!state.currentTrack) {
-    $('lyricsLine').textContent = t('noLyrics');
-    sendLyricsToDesktop(null);
-    return;
-  }
-  const text = await api.readLyrics(state.currentTrack.path);
-  if (text) state.lyrics = parseLRC(text);
-  updateLyricsDisplay();
-}
-
-function updateLyricsDisplay(currentTime = audioElement ? audioElement.currentTime : 0) {
-  if (!state.lyrics.length) {
-    $('lyricsLine').textContent = t('noLyrics');
-    return;
-  }
-  let index = -1;
-  for (let i = 0; i < state.lyrics.length; i++) {
-    if (state.lyrics[i].time <= currentTime) index = i;
-    else break;
-  }
-  state.lyricsIndex = index;
-  const current = index >= 0 ? state.lyrics[index].text : '';
-  const next = index + 1 < state.lyrics.length ? state.lyrics[index + 1].text : '';
-  $('lyricsLine').textContent = current || (index < 0 && state.lyrics[0] ? state.lyrics[0].text : t('noLyrics'));
-  if (state.settings.desktopLyrics) {
-    sendLyricsToDesktop({ current, next, active: index, total: state.lyrics.length, lang: state.settings.language });
-  }
-}
-
-function sendLyricsToDesktop(payload) {
-  api.updateLyrics(payload);
-}
-
-function toggleDesktopLyrics() {
-  state.settings.desktopLyrics = !state.settings.desktopLyrics;
-  api.setSettings({ desktopLyrics: state.settings.desktopLyrics });
-  if (state.settings.desktopLyrics) {
-    api.showLyrics();
-    sendLyricsToDesktop({ lang: state.settings.language });
-    updateLyricsDisplay();
-  } else {
-    api.hideLyrics();
-  }
 }
 
 let audioElement = null;
@@ -1052,7 +1242,6 @@ async function ensureAudioGraph() {
     if (!Number.isFinite(audioElement.duration)) return;
     $('progress').value = String(Math.round((audioElement.currentTime / audioElement.duration) * 1000));
     $('currentTime').textContent = formatTime(audioElement.currentTime);
-    updateLyricsDisplay(audioElement.currentTime);
   });
   audioElement.addEventListener('loadedmetadata', () => {
     $('totalTime').textContent = formatTime(audioElement.duration || 0);
@@ -1090,7 +1279,8 @@ function updateIRGraph() {
   if (!dryGainNode || !wetGainNode || !irDelayNode || !irHighpassNode || !irLowpassNode) return;
   const ir = state.effects.ir;
   const hasBuffer = !!convolverNode?.buffer;
-  const active = ir.enabled && hasBuffer;
+  // 卷积被第三方 Provider 接管时，内置卷积必须让位，避免两套卷积同时处理
+  const active = builtinActive('convolution') && ir.enabled && hasBuffer;
   if (!active || ir.ab) {
     dryGainNode.gain.value = 1;
     wetGainNode.gain.value = 0;
@@ -1117,11 +1307,43 @@ async function loadIRFile() {
     $('fxIR').checked = true;
     applyEffectsToUI();
     updateIRGraph();
+    // 外部加载的脉冲同样进入下方列表，具备重命名 / 删除 / 开关
+    await registerExternalPulse(filePath, decoded);
     showToast(state.settings.language === 'zh' ? 'IR 已加载' : 'IR loaded');
   } catch (error) {
     console.error(error);
     showToast(state.settings.language === 'zh' ? 'IR 加载失败' : 'IR load failed');
   }
+}
+
+/**
+ * 把「从磁盘加载的脉冲文件」登记为列表里的一条脉冲。
+ * 与制作器传送过来的脉冲同级：可重命名、可删除、可开关，只是来源不同，
+ * 名称后面会带「外部加载」标识；文件只记录路径，不复制内容。
+ */
+async function registerExternalPulse(filePath, decoded) {
+  const existing = state.presets.find(
+    (item) => item.type === 'pulse' && item.source === 'external' && item.filePath === filePath
+  );
+  const baseName = String(filePath).split(/[\\/]/).pop().replace(/\.[^.]+$/, '') || '外部脉冲';
+  if (existing) {
+    existing.enabled = true;
+    existing.updatedAt = Date.now();
+    state.presets = await api.savePreset(existing);
+  } else {
+    const preset = {
+      id: `pulse-ext-${Date.now()}`,
+      name: baseName,
+      type: 'pulse',
+      source: 'external',
+      filePath,
+      sampleRate: decoded && decoded.sampleRate ? decoded.sampleRate : 0,
+      createdAt: Date.now(),
+      enabled: true
+    };
+    state.presets = await api.savePreset(preset);
+  }
+  renderPulseList();
 }
 
 function clearIR() {
@@ -1177,7 +1399,10 @@ function base64ToArrayBuffer(base64) {
 async function applyPulsePreset(preset) {
   try {
     await ensureAudioGraph();
-    const arrayBuffer = base64ToArrayBuffer(preset.wavBase64);
+    // 外部加载的脉冲记录的是文件路径，从磁盘读取；制作器传送的脉冲带内嵌数据
+    const arrayBuffer = (preset.source === 'external' && preset.filePath)
+      ? await (await fetch(api.toFileUrl(preset.filePath))).arrayBuffer()
+      : base64ToArrayBuffer(preset.wavBase64);
     const decoded = await audioContext.decodeAudioData(arrayBuffer);
     convolverNode.buffer = decoded;
     state.effects.ir.filePath = preset.name;
@@ -1200,14 +1425,48 @@ function deletePulsePreset(id) {
   });
 }
 
-async function renamePulsePreset(id) {
+/**
+ * 重命名脉冲预设。
+ * 不使用 window.prompt —— Electron 中该弹窗不可用（会直接返回空值）。
+ * 改为把列表项里的名称就地换成输入框：回车或失焦提交，Esc 取消。
+ */
+function renamePulsePreset(id) {
+  const list = $('pulseList');
   const preset = state.presets.find((p) => p.id === id);
-  if (!preset) return;
-  const next = prompt(state.settings.language === 'zh' ? '输入新的脉冲名称' : 'Enter new pulse name', preset.name);
-  if (!next || !next.trim()) return;
-  preset.name = next.trim();
-  state.presets = await api.savePreset(preset);
-  renderPulseList();
+  if (!list || !preset) return;
+  const holder = list.querySelector(`.pulse-item [data-pulse-rename="${id}"]`)?.closest('.pulse-item');
+  const nameEl = holder ? holder.querySelector('.pulse-name') : null;
+  if (!nameEl || nameEl.dataset.editing === '1') return;
+
+  nameEl.dataset.editing = '1';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'pulse-name-input';
+  input.maxLength = 40;
+  input.spellcheck = false;
+  input.value = preset.name || '';
+  nameEl.textContent = '';
+  nameEl.appendChild(input);
+  input.focus();
+  input.select();
+
+  let settled = false;
+  const finish = async (save) => {
+    if (settled) return;
+    settled = true;
+    const next = (input.value || '').trim();
+    if (save && next && next !== preset.name) {
+      preset.name = next;
+      state.presets = await api.savePreset(preset);
+      showToast(t('toastPresetRenamed'));
+    }
+    renderPulseList();
+  };
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); finish(true); }
+    else if (event.key === 'Escape') { event.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
 }
 
 function selectFxTab(tabName) {
@@ -1224,7 +1483,26 @@ function selectFxTab(tabName) {
 
 function handleStudioMessage(event) {
   const data = event.data;
-  if (!data || data.type !== 'rlondsp-pulse-save') return;
+  if (!data) return;
+
+  // 制作器请求「下一个建议名称」（保存脉冲后推进编号）
+  if (data.type === 'rlondsp-pulse-name-request') {
+    pushPulseNameSuggestion();
+    return;
+  }
+
+  // 空间音效制作面板里的「差分环绕」是实时模块，改参数立即作用到当前播放
+  if (data.type === 'rlondsp-live-channel-delay') {
+    const cd = state.effects.channelDelay;
+    if (typeof data.enabled === 'boolean') cd.enabled = data.enabled;
+    if (data.channel === 'L' || data.channel === 'R') cd.channel = data.channel;
+    if (Number.isFinite(Number(data.ms))) cd.ms = Math.max(0, Math.min(30, Number(data.ms)));
+    syncDspGraph();
+    sendDSPParams();
+    return;
+  }
+
+  if (data.type !== 'rlondsp-pulse-save') return;
   const name = (data.name || '').trim() || `脉冲反馈 ${new Date().toLocaleTimeString()}`;
   const preset = {
     id: `pulse-${Date.now()}`,
@@ -1238,8 +1516,23 @@ function handleStudioMessage(event) {
   api.savePreset(preset).then((presets) => {
     state.presets = presets;
     renderPulseList();
+    pushPulseNameSuggestion();
     showToast(state.settings.language === 'zh' ? `脉冲已保存：${name}` : `Pulse saved: ${name}`);
   });
+}
+
+/** 建议的脉冲名称：RlonDSP_ + 升序编号 */
+function suggestedPulseName() {
+  return nextNumberedName('RlonDSP_', state.presets.filter((p) => p.type === 'pulse').map((p) => p.name));
+}
+
+/** 把建议名称推送给制作器里的「脉冲名称」输入框 */
+function pushPulseNameSuggestion() {
+  const frame = $('irStudioFrame');
+  if (!frame || !frame.contentWindow) return;
+  try {
+    frame.contentWindow.postMessage({ type: 'rlondsp-pulse-name', name: suggestedPulseName() }, '*');
+  } catch (error) { /* 忽略：推送失败不影响保存 */ }
 }
 
 function renderPulseList() {
@@ -1252,13 +1545,17 @@ function renderPulseList() {
     item.className = 'pulse-item' + (state.effects.ir.filePath === preset.name ? ' active' : '');
     item.innerHTML = `
       <span class="pulse-name"></span>
-      <span class="pulse-time">${new Date(preset.createdAt).toLocaleTimeString()}</span>
-      <label class="switch"><input type="checkbox" data-pulse-toggle="${preset.id}" ${preset.enabled ? 'checked' : ''}><span></span></label>
-      <button data-pulse-load="${preset.id}">加载</button>
+      <span class="pulse-badge" hidden></span>
       <button data-pulse-rename="${preset.id}">重命名</button>
       <button data-pulse-del="${preset.id}">删除</button>
+      <label class="switch"><input type="checkbox" data-pulse-toggle="${preset.id}" ${preset.enabled ? 'checked' : ''}></label>
     `;
     item.querySelector('.pulse-name').textContent = preset.name;
+    if (preset.source === 'external') {
+      const badge = item.querySelector('.pulse-badge');
+      badge.hidden = false;
+      badge.textContent = t('externalLoaded');
+    }
     list.appendChild(item);
   });
   list.querySelectorAll('[data-pulse-toggle]').forEach((toggle) => {
@@ -1269,12 +1566,6 @@ function renderPulseList() {
       await api.savePreset(preset);
       if (preset.enabled) await applyPulsePreset(preset);
       else clearIR();
-    });
-  });
-  list.querySelectorAll('[data-pulse-load]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const preset = state.presets.find((p) => p.id === btn.dataset.pulseLoad);
-      if (preset) await applyPulsePreset({ ...preset, enabled: true });
     });
   });
   list.querySelectorAll('[data-pulse-del]').forEach((btn) => {
@@ -1368,13 +1659,23 @@ function allocateAnalyserBuffers() {
 function setupVizCanvas(canvas) {
   const rect = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  const w = Math.max(1, Math.round(rect.width * dpr));
-  const h = Math.max(1, Math.round(rect.height * dpr));
+  /* 画布按「至少 2 倍」的分辨率绘制，再缩回卡片里的实际显示尺寸。
+     原因有两个：
+     1) 卡片宽度经常是 247.5 这种小数，按 1 倍渲染会出现半像素错位，
+        所有画在画布上的小字都会发虚；
+     2) 2 倍超采样等于先用大图绘制再缩回去，8～10px 的等宽小字边缘更干净。
+     画布内部的绘制坐标仍然以「显示尺寸」为单位（下面 width/height 传的就是
+     显示尺寸），所以各个绘制函数不用改。 */
+  const scale = Math.max(2, dpr);
+  const w = Math.max(1, Math.round(rect.width * scale));
+  const h = Math.max(1, Math.round(rect.height * scale));
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
   }
-  return canvas.getContext('2d');
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  return { ctx, width: rect.width, height: rect.height };
 }
 
 function getVizCanvas(key) {
@@ -1398,6 +1699,12 @@ const VIZ_BANDS = [[20, 160], [160, 500], [500, 2000], [2000, 6000], [6000, 1600
 const LUFS_HISTORY_MAX = 420;
 const CENTROID_MIN = 200;
 const CENTROID_MAX = 6000;
+/* 卡片底部那一排小字的统一位置。
+   卡片的两个下角有 16px 圆角，小字原来贴在距下沿 3～5px、距左右 3～4px 的位置，
+   正好落在圆角被切掉的区域里，看上去像被裁掉半截。
+   所以统一改成：距下沿 9px、左右各内缩 18px。 */
+const VIZ_LABEL_BOTTOM = 9;
+const VIZ_LABEL_INSET = 18;
 const VIZ_MONO = '"Consolas", "SFMono-Regular", monospace';
 
 const vizMetrics = {
@@ -1590,11 +1897,11 @@ function drawAnalyzer(ctx, width, height) {
   ctx.font = '9px ' + VIZ_MONO;
   ctx.fillStyle = cachedMuted;
   ctx.textAlign = 'left';
-  ctx.fillText('20Hz', 3, height - 3);
+  ctx.fillText('20Hz', VIZ_LABEL_INSET, height - VIZ_LABEL_BOTTOM);
   ctx.textAlign = 'center';
-  ctx.fillText('1kHz', freqToX((1000 / nyquist) * binCount, binCount, width), height - 3);
+  ctx.fillText('1kHz', freqToX((1000 / nyquist) * binCount, binCount, width), height - VIZ_LABEL_BOTTOM);
   ctx.textAlign = 'right';
-  ctx.fillText('10kHz', Math.min(width - 3, freqToX((10000 / nyquist) * binCount, binCount, width)), height - 3);
+  ctx.fillText('10kHz', Math.min(width - VIZ_LABEL_INSET, freqToX((10000 / nyquist) * binCount, binCount, width)), height - VIZ_LABEL_BOTTOM);
   ctx.textAlign = 'left';
 }
 
@@ -1648,11 +1955,11 @@ function drawScope(ctx, width, height) {
   ctx.font = '9px ' + VIZ_MONO;
   ctx.fillStyle = cachedMuted;
   ctx.textAlign = 'left';
-  ctx.fillText('0', 3, height - 3);
+  ctx.fillText('0', VIZ_LABEL_INSET, height - VIZ_LABEL_BOTTOM);
   ctx.textAlign = 'center';
-  ctx.fillText((ms / 2).toFixed(0) + 'ms', width / 2, height - 3);
+  ctx.fillText((ms / 2).toFixed(0) + 'ms', width / 2, height - VIZ_LABEL_BOTTOM);
   ctx.textAlign = 'right';
-  ctx.fillText(ms.toFixed(0) + 'ms', width - 3, height - 3);
+  ctx.fillText(ms.toFixed(0) + 'ms', width - VIZ_LABEL_INSET, height - VIZ_LABEL_BOTTOM);
   ctx.textAlign = 'left';
 }
 
@@ -1859,10 +2166,10 @@ function drawArc(ctx, width, height) {
   ctx.textBaseline = 'alphabetic';
   ctx.font = '8.5px ' + VIZ_MONO;
   ctx.fillStyle = VIZ_PEAK;
-  ctx.fillText('PK ' + (Number.isFinite(vizMetrics.peakDb) ? vizMetrics.peakDb.toFixed(1) : '-∞'), 4, height - 4);
+  ctx.fillText('PK ' + (Number.isFinite(vizMetrics.peakDb) ? vizMetrics.peakDb.toFixed(1) : '-∞'), VIZ_LABEL_INSET, height - VIZ_LABEL_BOTTOM);
   ctx.textAlign = 'right';
   ctx.fillStyle = cachedMuted;
-  ctx.fillText('I ' + (Number.isFinite(vizMetrics.integrated) ? vizMetrics.integrated.toFixed(1) : '-∞'), width - 4, height - 4);
+  ctx.fillText('I ' + (Number.isFinite(vizMetrics.integrated) ? vizMetrics.integrated.toFixed(1) : '-∞'), width - VIZ_LABEL_INSET, height - VIZ_LABEL_BOTTOM);
   ctx.textAlign = 'left';
 }
 
@@ -1871,7 +2178,8 @@ function drawOctave(ctx, width, height) {
   const labels = [t('bandLow'), t('bandLowMid'), t('bandMid'), t('bandHighMid'), t('bandHigh')];
   const n = 5;
   const gap = Math.max(4, width * 0.022);
-  const base = height - 13;
+  // 柱子底线要让开底部那排小字，否则小字会压到柱子并贴着卡片下沿
+  const base = height - VIZ_LABEL_BOTTOM - 15;
   const maxH = Math.max(6, base - 8);
   const bw = Math.max(3, (width - gap * (n + 1)) / n);
   const grad = ctx.createLinearGradient(0, base, 0, 0);
@@ -1890,7 +2198,7 @@ function drawOctave(ctx, width, height) {
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.fillStyle = v > 0.8 ? VIZ_PEAK : cachedMuted;
-    ctx.fillText(labels[k], x + bw / 2, height - 3);
+    ctx.fillText(labels[k], x + bw / 2, height - VIZ_LABEL_BOTTOM);
   }
   ctx.textAlign = 'left';
 }
@@ -1924,10 +2232,10 @@ function drawPhase(ctx, width, height) {
   ctx.font = '8.5px ' + VIZ_MONO;
   ctx.textAlign = 'left';
   ctx.fillStyle = cachedMuted;
-  ctx.fillText(t('phaseWidth') + ' ' + Math.round(vizMetrics.width * 100) + '%', pad, height - 5);
+  ctx.fillText(t('phaseWidth') + ' ' + Math.round(vizMetrics.width * 100) + '%', VIZ_LABEL_INSET, height - VIZ_LABEL_BOTTOM);
   ctx.textAlign = 'right';
   ctx.fillStyle = c < -0.05 ? VIZ_WARN : cachedMuted;
-  ctx.fillText(c < -0.05 ? t('phaseInv') : t('phaseOk'), width - pad, height - 5);
+  ctx.fillText(c < -0.05 ? t('phaseInv') : t('phaseOk'), width - VIZ_LABEL_INSET, height - VIZ_LABEL_BOTTOM);
   ctx.textAlign = 'left';
 }
 
@@ -1959,7 +2267,13 @@ function drawStats(ctx, width, height) {
 function drawCentroid(ctx, width, height) {
   const pad = 12;
   const bandW = Math.max(20, width - pad * 2);
-  const bandY = height - 13;
+  /* 底部这组内容原来全部贴着画布最下沿画：
+     色带中心在 height-13，两端「偏暗 / 偏亮」小字的基线在 height-3，
+     字几乎顶着卡片下边界，看上去像被切掉半截。
+     这里改成从下往上依次排：小字 → 留 6px 间隙 → 色带。 */
+  const labelY = height - VIZ_LABEL_BOTTOM;
+  const bandH = 10;
+  const bandY = labelY - 8 - 6 - bandH / 2;
   const g = ctx.createLinearGradient(pad, 0, pad + bandW, 0);
   g.addColorStop(0, '#4c7dff');
   g.addColorStop(0.5, '#8b6bff');
@@ -1967,7 +2281,7 @@ function drawCentroid(ctx, width, height) {
   ctx.globalAlpha = 0.35;
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.roundRect(pad, bandY - 5, bandW, 10, 5);
+  ctx.roundRect(pad, bandY - bandH / 2, bandW, bandH, bandH / 2);
   ctx.fill();
   ctx.globalAlpha = 1;
   const brightness = Math.max(0, Math.min(1, vizMetrics.bright));
@@ -1989,9 +2303,9 @@ function drawCentroid(ctx, width, height) {
   ctx.fillText('BRIGHT ' + Math.round(brightness * 100) + '%', width / 2, height * 0.42 + 15);
   ctx.font = '8px ' + VIZ_MONO;
   ctx.textAlign = 'left';
-  ctx.fillText(t('toneDark'), pad, height - 3);
+  ctx.fillText(t('toneDark'), VIZ_LABEL_INSET, labelY);
   ctx.textAlign = 'right';
-  ctx.fillText(t('toneBright'), width - pad, height - 3);
+  ctx.fillText(t('toneBright'), width - VIZ_LABEL_INSET, labelY);
   ctx.textAlign = 'left';
 }
 
@@ -2068,9 +2382,10 @@ function renderVisualization() {
   for (const key of keys) {
     const canvas = getVizCanvas(key);
     if (!canvas) continue;
-    const ctx = setupVizCanvas(canvas);
-    const width = canvas.width;
-    const height = canvas.height;
+    const surface = setupVizCanvas(canvas);
+    const ctx = surface.ctx;
+    const width = surface.width;
+    const height = surface.height;
     if (!hasSignal) {
       ctx.clearRect(0, 0, width, height);
       ctx.strokeStyle = cachedLine;
@@ -2129,17 +2444,26 @@ function openSettings() {
 function renderAbout() {
   const zh = state.settings.language === 'zh';
   $('aboutDesc').textContent = zh
-    ? '本项目基于 Echomusic 开源项目分支改造与扩展，专注于本地实时音效处理与频谱可视化。'
-    : 'This project is a fork of the Echomusic open-source project, focused on local real-time audio effects and spectrum visualization.';
-  $('aboutUpstreamNote').textContent = zh
-    ? '核心音频播放与音效框架源自 Echomusic，在此向原项目贡献者致以诚挚感谢。'
-    : 'The core audio playback and effects framework originates from Echomusic. Sincere thanks to the original contributors.';
+    ? 'RlonDSP 是一款纯本地的 Windows 桌面音频工作站：实时音效处理、脉冲响应卷积、空间音效与专业频谱可视化全部在本机完成，不联网、不上传任何数据。'
+    : 'RlonDSP is a fully local Windows audio workstation. Real-time effects, impulse-response convolution, spatial audio, and professional spectrum visualization all run on your machine — no network, no uploads.';
+  // 致谢部分只列举真正参考/沿用的内容，不做笼统的「完全基于某项目」表述
+  $('aboutUpstreamNote').innerHTML = zh
+    ? '<div>RlonDSP 在以下部分参考并借鉴了 Echomusic 开源项目的成果：</div>'
+      + '<div class="about-list-item">· 主界面框架与功能分区（播放列表、播放控制栏、音效面板、迷你窗口）</div>'
+      + '<div class="about-list-item">· 原生音频模块的调用接口设计</div>'
+      + '<div>Echomusic 的参考源码与原生模块以只读形式保留在 vendor/echomusic 目录，不参与本项目的构建与运行。</div>'
+      + '<div>界面、可视化、脉冲反馈生成器、空间音效与统一 DSP 图谱均为本项目自行实现。感谢 Echomusic 作者与全体贡献者的开源工作。</div>'
+    : '<div>RlonDSP references the following work from the Echomusic open-source project:</div>'
+      + '<div class="about-list-item">· Main window framework and functional layout (playlist, player bar, effects panel, mini window)</div>'
+      + '<div class="about-list-item">· Interface design of the native audio modules</div>'
+      + '<div>The Echomusic reference source and native modules are kept read-only under vendor/echomusic and take no part in this project\'s build or runtime.</div>'
+      + '<div>The interface, visualizations, pulse-feedback generator, spatial audio, and unified DSP graph are implemented by this project. Thanks to the Echomusic authors and all contributors.</div>';
   $('aboutLicense').textContent = zh
-    ? '本项目遵循 GPL-3.0-only，与上游 Echomusic 许可证保持兼容。'
-    : 'This project is licensed under GPL-3.0-only, compatible with the upstream Echomusic license.';
+    ? '本项目遵循 GPL-3.0-only 开源许可证。'
+    : 'This project is licensed under GPL-3.0-only.';
   $('aboutDeps').innerHTML = zh
-    ? '<div>Electron - 桌面应用运行时 - MIT</div><div>music-metadata - 音频元数据解析 - MIT</div><div>Chromium / FFmpeg - 音频解码与媒体处理</div><div>Echomusic 原生音频模块 - 音频播放与音效 DSP - GPL-3.0-only</div>'
-    : '<div>Electron - desktop runtime - MIT</div><div>music-metadata - audio metadata parsing - MIT</div><div>Chromium / FFmpeg - audio decoding and media processing</div><div>Echomusic native audio modules - playback and effects DSP - GPL-3.0-only</div>';
+    ? '<div>Electron - 桌面应用运行时 - MIT</div><div>music-metadata - 音频元数据解析 - MIT</div><div>Chromium / FFmpeg - 音频解码与媒体处理</div>'
+    : '<div>Electron - desktop runtime - MIT</div><div>music-metadata - audio metadata parsing - MIT</div><div>Chromium / FFmpeg - audio decoding and media processing</div>';
 }
 
 function openAbout() {
@@ -2209,7 +2533,13 @@ function bindUI() {
   });
   on('resetFxBtn', 'click', resetEffects);
   on('savePresetBtn', 'click', savePreset);
+  on('renamePresetBtn', 'click', renamePreset);
   on('deletePresetBtn', 'click', deletePreset);
+  const presetNameInput = $('presetNameInput');
+  if (presetNameInput) {
+    // 用户一旦手动改名，就不再自动覆盖
+    presetNameInput.addEventListener('input', () => { presetNameInput.dataset.auto = '0'; });
+  }
   on('exportPresetBtn', 'click', exportPreset);
   on('importPresetBtn', 'click', importPreset);
   on('loadIRBtn', 'click', loadIRFile);
@@ -2222,10 +2552,6 @@ function bindUI() {
   window.addEventListener('message', handleStudioMessage);
   const studioFrame = document.getElementById('irStudioFrame');
   if (studioFrame) studioFrame.addEventListener('load', syncStudioTheme);
-  on('presetSelect', 'change', () => {
-    const preset = state.presets.find((item) => item.id === currentPresetId());
-    if (preset) applyPreset(preset);
-  });
   on('settingsBtn', 'click', openSettings);
   on('winMinBtn', 'click', () => api.minimize());
   on('winMaxBtn', 'click', () => api.maximize());
@@ -2242,6 +2568,8 @@ function bindUI() {
   }
   if (api.onMaximized) {
     api.onMaximized((value) => {
+      // 最大化时窗口铺满屏幕，四角要恢复直角（见 styles.css 的窗口圆角说明）
+      document.documentElement.classList.toggle('is-maximized', !!value);
       const icon = $('winMaxIcon');
       if (icon) icon.setAttribute('href', value ? '#icon-win-restore' : '#icon-win-max');
       const btn = $('winMaxBtn');
@@ -2261,7 +2589,6 @@ function bindUI() {
   on('viewLicenseBtn', 'click', () => api.openLicense());
   on('muteBtn', 'click', toggleMute);
   on('modeBtn', 'click', cycleMode);
-  on('lyricsBtn', 'click', toggleDesktopLyrics);
   window.addEventListener('resize', () => {
     // canvas resizes during animation loop
   });
@@ -2295,6 +2622,7 @@ async function init() {
   safeRun('播放模式按钮同步', updateModeButton);
   safeRun('均衡器构建', buildEQ);
   applyEffectsToUI();
+  safeRun('DSP 图谱同步', syncDspGraph);
   bindUI();
   state.favorites = new Set(await api.getFavorites());
   await loadPresets();

@@ -37,7 +37,7 @@ RlonDSP 是一款**纯本地**的 Windows 桌面音频工作站与播放器。�
 
 <img src="docs/images/01-main.png" alt="RlonDSP 主界面" width="880" />
 
-<sub>左侧播放列表 · 中部十联可视化 · 底部悬浮播放控制栏 · 顶部 Liquid Glass 标题栏</sub>
+<sub>左侧播放列表 · 中部十联可视化 · 底部通栏播放控制栏 · 顶部 Liquid Glass 标题栏 · 整窗圆角</sub>
 
 </div>
 
@@ -45,28 +45,28 @@ RlonDSP 是一款**纯本地**的 Windows 桌面音频工作站与播放器。�
 
 <img src="docs/images/02-visualizations.png" alt="RlonDSP 可视化总览" width="880" />
 
-### 实时音效 / 脉冲反馈 / 桌面歌词 / 设置 / 迷你模式
+### 实时音效 / 空间音效制作器 / 设置 / 迷你模式
 
-| 实时音效 | 脉冲反馈（DSP-IR 1200） |
+| 实时音效 | 空间音效制作器 |
 | :---: | :---: |
-| <img src="docs/images/13-realtime-effects.png" alt="实时音效" /> | <img src="docs/images/15-pulse-feedback.png" alt="脉冲反馈" /> |
+| <img src="docs/images/13-realtime-effects.png" alt="实时音效" /> | <img src="docs/images/15-pulse-feedback.png" alt="空间音效制作器" /> |
 
-| IRS 空间音效 | 设置 |
+| 空间音效 | 设置 |
 | :---: | :---: |
-| <img src="docs/images/14-irs-spatial.png" alt="IRS 空间音效" /> | <img src="docs/images/16-settings.png" alt="设置" /> |
+| <img src="docs/images/14-irs-spatial.png" alt="空间音效" /> | <img src="docs/images/16-settings.png" alt="设置" /> |
 
-| 桌面歌词 | 迷你模式 |
+| 迷你模式 | 关于 |
 | :---: | :---: |
-| <img src="docs/images/17-desktop-lyrics.png" alt="桌面歌词" /> | <img src="docs/images/18-mini-mode.png" alt="迷你模式" /> |
+| <img src="docs/images/18-mini-mode.png" alt="迷你模式" /> | <img src="docs/images/19-about.png" alt="关于" /> |
 
 ## ✨ 核心特性
 
 - **极致美学：Liquid Glass 动态毛玻璃** — 全局统一的设计令牌（`glass-theme.css`），分层玻璃材质：全局背景层 / 面板层 / 内容层 / 控制层 / 微玻璃。播放控制栏带**跟随鼠标的动态高光**与玻璃边缘折射感，并完整支持*减弱透明*、*减弱动态*、*不支持背景模糊* 三种降级。
 - **实时频谱分析：10 个专业可视化模块** — 频谱分析仪、示波器、极坐标声场、响度历史、弧形电平表、倍频程频段、相位分析、动态范围、频谱质心、事件检测，一屏铺满、互不重复，全部由 `requestAnimationFrame` 驱动，暂停即停笔、画面保留最后一帧。
-- **脉冲反馈生成器：13 级 DSP 链** — 内嵌 RLONMUSIC DSP-IR 1200 脉冲响应生成器，信号链为 `IMPULSE → EQ-9 → COMP → BASS → SUR3D → HP-SUR → CLARITY → ULTRA → TUBE → FDN → NORM → WMK → WAV`，可导出 16 / 24 / 32-bit WAV。
+- **空间音效制作器：13 级 DSP 链** — 内嵌脉冲响应生成器，信号链为 `IMPULSE → EQ-9 → COMP → BASS → SUR3D → HP-SUR → CLARITY → ULTRA → TUBE → FDN → NORM → WMK → WAV`，可导出 16 / 24 / 32-bit WAV。
 - **9 段图示均衡器** — 每段 ±12 dB，覆盖 65 Hz ~ 16 kHz，配合总增益（-120 ~ +120 dB）与实时参数反馈。
-- **IRS 空间音效** — 加载本地 WAV / AIFF 脉冲响应文件，实时卷积，支持干湿比、预延迟、高通、低通、A/B 对比、试听与旁路。
-- **逐字歌词** — 读取同名 `.lrc` 文件并逐行同步，支持独立的**桌面歌词窗口**（无边框、半透明、置顶、可拖动）。
+- **空间音效** — 加载本地 WAV / AIFF 脉冲响应文件，实时卷积，支持干湿比、预延迟、高通、低通、A/B 对比、试听与旁路；制作器保存的脉冲与外部加载的脉冲都会进入同一份列表，可重命名、删除、逐个开关。
+- **统一 DSP 图谱** — 内置 DSP、原生引擎、第三方 Provider 与自研空间音效都是同一张图里的独立节点，可同时启用、按合法顺序串联或并行工作，延迟与尾音如实统计。
 - **播放列表管理** — 导入文件 / 文件夹 / 拖拽导入，搜索、排序、清空，曲目时长与封面解析。
 - **系统集成** — 系统托盘、媒体键（播放/暂停、上一曲、下一曲）、`Ctrl+Alt+P / ← / →` 全局快捷键、关闭时最小化到托盘、迷你窗口模式（360 × 64）。
 - **多语言** — 界面文字全部走语言表，中文 / English 实时切换，包含画布内绘制的标注文字。
@@ -89,7 +89,8 @@ RlonDSP 是一款**纯本地**的 Windows 桌面音频工作站与播放器。�
 | 混响（FDN） | 混响时间 0.10 ~ 5.00 s、高频阻尼、湿声比例、预延迟、房间大小 |
 | 降噪（噪声门） | 阈值 -80 ~ -20 dB、释放 20 ~ 500 ms |
 | 限幅 | 上限 -12 ~ 0 dB |
-| IRS 空间音效 | 干湿比、预延迟、高通 10 ~ 500 Hz、低通 1 k ~ 20 kHz、A/B 对比 |
+| 空间音效 | 干湿比、预延迟、高通 10 ~ 500 Hz、低通 1 k ~ 20 kHz、A/B 对比、脉冲列表（重命名 / 删除 / 开关） |
+| 差分环绕 | 延迟声道（左 / 右）、延迟 0 ~ 30 ms，实时作用于当前播放 |
 | 预设系统 | 保存 / 删除 / 导出 / 导入 |
 
 ## 📊 可视化与频谱分析
@@ -196,19 +197,20 @@ npm run dist:nsis       # 安装包
 RlonDSP/
 ├── main.js                  # Electron 主进程：窗口、托盘、菜单、IPC 注册、快捷键
 ├── preload.js               # 主窗口预加载桥接（contextBridge，仅暴露必要能力）
-├── lyrics-preload.js        # 桌面歌词窗口预加载桥接
+├── lyrics-preload.js        # 桌面歌词窗口预加载桥接（该窗口入口已移除，文件暂留）
 ├── package.json             # 项目元信息与打包配置
 ├── src/
 │   ├── index.html           # 主界面结构 + 内联 SVG 图标雪碧图
-│   ├── renderer.js          # 渲染进程：播放器、列表、音效、可视化、歌词、i18n
+│   ├── renderer.js          # 渲染进程：播放器、列表、音效、可视化、i18n
+│   ├── dsp-host.js          # 统一 DSP 图谱：多引擎节点的编排 / 延迟 / 尾音
 │   ├── styles.css           # 基础样式与布局
 │   ├── glass-theme.css      # Liquid Glass 设计令牌（--lg-* 命名空间）
 │   ├── glass-components.css # 玻璃组件类（.lg-surface / .lg-player-bar 等）
 │   ├── glass-motion.js      # 播放栏跟随鼠标的动态高光
 │   ├── dsp-worklet.js       # AudioWorklet 实时 DSP 处理链
-│   ├── ir-studio.html       # 脉冲反馈生成器（DSP-IR 1200）
+│   ├── ir-studio.html       # 空间音效制作器（脉冲反馈生成器）
 │   ├── ir-generator.js      # 脉冲响应生成与 WAV 导出
-│   └── lyrics.html/.css/.js # 桌面歌词窗口
+│   └── lyrics.html/.css/.js # 桌面歌词窗口（该窗口入口已移除，文件暂留）
 ├── assets/                  # 应用图标（ico / png / 托盘图标）
 ├── docs/                    # 文档与截图
 │   ├── images/              # README 使用的界面与功能截图
@@ -238,8 +240,9 @@ RlonDSP/
 - [x] 10 路专业音频可视化（每帧共享度量，暂停即停笔）
 - [x] AudioWorklet 实时音效链（均衡、压缩、混响、降噪、限幅等）
 - [x] 脉冲反馈生成器（13 级 DSP 链、WAV 导出、脉冲列表管理）
-- [x] IRS 空间音效（本地 IR 加载、卷积、干湿比、A/B 对比）
-- [x] 桌面歌词窗口与逐行同步
+- [x] 空间音效（本地 IR 加载、卷积、干湿比、A/B 对比、脉冲列表管理）
+- [x] 统一 DSP 图谱（多引擎节点共存、延迟统计、尾音标记、并行分支）
+- [x] 整窗圆角、通栏播放栏与跟随封面的毛玻璃底
 - [x] 中英双语（含画布内文字）
 - [x] 系统托盘、媒体键与全局快捷键
 - [x] 冒烟测试与便携版 / 安装包发布

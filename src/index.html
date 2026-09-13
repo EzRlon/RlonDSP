@@ -44,7 +44,7 @@
     <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M5 20v-8M12 20V6M19 20v-6"/></symbol>
     <symbol id="icon-eq" viewBox="0 0 24 24"><path d="M4 8v8M9 4v16M14 7v10M19 10v4"/></symbol>
     <symbol id="icon-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></symbol>
-    <symbol id="icon-lyrics" viewBox="0 0 24 24"><path d="M4 5h16M4 9h16M4 13h9M4 17h6"/></symbol>
+    <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M4 20l1-4 11-11 3 3-11 11-4 1z"/><path d="M14 7l3 3"/></symbol>
     <symbol id="icon-loop-list" viewBox="0 0 24 24"><path d="M17 3l3 3-3 3M20 6H8a5 5 0 0 0-5 5v1M7 21l-3-3 3-3M4 18h12a5 5 0 0 0 5-5v-1"/></symbol>
     <symbol id="icon-loop-single" viewBox="0 0 24 24"><path d="M17 3l3 3-3 3M20 6H8a5 5 0 0 0-5 5v1M7 21l-3-3 3-3M4 18h12a5 5 0 0 0 5-5v-1"/><path d="M12 9v6"/></symbol>
     <symbol id="icon-loop-random" viewBox="0 0 24 24"><path d="M16 3h5v5M21 3l-6 6M4 20l6-6M16 21h5v-5M21 21l-6-6M4 4l6 6"/></symbol>
@@ -145,7 +145,6 @@
           <button class="fx-tab active" data-fx-tab="realtime" data-i18n="soundEffects">实时音效</button>
           <button class="fx-tab" data-fx-tab="pulse" data-i18n="pulseFeedback">脉冲反馈</button>
         </div>
-        <button class="ghost-btn lg-button" id="resetFxBtn"><svg class="icon icon-sm"><use href="#icon-reset"></use></svg><span data-i18n="reset">重置</span></button>
         <button class="icon-btn lg-button" id="closeEffectsBtn"><svg class="icon"><use href="#icon-close"></use></svg></button>
       </div>
       <div class="fx-body">
@@ -155,15 +154,21 @@
           <div class="fx-section-title">
             <span data-i18n="preset">预设</span>
             <div class="preset-actions">
-              <button class="mini-btn lg-button" id="savePresetBtn"><svg class="icon icon-sm"><use href="#icon-save"></use></svg><span data-i18n="save">保存</span></button>
-              <button class="mini-btn lg-button" id="deletePresetBtn"><svg class="icon icon-sm"><use href="#icon-trash"></use></svg><span data-i18n="delete">删除</span></button>
+              <button class="mini-btn lg-button" id="resetFxBtn"><svg class="icon icon-sm"><use href="#icon-reset"></use></svg><span data-i18n="reset">重置</span></button>
               <button class="mini-btn lg-button" id="exportPresetBtn"><svg class="icon icon-sm"><use href="#icon-export"></use></svg><span data-i18n="export">导出</span></button>
               <button class="mini-btn lg-button" id="importPresetBtn"><svg class="icon icon-sm"><use href="#icon-import"></use></svg><span data-i18n="import">导入</span></button>
             </div>
           </div>
-          <select id="presetSelect" class="full-select">
-            <option value="">--</option>
-          </select>
+          <div class="preset-list" id="presetList"></div>
+          <div class="preset-row preset-row--new">
+            <input type="text" id="presetNameInput" class="preset-name-input" maxlength="40" spellcheck="false" data-i18n-ph="presetNamePlaceholder" placeholder="RlonIR_">
+            <div class="preset-row-actions">
+              <button class="mini-btn lg-button" id="savePresetBtn"><svg class="icon icon-sm"><use href="#icon-save"></use></svg><span data-i18n="save">保存</span></button>
+              <button class="mini-btn lg-button" id="renamePresetBtn" disabled><svg class="icon icon-sm"><use href="#icon-edit"></use></svg><span data-i18n="rename">重命名</span></button>
+              <button class="mini-btn lg-button" id="deletePresetBtn" disabled><svg class="icon icon-sm"><use href="#icon-trash"></use></svg><span data-i18n="delete">删除</span></button>
+            </div>
+            <label class="switch"><input type="checkbox" id="presetNewToggle" disabled></label>
+          </div>
         </div>
 
         <div class="fx-section">
@@ -176,21 +181,8 @@
           <input type="range" id="masterGain" min="-120" max="120" value="0" step="1">
         </div>
 
-        <div class="fx-section switches-grid">
-          <label class="switch"><input type="checkbox" id="fxCompressor"><span data-i18n="compressor">压缩器</span></label>
-          <label class="switch"><input type="checkbox" id="fxBass"><span data-i18n="bassBoost">低音增强</span></label>
-          <label class="switch"><input type="checkbox" id="fxStereo"><span data-i18n="stereoWide">立体声增强</span></label>
-          <label class="switch"><input type="checkbox" id="fxSurround"><span data-i18n="virtualSurround">虚拟环绕</span></label>
-          <label class="switch"><input type="checkbox" id="fxClarity"><span data-i18n="clarity">清晰度增强</span></label>
-          <label class="switch"><input type="checkbox" id="fxUltrasonic"><span data-i18n="ultrasonic">超高频净化</span></label>
-          <label class="switch"><input type="checkbox" id="fxTube"><span data-i18n="tube">胆机模拟</span></label>
-          <label class="switch"><input type="checkbox" id="fxReverb"><span data-i18n="reverb">混响</span></label>
-          <label class="switch"><input type="checkbox" id="fxNoiseGate"><span data-i18n="noiseGate">降噪</span></label>
-          <label class="switch"><input type="checkbox" id="fxLimiter"><span data-i18n="limiter">限幅</span></label>
-        </div>
-
         <div class="fx-section" id="compressorParams">
-          <div class="fx-section-title"><span data-i18n="compressor">压缩器</span></div>
+          <div class="fx-section-title"><span data-i18n="compressor">压缩器</span><label class="switch"><input type="checkbox" id="fxCompressor"></label></div>
           <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="compThreshold" min="-60" max="0" value="-24" step="1"><span id="compThresholdVal">-24 dB</span></div>
           <div class="param"><label data-i18n="ratio">压缩比</label><input type="range" id="compRatio" min="1" max="12" value="4" step="0.5"><span id="compRatioVal">4.0:1</span></div>
           <div class="param"><label data-i18n="attack">启动</label><input type="range" id="compAttack" min="1" max="50" value="10" step="1"><span id="compAttackVal">10 ms</span></div>
@@ -198,33 +190,37 @@
         </div>
 
         <div class="fx-section" id="bassParams">
-          <div class="fx-section-title"><span data-i18n="bassBoost">低音增强</span></div>
+          <div class="fx-section-title"><span data-i18n="bassBoost">低音增强</span><label class="switch"><input type="checkbox" id="fxBass"></label></div>
           <div class="param"><label data-i18n="bassGain">增益</label><input type="range" id="bassGain" min="0" max="120" value="60" step="1"><span id="bassGainVal">+6.0 dB</span></div>
           <div class="param"><label data-i18n="crossover">分频点</label><select id="bassCrossover" class="full-select"><option value="40">40 Hz</option><option value="60">60 Hz</option><option value="80" selected>80 Hz</option><option value="120">120 Hz</option></select></div>
         </div>
 
         <div class="fx-section" id="stereoParams">
-          <div class="fx-section-title"><span data-i18n="stereoWide">立体声增强</span></div>
+          <div class="fx-section-title"><span data-i18n="stereoWide">立体声增强</span><label class="switch"><input type="checkbox" id="fxStereo"></label></div>
           <div class="param"><label data-i18n="width">宽度</label><input type="range" id="stereoWidth" min="0" max="150" value="50" step="1"><span id="stereoWidthVal">0.50</span></div>
         </div>
 
         <div class="fx-section" id="surroundParams">
-          <div class="fx-section-title"><span data-i18n="virtualSurround">虚拟环绕</span></div>
+          <div class="fx-section-title"><span data-i18n="virtualSurround">虚拟环绕</span><label class="switch"><input type="checkbox" id="fxSurround"></label></div>
           <div class="param"><label data-i18n="roomSize">空间感</label><input type="range" id="surroundRoom" min="0" max="200" value="100" step="1"><span id="surroundRoomVal">1.00</span></div>
         </div>
 
         <div class="fx-section" id="clarityParams">
-          <div class="fx-section-title"><span data-i18n="clarity">清晰度增强</span></div>
+          <div class="fx-section-title"><span data-i18n="clarity">清晰度增强</span><label class="switch"><input type="checkbox" id="fxClarity"></label></div>
           <div class="param"><label data-i18n="strength">强度</label><input type="range" id="clarityStrength" min="0" max="100" value="50" step="1"><span id="clarityStrengthVal">0.50</span></div>
         </div>
 
+        <div class="fx-section" id="ultrasonicParams">
+          <div class="fx-section-title"><span data-i18n="ultrasonic">超高频净化</span><label class="switch"><input type="checkbox" id="fxUltrasonic"></label></div>
+        </div>
+
         <div class="fx-section" id="tubeParams">
-          <div class="fx-section-title"><span data-i18n="tube">胆机模拟</span></div>
+          <div class="fx-section-title"><span data-i18n="tube">胆机模拟</span><label class="switch"><input type="checkbox" id="fxTube"></label></div>
           <div class="param"><label data-i18n="drive">驱动</label><input type="range" id="tubeDrive" min="0" max="100" value="30" step="1"><span id="tubeDriveVal">0.30</span></div>
         </div>
 
         <div class="fx-section" id="reverbParams">
-          <div class="fx-section-title"><span data-i18n="reverb">混响</span></div>
+          <div class="fx-section-title"><span data-i18n="reverb">混响</span><label class="switch"><input type="checkbox" id="fxReverb"></label></div>
           <div class="param"><label data-i18n="reverbTime">混响时间</label><input type="range" id="revTime" min="10" max="500" value="260" step="1"><span id="revTimeVal">2.60 s</span></div>
           <div class="param"><label data-i18n="damping">高频阻尼</label><input type="range" id="revDamping" min="0" max="100" value="55" step="1"><span id="revDampingVal">0.55</span></div>
           <div class="param"><label data-i18n="wet">湿声比例</label><input type="range" id="revWet" min="0" max="100" value="32" step="1"><span id="revWetVal">0.32</span></div>
@@ -234,8 +230,8 @@
 
         <div class="fx-section" id="irsSection">
           <div class="fx-section-title">
-            <span data-i18n="irsSection">IRS 空间音效</span>
-            <label class="switch"><input type="checkbox" id="fxIR"><span data-i18n="enable">启用</span></label>
+            <span data-i18n="irsSection">空间音效</span>
+            <label class="switch"><input type="checkbox" id="fxIR"></label>
           </div>
           <div class="ir-actions">
             <button class="mini-btn lg-button" id="loadIRBtn"><svg class="icon icon-sm"><use href="#icon-folder"></use></svg><span data-i18n="loadPulse">加载脉冲</span></button>
@@ -252,14 +248,16 @@
         </div>
 
         <div class="fx-section" id="noiseGateParams">
-          <div class="fx-section-title"><span data-i18n="noiseGate">降噪</span></div>
+          <div class="fx-section-title"><span data-i18n="noiseGate">降噪</span><label class="switch"><input type="checkbox" id="fxNoiseGate"></label></div>
           <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="gateThreshold" min="-80" max="-20" value="-52" step="1"><span id="gateThresholdVal">-52 dB</span></div>
           <div class="param"><label data-i18n="release">释放</label><input type="range" id="gateRelease" min="20" max="500" value="180" step="5"><span id="gateReleaseVal">180 ms</span></div>
         </div>
 
         <div class="fx-section" id="limiterParams">
-          <div class="fx-section-title"><span data-i18n="limiter">限幅</span></div>
+          <div class="fx-section-title"><span data-i18n="limiter">限幅</span><label class="switch"><input type="checkbox" id="fxLimiter"></label></div>
           <div class="param"><label data-i18n="ceiling">上限</label><input type="range" id="limiterCeiling" min="-12" max="0" value="-1" step="0.5"><span id="limiterCeilingVal">-1.0 dB</span></div>
+          <div class="param"><label data-i18n="lookahead">前瞻</label><input type="range" id="limiterLookahead" min="0.5" max="10" value="2" step="0.5"><span id="limiterLookaheadVal">2.0 ms</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="limiterRelease" min="10" max="500" value="60" step="5"><span id="limiterReleaseVal">60 ms</span></div>
         </div>
       </div>
       </div>
@@ -296,7 +294,6 @@
     <div class="player-right">
       <button class="round-btn lg-button" id="muteBtn" title="静音"><svg class="icon"><use id="muteBtnIcon" href="#icon-volume"></use></svg></button>
       <input type="range" id="volume" min="0" max="100" value="80" step="1">
-      <button class="round-btn lg-button" id="lyricsBtn" title="桌面歌词"><svg class="icon"><use href="#icon-lyrics"></use></svg></button>
       <button class="round-btn lg-button" id="effectsBtn" title="实时音效"><svg class="icon"><use href="#icon-effects"></use></svg></button>
       <button class="round-btn lg-button" id="settingsBtn" title="设置"><svg class="icon"><use href="#icon-settings"></use></svg></button>
     </div>
@@ -371,8 +368,8 @@
     </div>
   </div>
 
-  <div id="lyricsLine" hidden></div>
   <script src="glass-motion.js"></script>
+  <script src="dsp-host.js"></script>
   <script src="ir-generator.js"></script>
   <script src="renderer.js"></script>
 </body>

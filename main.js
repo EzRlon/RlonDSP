@@ -156,7 +156,11 @@ function createMainWindow() {
     title: 'RlonDSP',
     show: false,
     frame: false,
-    backgroundColor: '#0f1115',
+    /* 窗口四角做成圆角：无边框窗口在 Windows 上不会自动圆角，
+       所以把窗口底做成“透明的”，由界面自己用圆角把整块内容裁出来。
+       底色的 alpha 必须是 0，否则圆角外面会露出这块底色。 */
+    transparent: true,
+    backgroundColor: '#00000000',
     autoHideMenuBar: true,
     icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {

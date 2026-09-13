@@ -57,6 +57,46 @@ body {
   transition: background 0.3s var(--ease), color 0.3s var(--ease);
 }
 
+/* 最底层背景：当前歌曲的专辑封面。
+   封面放在所有背景层的最下面，上面再叠原本的渐变色；
+   柔化由 .lg-app-bg::before 的高斯模糊完成（见 glass-components.css），
+   形成类似系统状态栏/控制中心那种「毛玻璃底」。
+   --app-cover 由渲染进程在切歌时写入；没有封面时为 none，自动回退到渐变。 */
+body {
+  background-image:
+    var(--app-cover, none),
+    radial-gradient(circle at 16% 0%, rgba(76, 125, 255, 0.24), transparent 36%),
+    radial-gradient(circle at 86% 14%, rgba(122, 92, 255, 0.20), transparent 32%),
+    linear-gradient(160deg, var(--bg), var(--bg));
+  background-size: cover, auto, auto, auto;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* ===== 窗口圆角 =====
+   窗口是无边框 + 透明的，四个圆角由这里裁出来：
+   body 撑满整扇窗口，加圆角后把里面的所有内容（标题栏、频谱区、播放栏）
+   一起裁成圆角矩形。半径取 12px，是克制的「小圆角」，不夸张。
+   html 必须保持透明；用一层全透明的渐变挡住浏览器的「背景向上传递」规则，
+   否则底色会铺满整扇窗口，四个角又会变回直角。
+   窗口最大化时铺满整块屏幕，四角必须恢复直角，否则屏幕边角会露出缺口。 */
+html {
+  background: transparent;
+  background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
+}
+
+body {
+  position: relative;
+  border-radius: 12px;
+  background-clip: padding-box;
+}
+
+html.is-maximized body { border-radius: 0; }
+
+/* 迷你播放器更小，圆角跟着收一点，免得看起来像药丸 */
+body.mini-mode { border-radius: 10px; }
+
 button, input, select {
   font-family: inherit;
   color: inherit;
@@ -72,7 +112,10 @@ button { border: 0; cursor: pointer; background: transparent; }
   gap: 14px;
   padding: 14px;
   position: relative;
-  z-index: 1;
+  /* 弹窗（设置 / 实时音效 / 脉冲反馈 / 关于）挂在这一层里。
+     这里必须高于底部播放栏，否则弹窗底部会被播放栏盖住，
+     出现「滚到底部时卡片显示不完整」的问题。 */
+  z-index: 2;
 }
 
 .titlebar {
@@ -89,7 +132,8 @@ button { border: 0; cursor: pointer; background: transparent; }
   box-shadow: none;
   -webkit-app-region: drag;
   position: relative;
-  z-index: 2;
+  /* 标题栏（含窗口按钮）保持最上层，弹窗打开时仍可操作窗口 */
+  z-index: 3;
   user-select: none;
 }
 
@@ -229,24 +273,43 @@ button { border: 0; cursor: pointer; background: transparent; }
 .full-select { width: 100%; }
 .compact-select { min-width: 108px; }
 
+/* 下拉选项弹层由浏览器绘制，背景色不一定跟随页面主题。
+   必须显式指定底色与文字色，否则深色主题下会出现「浅字浅底」看不清的问题。 */
+select option {
+  background: #ffffff;
+  color: #1d222c;
+}
+[data-theme="dark"] select option {
+  background: #22242b;
+  color: #f1f4fa;
+}
+
 .track-list {
   list-style: none;
   margin: 0;
-  padding: 0 10px 14px;
+  /* 左右不留内边距：让每条歌曲记录铺满整行，不再缩成一张小圆角卡片 */
+  padding: 0 0 14px;
   overflow-y: auto;
   flex: 1;
+  /* 这一层不要再铺自己的白底（原先跟着 .lg-content 叠了第二层白色）。
+     播列表本来就挂在左栏那层毛玻璃上，多叠一层白会把整个左栏洗白，
+     背后的专辑封面颜色就透不过来，并且列表区和上方工具栏之间会出现
+     一条深浅分界。去掉白底和描边后，左栏上下一致，封面颜色正常透出。 */
+  background: transparent;
+  border-color: transparent;
 }
 
 .track-item {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 9px;
-  border-radius: 11px;
+  padding: 9px 14px;
+  /* 去掉圆角与外边距，条目直接铺满；用细分隔线代替圆角带来的分界感 */
+  border-radius: 0;
   cursor: pointer;
-  margin-bottom: 2px;
   transition: background 0.18s var(--ease);
 }
+.track-item + .track-item { border-top: 1px solid var(--line); }
 .track-item:hover { background: var(--hover); }
 .track-item.active { background: var(--accent-soft); }
 .track-item.active .track-title { color: var(--accent); }
@@ -399,8 +462,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
 .player-bar {
   height: 82px;
   flex: none;
-  margin: 0 14px 14px;
-  border-radius: 18px;
+  /* 通栏贴底：播放栏自己占满整条底部，四周不再留缝。
+     之前这里留了 14px 外边距，卡片四周会露出一圈比卡片更深的底色，
+     在整块界面里看就是底部一条突兀的深色带，因此改为通栏。
+     窗口本身的 12px 圆角会把这条底栏的两个下角一起收圆。 */
+  margin: 0;
+  border-radius: 0;
   display: grid;
   grid-template-columns: 1fr 2fr 1fr;
   align-items: center;
@@ -556,6 +623,61 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
 .fx-section .ir-actions,
 .fx-section .preset-actions { gap: 6px; }
 
+/* 实时音效面板：每个功能区块之间补一条可见的分割线。
+   原先各区块只有一层近乎透明的白色描边，浅色背景下几乎看不见，
+   区块之间糊在一起；这里在间距中间补一条实色细线作为区隔。 */
+.fx-section + .fx-section { position: relative; }
+.fx-section + .fx-section::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: -5px;
+  height: 1px;
+  background: var(--lg-content-border);
+  pointer-events: none;
+}
+
+/* 预设条目：每一行都是一张卡片 —— 名称 + 保存/重命名/删除 + 最右侧开关 */
+.preset-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 右侧不留内边距：开关与上方各模块标题栏的开关对齐到同一条竖线 */
+  padding: 7px 0 7px 10px;
+  border-radius: var(--lg-radius-sm);
+  background: var(--lg-bg-content);
+  border: 1px solid var(--lg-content-border);
+}
+.preset-row--new { margin-top: 6px; }
+.preset-name-input {
+  flex: 0 1 168px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+  color: var(--text);
+  font-size: 11.5px;
+}
+.preset-row-actions { display: flex; gap: 6px; }
+/* 开关统一用标准尺寸，并与上方各模块标题栏的开关落在同一条竖线上 */
+.preset-row .switch { margin-left: auto; }
+
+/* 脉冲列表的就地重命名输入框 */
+.pulse-name .pulse-name-input {
+  width: 100%;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+  color: var(--text);
+  font-size: 11px;
+}
+
 .player-center { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
 .transport { display: flex; align-items: center; gap: 13px; }
 .round-btn {
@@ -598,15 +720,37 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 .settings-modal {
+  /* 保持 fixed（铺满整扇窗口，连底部播放栏一起压暗）。
+     因为 fixed 层不受 body 圆角裁剪，这里把遮罩自身也做成同样的圆角，
+     它的弧线正好和窗口四角重合，就不会把圆角盖成直角。 */
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.26);
+  border-radius: 12px;
+  overflow: hidden;
+  /* 弹窗底层遮罩：半透明 + 高斯模糊，让背后内容虚化以突出弹窗本身。
+     底色跟随主题（浅色用白色薄雾，深色用黑色压暗），不影响主题切换。 */
+  background: var(--modal-scrim);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 40;
 }
 .settings-modal[hidden] { display: none; }
+
+/* 最大化时窗口是直角，遮罩也要跟着变直角，否则四角会露出没被压暗的缺口 */
+html.is-maximized .settings-modal { border-radius: 0; }
+
+/* 遮罩底色跟随主题 */
+:root { --modal-scrim: rgba(255, 255, 255, 0.22); }
+[data-theme="dark"] { --modal-scrim: rgba(0, 0, 0, 0.44); }
+
+/* 浏览器不支持背景模糊时，靠底色本身保证弹窗依然清晰可辨 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --modal-scrim: rgba(255, 255, 255, 0.72); }
+  [data-theme="dark"] { --modal-scrim: rgba(0, 0, 0, 0.74); }
+}
 
 .modal-card {
   width: 400px;
@@ -659,6 +803,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
 .about-label { font-weight: 700; margin-bottom: 6px; }
 .about-link { color: var(--accent); word-break: break-all; }
 .about-upstream-note { margin-top: 6px; color: var(--muted); line-height: 1.6; }
+.about-upstream-note > div { margin: 4px 0; }
+.about-upstream-note .about-list-item { padding-left: 10px; }
 .about-deps div { margin: 4px 0; color: var(--muted); line-height: 1.5; }
 .about-license div { color: var(--muted); line-height: 1.5; }
 .about-thanks { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); }
@@ -963,7 +1109,8 @@ body.mini-mode .toast { bottom: 6px; }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 9px;
+  /* 右侧不留内边距：让条目里的开关与上方各模块标题栏的开关落在同一条竖线上 */
+  padding: 7px 0 7px 9px;
   border-radius: 10px;
   background: var(--lg-micro-bg);
   border: 1px solid var(--lg-micro-border);
@@ -983,10 +1130,19 @@ body.mini-mode .toast { bottom: 6px; }
   text-overflow: ellipsis;
 }
 
-.pulse-item .pulse-time {
-  font-size: 10px;
-  color: var(--muted);
+/* 开关固定在最右侧：重命名、删除排在它左边 */
+.pulse-item .switch { margin-left: auto; flex: none; }
+
+/* 外部加载标识：跟在脉冲名称后面 */
+.pulse-item .pulse-badge {
   flex: none;
+  font-size: 9px;
+  line-height: 1.7;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
 }
 
 .pulse-item button {
@@ -998,4 +1154,44 @@ body.mini-mode .toast { bottom: 6px; }
   border: 1px solid var(--lg-light-border);
   color: var(--text);
   font-size: 10px;
+}
+
+/* ==========================================================================
+   播放列表与频谱展示区：改为平铺布局
+   这两个功能区原先被做成了「悬浮卡片」，四周和中间共有 14 像素留白，
+   底部还带圆角。这里去掉留白与圆角，让它们贴合窗口边缘、自上而下铺满，
+   两块之间只用一条细分隔线区分。
+   ========================================================================== */
+.app-shell {
+  gap: 0;
+  padding: 0;
+}
+
+.app-shell > .sidebar,
+.app-shell > .main-panel {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* 左侧播放列表：右侧留一条分隔线，其余三边贴边 */
+.app-shell > .sidebar {
+  border-width: 0 1px 0 0;
+  /* 与中间频谱展示区保持同样的材质观感：
+     两边底色其实相同，但展示区内部有一层很淡的紫蓝渐变，
+     播放列表原先只有纯色底，看起来就是一块死白。这里补上同样的渐变。 */
+  background-image:
+    radial-gradient(900px 320px at 6% -10%, rgba(76, 125, 255, 0.10), transparent 62%),
+    radial-gradient(720px 300px at 100% 4%, rgba(122, 92, 255, 0.10), transparent 60%);
+  background-repeat: no-repeat;
+}
+
+[data-theme="dark"] .app-shell > .sidebar {
+  background-image:
+    radial-gradient(900px 320px at 6% -10%, rgba(76, 125, 255, 0.14), transparent 62%),
+    radial-gradient(720px 300px at 100% 4%, rgba(122, 92, 255, 0.14), transparent 60%);
+}
+
+/* 中间频谱展示区：四边都不需要描边 */
+.app-shell > .main-panel {
+  border-width: 0;
 }

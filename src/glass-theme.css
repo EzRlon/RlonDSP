@@ -32,7 +32,9 @@
   --lg-bg-overlay: rgba(255, 255, 255, 0.05);
   --lg-bg-panel: rgba(255, 255, 255, 0.27);
   --lg-bg-control: rgba(255, 255, 255, 0.23);
-  --lg-bg-content: rgba(255, 255, 255, 0.72);
+  /* 内容层：比面板层更实一点以保证文字可读，但不能太实，
+     否则歌曲列表会变成一块与周围玻璃脱节的白板。 */
+  --lg-bg-content: rgba(255, 255, 255, 0.52);
 
   /* Core glass: sidebar, primary navigation */
   --lg-core-bg: rgba(255, 255, 255, 0.14);
@@ -88,7 +90,7 @@
   --lg-bg-overlay: rgba(0, 0, 0, 0.10);
   --lg-bg-panel: rgba(20, 20, 20, 0.34);
   --lg-bg-control: rgba(20, 20, 20, 0.30);
-  --lg-bg-content: rgba(25, 29, 38, 0.88);
+  --lg-bg-content: rgba(25, 29, 38, 0.68);
 
   --lg-core-bg: rgba(20, 20, 20, 0.42);
   --lg-core-border: rgba(255, 255, 255, 0.16);

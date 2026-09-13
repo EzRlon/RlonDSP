@@ -258,7 +258,8 @@ class RlonDSPDSP extends AudioWorkletProcessor {
   constructor() {
     super();
     this.fs = sampleRate || 48000;
-    this.eqFreqs = [60, 120, 250, 500, 1000, 2000, 4000, 8000, 12000, 16000];
+    // 均衡器频点（ISO 八度系列，31 Hz ~ 16 kHz，共 10 段）
+    this.eqFreqs = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
     this.eqL = this.eqFreqs.map(() => new Biquad());
     this.eqR = this.eqFreqs.map(() => new Biquad());
     this.bassL = new Biquad();
@@ -270,6 +271,28 @@ class RlonDSPDSP extends AudioWorkletProcessor {
     this.reverb = new FDNReverb(this.fs);
     this.gate = new NoiseGate(this.fs);
     this.env = 0;
+    // 均衡器平滑状态（目标值 → 当前值逐块逼近，消除拖动爆音）
+    this.eqCurrent = null;
+    this.eqTarget = null;
+    // 限幅器前瞻缓冲
+    this.limLen = 0;
+    this.limPos = 0;
+    this.limBufL = null;
+    this.limBufR = null;
+    this.limGain = 1;
+    // 前瞻窗口最大值（单调队列，O(1) 均摊），保证增益覆盖延迟样点之后的峰值
+    this.limDqIdx = null;
+    this.limDqVal = null;
+    this.limDqHead = 0;
+    this.limDqTail = 0;
+    this.limAbs = 0;
+    this.builtins = null;
+    // 差分环绕：声道延迟环形缓冲（最大 30 ms）
+    this.cdSize = 0;
+    this.cdBufL = null;
+    this.cdBufR = null;
+    this.cdWrite = 0;
+    this.cdSamples = 0;
     this.params = this.defaultParams();
     this.applyParams(this.params);
     this.port.onmessage = (event) => {
@@ -303,7 +326,9 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       tube: { drive: 0.3 },
       reverb: { roomSize: 1, t60: 2.6, damping: 0.55, wet: 0.32, predelay: 0.02 },
       gate: { threshold: -52, releaseMs: 180 },
-      limiter: { ceilingDB: -1 }
+      limiter: { ceilingDB: -1, lookaheadMs: 2, releaseMs: 60 },
+      // 差分环绕：把一个声道整体延后，制造左右时间差（Haas 效应），影响人声定位
+      channelDelay: { enabled: false, channel: 'R', ms: 0 }
     };
   }
 
@@ -320,13 +345,24 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       tube: { ...this.defaultParams().tube, ...(p.tube || {}) },
       reverb: { ...this.defaultParams().reverb, ...(p.reverb || {}) },
       gate: { ...this.defaultParams().gate, ...(p.gate || {}) },
-      limiter: { ...this.defaultParams().limiter, ...(p.limiter || {}) }
+      limiter: { ...this.defaultParams().limiter, ...(p.limiter || {}) },
+      channelDelay: { ...this.defaultParams().channelDelay, ...(p.channelDelay || {}) }
     };
 
-    const eqGains = this.params.eqGains || new Array(10).fill(0);
-    for (let i = 0; i < this.eqFreqs.length; i++) {
-      this.eqL[i].setPeaking(this.eqFreqs[i], eqGains[i] || 0, this.fs);
-      this.eqR[i].setPeaking(this.eqFreqs[i], eqGains[i] || 0, this.fs);
+    // 内置引擎开关表：被第三方 Provider 接管的类型，内置引擎必须跳过，避免重复处理。
+    // 未提供时全部视为启用（与旧版行为一致）。
+    this.builtins = p.builtins ? { ...p.builtins } : null;
+
+    // 均衡器：目标增益与当前平滑增益分离，逐块向目标靠拢，避免拖动时产生爆音
+    const eqGains = this.params.eqGains || new Array(this.eqFreqs.length).fill(0);
+    this.eqTarget = this.eqFreqs.map((_, i) => Number(eqGains[i]) || 0);
+    if (!this.eqCurrent || this.eqCurrent.length !== this.eqTarget.length) {
+      // 首次加载直接生效，不做渐入
+      this.eqCurrent = this.eqTarget.slice();
+      for (let i = 0; i < this.eqFreqs.length; i++) {
+        this.eqL[i].setPeaking(this.eqFreqs[i], this.eqCurrent[i], this.fs);
+        this.eqR[i].setPeaking(this.eqFreqs[i], this.eqCurrent[i], this.fs);
+      }
     }
 
     const bassGain = this.params.enabled.bass ? this.params.bass.gainDB : 0;
@@ -348,6 +384,36 @@ class RlonDSPDSP extends AudioWorkletProcessor {
     this.surroundCross = 0.02 + (this.params.surround.roomSize || 1) * 0.08;
     this.tubeDrive = 1 + (this.params.tube.drive || 0) * 2;
     this.ceiling = Math.pow(10, (this.params.limiter.ceilingDB || -1) / 20);
+    // 限幅器：前瞻长度与释放系数
+    const lim = this.params.limiter;
+    const lookMs = Math.max(0.2, Math.min(20, Number(lim.lookaheadMs) || 2));
+    const lookSamples = Math.max(1, Math.round(this.fs * lookMs / 1000));
+    if (lookSamples !== this.limLen) {
+      this.limLen = lookSamples;
+      this.limBufL = new Float32Array(lookSamples);
+      this.limBufR = new Float32Array(lookSamples);
+      this.limPos = 0;
+      this.limDqIdx = new Int32Array(lookSamples + 2);
+      this.limDqVal = new Float32Array(lookSamples + 2);
+      this.limDqHead = 0;
+      this.limDqTail = 0;
+      this.limAbs = 0;
+      this.limGain = 1;
+    }
+    this.limReleaseCoef = 1 - Math.exp(-1 / (Math.max(5, Number(lim.releaseMs) || 60) * this.fs / 1000));
+
+    // 差分环绕：缓冲按最大 30 ms 分配，实际延迟由参数决定（0 ~ 30 ms）
+    const cd = this.params.channelDelay;
+    const cdMaxMs = 30;
+    const cdSize = Math.max(2, Math.round(this.fs * cdMaxMs / 1000) + 1);
+    if (this.cdSize !== cdSize) {
+      this.cdSize = cdSize;
+      this.cdBufL = new Float32Array(cdSize);
+      this.cdBufR = new Float32Array(cdSize);
+      this.cdWrite = 0;
+    }
+    const cdMs = Math.max(0, Math.min(cdMaxMs, Number(cd.ms) || 0));
+    this.cdSamples = Math.max(0, Math.min(cdSize - 1, Math.round(this.fs * cdMs / 1000)));
     this.reverb.setParams({
       enabled: this.params.enabled.reverb,
       roomSize: this.params.reverb.roomSize,
@@ -363,6 +429,15 @@ class RlonDSPDSP extends AudioWorkletProcessor {
     });
   }
 
+  /**
+   * 某个内置引擎当前是否应当执行。
+   * 被第三方 Provider 接管（DSP Host 判定）时返回 false，内置引擎必须跳过，
+   * 这就是「同一时刻同一种 DSP 只有一个执行者」在音频线程里的落地。
+   */
+  on(kind) {
+    return !this.builtins || this.builtins[kind] !== false;
+  }
+
   process(inputs, outputs) {
     const input = inputs[0];
     const output = outputs[0];
@@ -373,11 +448,25 @@ class RlonDSPDSP extends AudioWorkletProcessor {
     const outL = output[0];
     const outR = output.length > 1 ? output[1] : outL;
 
+    // 均衡器参数平滑：每块只更新有变化的那几段，向目标值逼近，避免拖动产生爆音
+    if (this.on('eq') && this.eqCurrent && this.eqTarget) {
+      for (let b = 0; b < this.eqFreqs.length; b++) {
+        const target = this.eqTarget[b];
+        let cur = this.eqCurrent[b];
+        if (cur === target) continue;
+        const delta = target - cur;
+        cur = Math.abs(delta) < 0.005 ? target : cur + delta * 0.25;
+        this.eqCurrent[b] = cur;
+        this.eqL[b].setPeaking(this.eqFreqs[b], cur, this.fs);
+        this.eqR[b].setPeaking(this.eqFreqs[b], cur, this.fs);
+      }
+    }
+
     for (let i = 0; i < n; i++) {
       let l = inL[i] || 0;
       let r = inR[i] || 0;
 
-      if (this.params.enabled.bass) {
+      if (this.on('bass') && this.params.enabled.bass) {
         l = this.bassL.process(l);
         r = this.bassR.process(r);
         if (this.bassDrive > 1.001) {
@@ -386,12 +475,14 @@ class RlonDSPDSP extends AudioWorkletProcessor {
         }
       }
 
-      for (let b = 0; b < this.eqFreqs.length; b++) {
-        l = this.eqL[b].process(l);
-        r = this.eqR[b].process(r);
+      if (this.on('eq')) {
+        for (let b = 0; b < this.eqFreqs.length; b++) {
+          l = this.eqL[b].process(l);
+          r = this.eqR[b].process(r);
+        }
       }
 
-      if (this.params.enabled.compressor) {
+      if (this.on('compressor') && this.params.enabled.compressor) {
         const level = Math.max(Math.abs(l), Math.abs(r));
         if (level > this.env) this.env += this.compAttackCoef * (level - this.env);
         else this.env += this.compReleaseCoef * (level - this.env);
@@ -408,30 +499,30 @@ class RlonDSPDSP extends AudioWorkletProcessor {
         r *= g;
       }
 
-      if (this.params.enabled.clarity) {
+      if (this.on('clarity') && this.params.enabled.clarity) {
         l = this.clarityL.process(l);
         r = this.clarityR.process(r);
       }
 
-      if (this.params.enabled.stereo) {
+      if (this.on('stereo') && this.params.enabled.stereo) {
         const mid = (l + r) * 0.5;
         const side = (l - r) * 0.5 * (1 + this.stereoWidth);
         l = mid + side;
         r = mid - side;
       }
 
-      if (this.params.enabled.surround) {
+      if (this.on('spatial') && this.params.enabled.surround) {
         const cross = this.surroundCross;
         l = l + (r - l) * cross;
         r = r + (l - r) * cross;
       }
 
-      if (this.params.enabled.tube) {
+      if (this.on('tube') && this.params.enabled.tube) {
         l = Math.tanh(l * this.tubeDrive);
         r = Math.tanh(r * this.tubeDrive);
       }
 
-      if (this.params.enabled.ultrasonic) {
+      if (this.on('ultrasonic') && this.params.enabled.ultrasonic) {
         l = this.ultraL.process(l);
         r = this.ultraR.process(r);
       }
@@ -440,12 +531,12 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       outR[i] = r;
     }
 
-    if (this.params.enabled.reverb) {
+      if (this.on('reverb') && this.params.enabled.reverb) {
       this.reverb.process(outL, outL, 0, n);
       this.reverb.process(outR, outR, 0, n);
     }
 
-    if (this.params.enabled.noiseGate) {
+      if (this.on('gate') && this.params.enabled.noiseGate) {
       for (let i = 0; i < n; i++) {
         const left = this.gate.processSample(outL[i], this.gate.envL, this.gate.gainL);
         this.gate.envL = left.env;
@@ -459,12 +550,93 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       }
     }
 
+    // 差分环绕（Haas 效应）：把选定声道整体延后，制造左右时间差。
+    // 先发声的一侧被优先感知，因此人声定位会偏向未延迟的那一侧。
+    if (this.on('channel-delay') && this.cdBufL && this.cdBufR) {
+      const cd = this.params.channelDelay;
+      const delayRight = cd.channel !== 'L';
+      const buf = delayRight ? this.cdBufR : this.cdBufL;
+      const target = delayRight ? outR : outL;
+      const size = this.cdSize;
+      const delaySamples = this.cdSamples;
+      const active = cd.enabled && delaySamples > 0;
+      let w = this.cdWrite;
+      for (let i = 0; i < n; i++) {
+        const dry = target[i];
+        buf[w] = dry;
+        if (active) {
+          let rp = w - delaySamples;
+          if (rp < 0) rp += size;
+          target[i] = buf[rp];
+        }
+        w++;
+        if (w >= size) w = 0;
+      }
+      this.cdWrite = w;
+    }
+
+    const masterGain = this.on('gain') ? this.masterGain : 1;
+    // 限幅器升级：前瞻 + 立体声联动 + 峰值保护
+    // 侧链读取「当前样点」，主通路延迟一小段；增益因此在峰值抵达输出之前就已压下，
+    // 正常情况不会削波，只有极端情况才由末尾的峰值保护兜底。
+    const limActive = this.on('limiter') && this.params.enabled.limiter && this.limLen > 0;
+
     for (let i = 0; i < n; i++) {
-      let l = outL[i] * this.masterGain;
-      let r = outR[i] * this.masterGain;
-      if (this.params.enabled.limiter) {
-        l = Math.max(-this.ceiling, Math.min(this.ceiling, l));
-        r = Math.max(-this.ceiling, Math.min(this.ceiling, r));
+      let l = outL[i] * masterGain;
+      let r = outR[i] * masterGain;
+
+      if (limActive) {
+        // 1) 立体声联动：用左右声道的较大值作为本样点的峰值
+        const peak = Math.max(Math.abs(l), Math.abs(r));
+
+        // 2) 维护「前瞻窗口最大值」：窗口覆盖最近 limLen 个样点。
+        //    输出样点比输入晚 limLen 个样点，因此该窗口对输出而言包含其“未来”，
+        //    增益据此计算，必然覆盖即将到来的峰值 —— 不需要靠削波兜底。
+        const abs = this.limAbs++;
+        const dqIdx = this.limDqIdx;
+        const dqVal = this.limDqVal;
+        let head = this.limDqHead;
+        let tail = this.limDqTail;
+        while (tail > head && dqVal[tail - 1] <= peak) tail--;
+        if (tail >= dqIdx.length) {
+          // 压缩有效区间，避免队列指针跑出数组
+          const live = tail - head;
+          for (let k = 0; k < live; k++) {
+            dqIdx[k] = dqIdx[head + k];
+            dqVal[k] = dqVal[head + k];
+          }
+          head = 0;
+          tail = live;
+        }
+        dqIdx[tail] = abs;
+        dqVal[tail] = peak;
+        tail++;
+        // 窗口保持 limLen + 1 个样点：必须把延迟后的那个样点本身也覆盖进去
+        while (head < tail && abs - dqIdx[head] > this.limLen) head++;
+        const windowMax = dqVal[head];
+        this.limDqHead = head;
+        this.limDqTail = tail;
+
+        // 3) 目标增益：瞬时压下、缓慢释放（释放慢于前瞻长度，保证峰值经过时仍处于压低状态）
+        const need = windowMax > this.ceiling ? this.ceiling / windowMax : 1;
+        if (need < this.limGain) this.limGain = need;
+        else this.limGain += this.limReleaseCoef * (need - this.limGain);
+        const limGain = this.limGain;
+
+        const delayedL = this.limBufL[this.limPos];
+        const delayedR = this.limBufR[this.limPos];
+        this.limBufL[this.limPos] = l;
+        this.limBufR[this.limPos] = r;
+        this.limPos = (this.limPos + 1) % this.limLen;
+
+        l = delayedL * limGain;
+        r = delayedR * limGain;
+
+        // 峰值保护：无论如何都不允许越过上限
+        if (l > this.ceiling) l = this.ceiling;
+        else if (l < -this.ceiling) l = -this.ceiling;
+        if (r > this.ceiling) r = this.ceiling;
+        else if (r < -this.ceiling) r = -this.ceiling;
       } else {
         l = Math.max(-1, Math.min(1, l));
         r = Math.max(-1, Math.min(1, r));

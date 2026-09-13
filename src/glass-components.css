@@ -127,7 +127,10 @@
   border: 1px solid var(--lg-control-border);
   backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
   -webkit-backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
-  box-shadow: var(--lg-control-shadow), var(--lg-highlight);
+  /* 底部播放栏下方只有十几像素留白，任何外投影都会被窗口下沿硬切，
+     在卡片底下留出一条灰带。这里直接不给外投影，只保留顶部那一道
+     内高光，卡片靠边框和玻璃底自己立起来。 */
+  box-shadow: var(--lg-highlight);
   border-radius: var(--lg-radius-md);
 }
 
@@ -199,9 +202,9 @@
 }
 
 @keyframes lg-player-pulse {
-  0% { box-shadow: var(--lg-control-shadow), 0 0 0 1px rgba(255, 255, 255, 0.14); }
+  0% { box-shadow: var(--lg-highlight), 0 0 0 1px rgba(255, 255, 255, 0.14); }
   45% { box-shadow: 0 0 28px rgba(110, 140, 255, 0.26), var(--lg-highlight); }
-  100% { box-shadow: var(--lg-control-shadow), var(--lg-highlight); }
+  100% { box-shadow: var(--lg-highlight); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -221,12 +224,16 @@
 
 .lg-app-bg::before {
   content: "";
-  position: fixed;
+  /* 与弹窗同理：改成相对于 body 定位，才会跟着窗口圆角一起被裁掉，
+     否则这层毛玻璃底会在四个角上留下方块。 */
+  position: absolute;
   inset: 0;
   pointer-events: none;
   background: var(--lg-bg-overlay);
-  backdrop-filter: blur(2px) saturate(1.05);
-  -webkit-backdrop-filter: blur(2px) saturate(1.05);
+  /* 高斯模糊：把底层的专辑封面柔化成毛玻璃底（类似系统状态栏/控制中心的效果）。
+     模糊的是「后面画的东西」，因此只影响背景，不会让前景界面发虚。 */
+  backdrop-filter: blur(60px) saturate(1.6);
+  -webkit-backdrop-filter: blur(60px) saturate(1.6);
   z-index: 0;
   transition: filter var(--lg-duration) var(--lg-ease),
     background var(--lg-duration) var(--lg-ease);
@@ -333,35 +340,68 @@
   padding: 12px;
 }
 
+/* ==========================================================================
+   降级处理：统一改「玻璃令牌」，而不是逐个元素压成实色。
+
+   早期写法是给 .lg-* 元素直接套一层不透明底色，结果只有走 .lg-* 的表面被降级，
+   而 .viz-card、.track-list 这类直接引用令牌的表面没有跟着变，
+   于是出现「左边死白、右边还是通透玻璃」的两副面孔。
+   改为只覆盖令牌后，所有表面必定同步变化，观感始终一致。
+   ========================================================================== */
+
+/* 环境根本不支持背景模糊：只能靠不透明度撑住观感 */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .lg-surface,
-  .lg-button,
-  .lg-navbar,
-  .lg-sidebar,
-  .lg-modal,
-  .lg-menu,
-  .lg-fab,
-  .lg-player-bar,
-  .lg-toast {
-    background: var(--lg-fallback-bg);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+  :root {
+    --lg-bg: rgba(255, 255, 255, 0.88);
+    --lg-bg-panel: rgba(255, 255, 255, 0.90);
+    --lg-bg-control: rgba(255, 255, 255, 0.90);
+    --lg-core-bg: rgba(255, 255, 255, 0.90);
+    --lg-control-bg: rgba(255, 255, 255, 0.90);
+    --lg-strong-bg: rgba(255, 255, 255, 0.94);
+    --lg-light-bg: rgba(255, 255, 255, 0.80);
+    --lg-micro-bg: rgba(255, 255, 255, 0.82);
+    --lg-bg-content: rgba(255, 255, 255, 0.84);
+    --lg-blur: 0px;
+    --lg-core-blur: 0px;
+    --lg-control-blur: 0px;
+  }
+  [data-theme="dark"] {
+    --lg-bg: rgba(22, 25, 32, 0.92);
+    --lg-bg-panel: rgba(22, 25, 32, 0.94);
+    --lg-bg-control: rgba(22, 25, 32, 0.94);
+    --lg-core-bg: rgba(22, 25, 32, 0.94);
+    --lg-control-bg: rgba(22, 25, 32, 0.94);
+    --lg-strong-bg: rgba(22, 25, 32, 0.96);
+    --lg-light-bg: rgba(255, 255, 255, 0.10);
+    --lg-micro-bg: rgba(255, 255, 255, 0.09);
+    --lg-bg-content: rgba(25, 29, 38, 0.88);
   }
 }
 
+/* 系统开启「减少透明效果」：保留玻璃质感（模糊仍在），整体提高不透明度。
+   只动令牌，因此左侧播放列表与右侧频谱卡片一定同步，不会再出现死白块。 */
 @media (prefers-reduced-transparency: reduce) {
-  .lg-surface,
-  .lg-button,
-  .lg-navbar,
-  .lg-sidebar,
-  .lg-modal,
-  .lg-menu,
-  .lg-fab,
-  .lg-player-bar,
-  .lg-toast {
-    background: var(--lg-fallback-bg);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+  :root {
+    --lg-bg: rgba(255, 255, 255, 0.44);
+    --lg-bg-panel: rgba(255, 255, 255, 0.52);
+    --lg-bg-control: rgba(255, 255, 255, 0.50);
+    --lg-core-bg: rgba(255, 255, 255, 0.48);
+    --lg-control-bg: rgba(255, 255, 255, 0.48);
+    --lg-strong-bg: rgba(255, 255, 255, 0.82);
+    --lg-light-bg: rgba(255, 255, 255, 0.34);
+    --lg-micro-bg: rgba(255, 255, 255, 0.30);
+    --lg-bg-content: rgba(255, 255, 255, 0.62);
+  }
+  [data-theme="dark"] {
+    --lg-bg: rgba(22, 25, 32, 0.60);
+    --lg-bg-panel: rgba(22, 25, 32, 0.66);
+    --lg-bg-control: rgba(22, 25, 32, 0.64);
+    --lg-core-bg: rgba(22, 25, 32, 0.64);
+    --lg-control-bg: rgba(22, 25, 32, 0.64);
+    --lg-strong-bg: rgba(22, 25, 32, 0.88);
+    --lg-light-bg: rgba(255, 255, 255, 0.10);
+    --lg-micro-bg: rgba(255, 255, 255, 0.08);
+    --lg-bg-content: rgba(25, 29, 38, 0.78);
   }
 }
 
