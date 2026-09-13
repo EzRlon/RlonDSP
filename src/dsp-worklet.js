@@ -98,6 +98,22 @@ class Biquad {
     this.y1 = out;
     return out;
   }
+
+  /** 带通（RBJ）：用于去齿音与动态 EQ 的检测频段 */
+  setBandpass(freq, fs, q = 1.2) {
+    const w0 = 2 * Math.PI * Math.min(fs * 0.45, Math.max(20, freq)) / fs;
+    const cos = Math.cos(w0);
+    const sin = Math.sin(w0);
+    const alpha = sin / (2 * Math.max(0.1, q));
+    const a0 = 1 + alpha;
+    this.setCoefficients(
+      alpha / a0,
+      0,
+      -alpha / a0,
+      -2 * cos / a0,
+      (1 - alpha) / a0
+    );
+  }
 }
 
 class FDNReverb {
@@ -263,6 +279,25 @@ function clampNum(v, lo, hi, fallback) {
   return n;
 }
 
+/* ===== 包络跟随器：扩展器 / 瞬态整形 / 去齿音 / 动态 EQ 共用 =====
+   一次攻击时间、一次释放时间，输入取绝对值，输出 0~1 的包络。 */
+class EnvelopeFollower {
+  constructor() {
+    this.env = 0;
+    this.aCoef = 0.5;
+    this.rCoef = 0.01;
+  }
+  setTimes(fs, attackMs, releaseMs) {
+    this.aCoef = 1 - Math.exp(-1 / (Math.max(0.1, attackMs) * fs / 1000));
+    this.rCoef = 1 - Math.exp(-1 / (Math.max(1, releaseMs) * fs / 1000));
+  }
+  step(x) {
+    const v = Math.abs(Number.isFinite(x) ? x : 0);
+    this.env += (v > this.env ? this.aCoef : this.rCoef) * (v - this.env);
+    return this.env;
+  }
+}
+
 /* ===== 延迟线：延迟 / 合唱 / 镶边 三段效果共用的一套基础设施 =====
    环形缓冲 + 线性插值读取，可以读「小数个样点之前」的值 —— 调制类
    效果（合唱、镶边）必须要这个能力。
@@ -348,6 +383,34 @@ class RlonDSPDSP extends AudioWorkletProcessor {
     this.flR = null;
     this.modPhase = 0;
     this.modPhase2 = 0.5;
+    // 扩展器 / 瞬态整形 / 去齿音 / 动态 EQ / 多段压缩
+    this.fol = null;
+    this.expEnvL = null;
+    this.expEnvR = null;
+    this.expGainL = 1;
+    this.expGainR = 1;
+    this.trFastL = null;
+    this.trFastR = null;
+    this.trSlowL = null;
+    this.trSlowR = null;
+    this.dsBandL = new Biquad();
+    this.dsBandR = new Biquad();
+    this.dsEnvL = null;
+    this.dsEnvR = null;
+    this.dsGain = 1;
+    this.dqDetL = new Biquad();
+    this.dqDetR = new Biquad();
+    this.dqL = new Biquad();
+    this.dqR = new Biquad();
+    this.dqEnvL = null;
+    this.dqEnvR = null;
+    this.dqCurrent = 0;
+    this.mbLowL = new Biquad();
+    this.mbLowR = new Biquad();
+    this.mbMidL = new Biquad();
+    this.mbMidR = new Biquad();
+    this.mbEnv = null;
+    this.mbGain = [1, 1, 1];
     this.params = this.defaultParams();
     this.applyParams(this.params);
     this.port.onmessage = (event) => {
@@ -374,7 +437,12 @@ class RlonDSPDSP extends AudioWorkletProcessor {
         delay: false,
         chorus: false,
         flanger: false,
-        clipper: false
+        clipper: false,
+        expander: false,
+        transient: false,
+        deesser: false,
+        dynEq: false,
+        mbComp: false
       },
       gainDB: 0,
       compressor: { thresholdDB: -24, ratio: 4, attackMs: 10, releaseMs: 120 },
@@ -389,13 +457,27 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       // 差分环绕：把一个声道整体延后，制造左右时间差（Haas 效应），影响人声定位
       channelDelay: { enabled: false, channel: 'R', ms: 0 },
       // 延迟 / 回声（可交叉反馈做乒乓）
-      delay: { enabled: false, timeMs: 320, feedback: 0.35, mix: 0.25, pingPong: false },
+      delay: { enabled: false, timeMs: 320, feedback: 0.35, mix: 0.25, pingPong: false, filterHz: 20000 },
       // 合唱：短延迟 + 缓慢调制，制造「多个人同时唱」的厚度
       chorus: { enabled: false, rateHz: 0.6, depthMs: 6, mix: 0.4, spread: 0.5 },
       // 镶边：更短的延迟 + 反馈，产生梳状滤波的扫频效果
       flanger: { enabled: false, rateHz: 0.25, depthMs: 3, mix: 0.45, feedback: 0.4 },
       // 削波 / 饱和：软削波（tanh）或硬削波
-      clipper: { enabled: false, drive: 2, mode: 'soft', outputDB: 0 }
+      clipper: { enabled: false, drive: 2, mode: 'soft', thresholdDB: -6, ceilingDB: 0, mix: 1, outputDB: 0 },
+      // 扩展器：低于阈值时按比例继续压低（噪声门的升级版，带比例）
+      expander: { enabled: false, threshold: -40, ratio: 2, attackMs: 5, releaseMs: 150, range: 24 },
+      // 瞬态整形：分别强调/削弱起音与延音
+      transient: { enabled: false, attack: 0.5, sustain: 0.5, mix: 1, outputDB: 0 },
+      // 去齿音：检测高频齿音频段并整体衰减
+      deesser: { enabled: false, freq: 6000, threshold: -24, range: 12, attackMs: 1, releaseMs: 60 },
+      // 动态 EQ：某个频段的增益随该频段电平变化
+      dynEq: { enabled: false, freq: 200, q: 1.2, gainDB: -6, threshold: -30, range: 12, attackMs: 10, releaseMs: 150 },
+      // 多段压缩：低 / 中 / 高三个频段共用一组压缩参数，各自带增益补偿
+      mbComp: {
+        enabled: false, lowXover: 200, highXover: 3000,
+        lowGainDB: 0, midGainDB: 0, highGainDB: 0,
+        threshold: -20, ratio: 3, attackMs: 10, releaseMs: 120
+      }
     };
   }
 
@@ -417,7 +499,12 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       delay: { ...this.defaultParams().delay, ...(p.delay || {}) },
       chorus: { ...this.defaultParams().chorus, ...(p.chorus || {}) },
       flanger: { ...this.defaultParams().flanger, ...(p.flanger || {}) },
-      clipper: { ...this.defaultParams().clipper, ...(p.clipper || {}) }
+      clipper: { ...this.defaultParams().clipper, ...(p.clipper || {}) },
+      expander: { ...this.defaultParams().expander, ...(p.expander || {}) },
+      transient: { ...this.defaultParams().transient, ...(p.transient || {}) },
+      deesser: { ...this.defaultParams().deesser, ...(p.deesser || {}) },
+      dynEq: { ...this.defaultParams().dynEq, ...(p.dynEq || {}) },
+      mbComp: { ...this.defaultParams().mbComp, ...(p.mbComp || {}) }
     };
 
     // 内置引擎开关表：被第三方 Provider 接管的类型，内置引擎必须跳过，避免重复处理。
@@ -511,6 +598,17 @@ class RlonDSPDSP extends AudioWorkletProcessor {
     this.clipDrive = clampNum(clip.drive, 1, 12, 2);
     this.clipHard = clip.mode === 'hard';
     this.clipOut = Math.pow(10, clampNum(clip.outputDB, -24, 24, 0) / 20);
+    this.clipThresholdLin = Math.pow(10, clampNum(clip.thresholdDB, -24, 0, -6) / 20);
+    this.clipCeilingLin = Math.pow(10, clampNum(clip.ceilingDB, -12, 0, 0) / 20);
+    this.clipMix = clampNum(clip.mix, 0, 1, 1);
+    // 延迟反馈路径上的低通（阻尼）
+    this.delayFilterHz = clampNum(dl.filterHz, 1000, 20000, 20000);
+    if (!this.dlLpL) {
+      this.dlLpL = new Biquad();
+      this.dlLpR = new Biquad();
+    }
+    this.dlLpL.setLowpass(this.delayFilterHz, this.fs, 0.707);
+    this.dlLpR.setLowpass(this.delayFilterHz, this.fs, 0.707);
 
     if (!this.dlL) {
       // 一次性分配：延迟最长 1.2 s，合唱 60 ms，镶边 25 ms
@@ -520,6 +618,89 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       this.chR = new DelayLine(this.fs * 0.06);
       this.flL = new DelayLine(this.fs * 0.025);
       this.flR = new DelayLine(this.fs * 0.025);
+    }
+
+    // ---- 扩展器：低于阈值按比例继续压低，最多压到 range ----
+    const exp = this.params.expander;
+    this.expThresholdLin = Math.pow(10, clampNum(exp.threshold, -80, 0, -40) / 20);
+    this.expRatio = clampNum(exp.ratio, 1, 10, 2);
+    this.expRangeLin = Math.pow(10, -clampNum(exp.range, 0, 60, 24) / 20);
+    this.expAtkCoef = 1 - Math.exp(-1 / (clampNum(exp.attackMs, 0.1, 100, 5) * this.fs / 1000));
+    this.expRelCoef = 1 - Math.exp(-1 / (clampNum(exp.releaseMs, 5, 1000, 150) * this.fs / 1000));
+    this.expEnvL = this.follower('expL');
+    this.expEnvR = this.follower('expR');
+    this.expEnvL.setTimes(this.fs, clampNum(exp.attackMs, 0.1, 100, 5), clampNum(exp.releaseMs, 5, 1000, 150));
+    this.expEnvR.setTimes(this.fs, clampNum(exp.attackMs, 0.1, 100, 5), clampNum(exp.releaseMs, 5, 1000, 150));
+
+    // ---- 瞬态整形：快包络与慢包络之差 = 起音 / 延音 ----
+    const tr = this.params.transient;
+    this.trAttack = clampNum(tr.attack, 0, 1, 0.5);
+    this.trSustain = clampNum(tr.sustain, 0, 1, 0.5);
+    this.trMix = clampNum(tr.mix, 0, 1, 1);
+    this.trOutGain = Math.pow(10, clampNum(tr.outputDB, -24, 24, 0) / 20);
+    this.trFastL = this.follower('trFastL');
+    this.trFastR = this.follower('trFastR');
+    this.trSlowL = this.follower('trSlowL');
+    this.trSlowR = this.follower('trSlowR');
+    this.trFastL.setTimes(this.fs, 1, 40);
+    this.trFastR.setTimes(this.fs, 1, 40);
+    this.trSlowL.setTimes(this.fs, 40, 200);
+    this.trSlowR.setTimes(this.fs, 40, 200);
+
+    // ---- 去齿音：检测齿音频段，超过阈值就整体衰减 ----
+    const ds = this.params.deesser;
+    this.dsFreq = clampNum(ds.freq, 2000, 12000, 6000);
+    this.dsThresholdLin = Math.pow(10, clampNum(ds.threshold, -60, 0, -24) / 20);
+    this.dsRangeLin = Math.pow(10, -clampNum(ds.range, 0, 40, 12) / 20);
+    this.dsAtkCoef = 1 - Math.exp(-1 / (clampNum(ds.attackMs, 0.1, 50, 1) * this.fs / 1000));
+    this.dsRelCoef = 1 - Math.exp(-1 / (clampNum(ds.releaseMs, 5, 500, 60) * this.fs / 1000));
+    this.dsBandL.setBandpass(this.dsFreq, this.fs, 1.4);
+    this.dsBandR.setBandpass(this.dsFreq, this.fs, 1.4);
+    this.dsEnvL = this.follower('dsL');
+    this.dsEnvR = this.follower('dsR');
+    this.dsEnvL.setTimes(this.fs, clampNum(ds.attackMs, 0.1, 50, 1), clampNum(ds.releaseMs, 5, 500, 60));
+    this.dsEnvR.setTimes(this.fs, clampNum(ds.attackMs, 0.1, 50, 1), clampNum(ds.releaseMs, 5, 500, 60));
+
+    // ---- 动态 EQ：某个频段的增益随该频段电平变化 ----
+    const dq = this.params.dynEq;
+    this.dqFreq = clampNum(dq.freq, 40, 16000, 200);
+    this.dqQ = clampNum(dq.q, 0.3, 8, 1.2);
+    this.dqGainDB = clampNum(dq.gainDB, -18, 18, -6);
+    this.dqThresholdDB = clampNum(dq.threshold, -60, 0, -30);
+    this.dqRange = clampNum(dq.range, 0, 24, 12);
+    this.dqAtkCoef = 1 - Math.exp(-1 / (clampNum(dq.attackMs, 0.5, 200, 10) * this.fs / 1000));
+    this.dqRelCoef = 1 - Math.exp(-1 / (clampNum(dq.releaseMs, 5, 1000, 150) * this.fs / 1000));
+    this.dqDetL.setBandpass(this.dqFreq, this.fs, this.dqQ);
+    this.dqDetR.setBandpass(this.dqFreq, this.fs, this.dqQ);
+    this.dqL.setPeaking(this.dqFreq, 0, this.fs, this.dqQ);
+    this.dqR.setPeaking(this.dqFreq, 0, this.fs, this.dqQ);
+    this.dqEnvL = this.follower('dqL');
+    this.dqEnvR = this.follower('dqR');
+    this.dqEnvL.setTimes(this.fs, clampNum(dq.attackMs, 0.5, 200, 10), clampNum(dq.releaseMs, 5, 1000, 150));
+    this.dqEnvR.setTimes(this.fs, clampNum(dq.attackMs, 0.5, 200, 10), clampNum(dq.releaseMs, 5, 1000, 150));
+
+    // ---- 多段压缩：低 / 中 / 高互补分频 + 各自压缩 ----
+    const mb = this.params.mbComp;
+    this.mbLowXover = clampNum(mb.lowXover, 40, 800, 200);
+    this.mbHighXover = clampNum(mb.highXover, this.mbLowXover * 1.5, 12000, 3000);
+    this.mbThresholdLin = Math.pow(10, clampNum(mb.threshold, -60, 0, -20) / 20);
+    this.mbRatio = clampNum(mb.ratio, 1, 20, 3);
+    this.mbAtkCoef = 1 - Math.exp(-1 / (clampNum(mb.attackMs, 0.5, 200, 10) * this.fs / 1000));
+    this.mbRelCoef = 1 - Math.exp(-1 / (clampNum(mb.releaseMs, 5, 1000, 120) * this.fs / 1000));
+    this.mbTrim = [
+      Math.pow(10, clampNum(mb.lowGainDB, -24, 24, 0) / 20),
+      Math.pow(10, clampNum(mb.midGainDB, -24, 24, 0) / 20),
+      Math.pow(10, clampNum(mb.highGainDB, -24, 24, 0) / 20)
+    ];
+    this.mbLowL.setLowpass(this.mbLowXover, this.fs, 0.707);
+    this.mbLowR.setLowpass(this.mbLowXover, this.fs, 0.707);
+    this.mbMidL.setLowpass(this.mbHighXover, this.fs, 0.707);
+    this.mbMidR.setLowpass(this.mbHighXover, this.fs, 0.707);
+    if (!this.mbEnv) {
+      this.mbEnv = [new EnvelopeFollower(), new EnvelopeFollower(), new EnvelopeFollower()];
+    }
+    for (let b = 0; b < 3; b++) {
+      this.mbEnv[b].setTimes(this.fs, clampNum(mb.attackMs, 0.5, 200, 10), clampNum(mb.releaseMs, 5, 1000, 120));
     }
     this.reverb.setParams({
       enabled: this.params.enabled.reverb,
@@ -543,6 +724,13 @@ class RlonDSPDSP extends AudioWorkletProcessor {
    */
   on(kind) {
     return !this.builtins || this.builtins[kind] !== false;
+  }
+
+  /** 取（或首次创建）一个具名包络跟随器，避免在音频线程里反复分配 */
+  follower(name) {
+    if (!this.fol) this.fol = {};
+    if (!this.fol[name]) this.fol[name] = new EnvelopeFollower();
+    return this.fol[name];
   }
 
   process(inputs, outputs) {
@@ -637,15 +825,28 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       // 削波 / 饱和：驱动增益 + 软削波（tanh）或硬削波，再按输出增益补回电平
       if (this.on('clipper') && this.params.enabled.clipper) {
         const d = this.clipDrive;
-        if (this.clipHard) {
-          l = Math.max(-1, Math.min(1, l * d));
-          r = Math.max(-1, Math.min(1, r * d));
-        } else {
-          l = Math.tanh(l * d);
-          r = Math.tanh(r * d);
+        const thr = this.clipThresholdLin;
+        const ceil = this.clipCeilingLin;
+        const mix = this.clipMix;
+        const dryL = l;
+        const dryR = r;
+        if (Math.abs(l) > thr) {
+          const driven = l * d;
+          l = this.clipHard
+            ? Math.max(-ceil, Math.min(ceil, driven))
+            : Math.tanh(driven / ceil) * ceil;
+          l *= this.clipOut;
         }
-        l *= this.clipOut;
-        r *= this.clipOut;
+        if (Math.abs(r) > thr) {
+          const driven = r * d;
+          r = this.clipHard
+            ? Math.max(-ceil, Math.min(ceil, driven))
+            : Math.tanh(driven / ceil) * ceil;
+          r *= this.clipOut;
+        }
+        // 干湿比：0 = 完全不处理，1 = 全处理
+        l = dryL + (l - dryL) * mix;
+        r = dryR + (r - dryR) * mix;
       }
 
       outL[i] = l;
@@ -696,6 +897,168 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       this.cdWrite = w;
     }
 
+    // ---- 扩展器：低于阈值时按比例继续压低（立体声联动，最多压到 range）----
+    if (this.on('expander') && this.params.enabled.expander) {
+      const thr = this.expThresholdLin;
+      const ratio = this.expRatio;
+      const floorLin = this.expRangeLin;
+      const eL = this.expEnvL;
+      const eR = this.expEnvR;
+      let g = this.expGainL;
+      for (let i = 0; i < n; i++) {
+        const l = outL[i];
+        const r = outR[i];
+        const env = Math.max(eL.step(l), eR.step(r));
+        let target = 1;
+        if (env < thr) {
+          const below = Math.max(1e-6, env) / thr;
+          target = Math.pow(below, ratio - 1);
+          if (target < floorLin) target = floorLin;
+        }
+        const coef = target < g ? this.expAtkCoef : this.expRelCoef;
+        g += coef * (target - g);
+        outL[i] = l * g;
+        outR[i] = r * g;
+      }
+      this.expGainL = g;
+      this.expGainR = g;
+    }
+
+    // ---- 瞬态整形：快 / 慢包络之差决定起音与延音 ----
+    if (this.on('transient') && this.params.enabled.transient) {
+      const a = this.trAttack;
+      const s = this.trSustain;
+      const mix = this.trMix;
+      const outGain = this.trOutGain;
+      const fL = this.trFastL;
+      const fR = this.trFastR;
+      const sL = this.trSlowL;
+      const sR = this.trSlowR;
+      for (let i = 0; i < n; i++) {
+        const l = outL[i];
+        const r = outR[i];
+        const fast = Math.max(fL.step(l), fR.step(r));
+        const slow = Math.max(sL.step(l), sR.step(r));
+        const diff = fast - slow;
+        let gain = 1;
+        if (diff > 0) gain = 1 + a * Math.min(1, diff * 4) * 2.5;
+        else gain = 1 + s * Math.max(-1, diff * 4) * 0.6;
+        if (!Number.isFinite(gain)) gain = 1;
+        if (gain < 0.2) gain = 0.2;
+        if (gain > 4) gain = 4;
+        const applied = 1 + (gain - 1) * mix;
+        outL[i] = l * applied * outGain;
+        outR[i] = r * applied * outGain;
+      }
+    }
+
+    // ---- 去齿音：检测高频齿音频段，超过阈值就整体衰减 ----
+    if (this.on('deesser') && this.params.enabled.deesser) {
+      const thr = this.dsThresholdLin;
+      const floorLin = this.dsRangeLin;
+      const eL = this.dsEnvL;
+      const eR = this.dsEnvR;
+      let g = this.dsGain;
+      for (let i = 0; i < n; i++) {
+        const l = outL[i];
+        const r = outR[i];
+        const band = Math.max(eL.step(this.dsBandL.process(l)), eR.step(this.dsBandR.process(r)));
+        let target = 1;
+        if (band > thr) {
+          target = Math.max(floorLin, thr / band);
+        }
+        const coef = target < g ? this.dsAtkCoef : this.dsRelCoef;
+        g += coef * (target - g);
+        outL[i] = l * g;
+        outR[i] = r * g;
+      }
+      this.dsGain = g;
+    }
+
+    // ---- 动态 EQ：该频段超过阈值时按比例施加设定的增益 ----
+    if (this.on('dynEq') && this.params.enabled.dynEq) {
+      const eL = this.dqEnvL;
+      const eR = this.dqEnvR;
+      let current = this.dqCurrent;
+      let phase = 0;
+      for (let i = 0; i < n; i++) {
+        const l = outL[i];
+        const r = outR[i];
+        const level = Math.max(eL.step(this.dqDetL.process(l)), eR.step(this.dqDetR.process(r)));
+        const levelDb = 20 * Math.log10(Math.max(level, 1e-9));
+        let target = 0;
+        if (levelDb > this.dqThresholdDB) {
+          const over = Math.min(1, (levelDb - this.dqThresholdDB) / 12);
+          target = this.dqGainDB * over;
+        }
+        const coef = target < current ? this.dqAtkCoef : this.dqRelCoef;
+        current += coef * (target - current);
+        // 每 32 个样点更新一次滤波器系数：避免逐样点重算，同时保持听感平滑
+        if ((phase++ & 31) === 0) {
+          this.dqL.setPeaking(this.dqFreq, current, this.fs, this.dqQ);
+          this.dqR.setPeaking(this.dqFreq, current, this.fs, this.dqQ);
+        }
+        outL[i] = this.dqL.process(l);
+        outR[i] = this.dqR.process(r);
+      }
+      this.dqCurrent = current;
+    }
+
+    // ---- 多段压缩：低 / 中 / 高互补分频，各自按同一组参数压缩并做增益补偿 ----
+    if (this.on('mbComp') && this.params.enabled.mbComp) {
+      const thr = this.mbThresholdLin;
+      const ratio = this.mbRatio;
+      const env = this.mbEnv;
+      const gainState = this.mbGain;
+      const trim = this.mbTrim;
+      const atk = this.mbAtkCoef;
+      const rel = this.mbRelCoef;
+      for (let i = 0; i < n; i++) {
+        const l = outL[i];
+        const r = outR[i];
+        const lowL = this.mbLowL.process(l);
+        const lowR = this.mbLowR.process(r);
+        const mid2L = this.mbMidL.process(l);
+        const mid2R = this.mbMidR.process(r);
+        const midL = mid2L - lowL;
+        const midR = mid2R - lowR;
+        const highL = l - mid2L;
+        const highR = r - mid2R;
+        // 三个频段各自算增益（立体声联动）。这里不建临时数组，避免音频线程内分配。
+        const lvLow = lowL < 0 ? -lowL : lowL;
+        const lvLowR = lowR < 0 ? -lowR : lowR;
+        const lowPeak = lvLow > lvLowR ? lvLow : lvLowR;
+        env[0].step(lowPeak);
+        let e0 = env[0].env;
+        let t0 = 1;
+        if (e0 > thr) t0 = Math.pow(thr / e0, 1 - 1 / ratio);
+        gainState[0] += (t0 < gainState[0] ? atk : rel) * (t0 - gainState[0]);
+
+        const lvMid = midL < 0 ? -midL : midL;
+        const lvMidR = midR < 0 ? -midR : midR;
+        const midPeak = lvMid > lvMidR ? lvMid : lvMidR;
+        env[1].step(midPeak);
+        let e1 = env[1].env;
+        let t1 = 1;
+        if (e1 > thr) t1 = Math.pow(thr / e1, 1 - 1 / ratio);
+        gainState[1] += (t1 < gainState[1] ? atk : rel) * (t1 - gainState[1]);
+
+        const lvHigh = highL < 0 ? -highL : highL;
+        const lvHighR = highR < 0 ? -highR : highR;
+        const highPeak = lvHigh > lvHighR ? lvHigh : lvHighR;
+        env[2].step(highPeak);
+        let e2 = env[2].env;
+        let t2 = 1;
+        if (e2 > thr) t2 = Math.pow(thr / e2, 1 - 1 / ratio);
+        gainState[2] += (t2 < gainState[2] ? atk : rel) * (t2 - gainState[2]);
+        const gLow = gainState[0] * trim[0];
+        const gMid = gainState[1] * trim[1];
+        const gHigh = gainState[2] * trim[2];
+        outL[i] = lowL * gLow + midL * gMid + highL * gHigh;
+        outR[i] = lowR * gLow + midR * gMid + highR * gHigh;
+      }
+    }
+
     // ---- 延迟 / 回声：时间 20~1000 ms、反馈 0~0.9、干湿混合，可开乒乓 ----
     if (this.on('delay') && this.params.enabled.delay && this.dlL) {
       const t = this.delayTimeSamples;
@@ -705,8 +1068,9 @@ class RlonDSPDSP extends AudioWorkletProcessor {
       for (let i = 0; i < n; i++) {
         const xl = outL[i];
         const xr = outR[i];
-        const wetL = this.dlL.read(t);
-        const wetR = this.dlR.read(t);
+        // 反馈路径经过低通（阻尼），可把回声调暗
+        const wetL = this.dlLpL.process(this.dlL.read(t));
+        const wetR = this.dlLpR.process(this.dlR.read(t));
         // 乒乓：两条延迟线的反馈互相交叉，回声在左右之间来回跳
         this.dlL.push(xl + (pp ? wetR : wetL) * fb);
         this.dlR.push(xr + (pp ? wetL : wetR) * fb);

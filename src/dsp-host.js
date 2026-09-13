@@ -53,6 +53,11 @@
     'delay',       // 延迟 / 回声
     'chorus',      // 合唱
     'flanger',     // 镶边
+    'dyn-eq',      // 动态 EQ
+    'mb-comp',     // 多段压缩
+    'deesser',     // 去齿音
+    'expander',    // 扩展器
+    'transient',   // 瞬态整形
     'analyzer'     // 分析（不影响声音，但同样作为节点存在）
   ];
 

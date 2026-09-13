@@ -225,37 +225,6 @@
           <div class="param"><label data-i18n="drive">驱动</label><input type="range" id="tubeDrive" min="0" max="100" value="30" step="1"><span id="tubeDriveVal">0.30</span></div>
         </div>
 
-        <div class="fx-section" id="clipperParams">
-          <div class="fx-section-title"><span data-i18n="clipper">削波 / 饱和</span><label class="switch"><input type="checkbox" id="fxClipper"></label></div>
-          <div class="param"><label data-i18n="drive">驱动</label><input type="range" id="clipDrive" min="1" max="12" value="2" step="0.1"><span id="clipDriveVal">2.0</span></div>
-          <div class="param"><label data-i18n="mode">模式</label><select id="clipMode" class="full-select"><option value="soft" selected data-i18n="clipSoft">软削波</option><option value="hard" data-i18n="clipHard">硬削波</option></select></div>
-          <div class="param"><label data-i18n="outputGain">输出</label><input type="range" id="clipOutput" min="-24" max="12" value="0" step="0.5"><span id="clipOutputVal">0.0 dB</span></div>
-        </div>
-
-        <div class="fx-section" id="delayParams">
-          <div class="fx-section-title"><span data-i18n="delay">延迟 / 回声</span><label class="switch"><input type="checkbox" id="fxDelay"></label></div>
-          <div class="param"><label data-i18n="delayTime">延迟时间</label><input type="range" id="delayTime" min="20" max="1000" value="320" step="5"><span id="delayTimeVal">320 ms</span></div>
-          <div class="param"><label data-i18n="feedback">反馈</label><input type="range" id="delayFeedback" min="0" max="90" value="35" step="1"><span id="delayFeedbackVal">0.35</span></div>
-          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="delayMix" min="0" max="100" value="25" step="1"><span id="delayMixVal">0.25</span></div>
-          <div class="param"><label data-i18n="pingPong">乒乓</label><select id="delayPingPong" class="full-select"><option value="off" selected data-i18n="off">关</option><option value="on" data-i18n="on">开</option></select></div>
-        </div>
-
-        <div class="fx-section" id="chorusParams">
-          <div class="fx-section-title"><span data-i18n="chorus">合唱</span><label class="switch"><input type="checkbox" id="fxChorus"></label></div>
-          <div class="param"><label data-i18n="rate">速率</label><input type="range" id="chorusRate" min="5" max="800" value="60" step="5"><span id="chorusRateVal">0.60 Hz</span></div>
-          <div class="param"><label data-i18n="depth">深度</label><input type="range" id="chorusDepth" min="0" max="15" value="6" step="0.5"><span id="chorusDepthVal">6.0 ms</span></div>
-          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="chorusMix" min="0" max="100" value="40" step="1"><span id="chorusMixVal">0.40</span></div>
-          <div class="param"><label data-i18n="spread">左右错开</label><input type="range" id="chorusSpread" min="0" max="100" value="50" step="1"><span id="chorusSpreadVal">0.50</span></div>
-        </div>
-
-        <div class="fx-section" id="flangerParams">
-          <div class="fx-section-title"><span data-i18n="flanger">镶边</span><label class="switch"><input type="checkbox" id="fxFlanger"></label></div>
-          <div class="param"><label data-i18n="rate">速率</label><input type="range" id="flangerRate" min="5" max="500" value="25" step="5"><span id="flangerRateVal">0.25 Hz</span></div>
-          <div class="param"><label data-i18n="depth">深度</label><input type="range" id="flangerDepth" min="0" max="6" value="3" step="0.1"><span id="flangerDepthVal">3.0 ms</span></div>
-          <div class="param"><label data-i18n="feedback">反馈</label><input type="range" id="flangerFeedback" min="-90" max="90" value="40" step="1"><span id="flangerFeedbackVal">0.40</span></div>
-          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="flangerMix" min="0" max="100" value="45" step="1"><span id="flangerMixVal">0.45</span></div>
-        </div>
-
         <div class="fx-section" id="reverbParams">
           <div class="fx-section-title"><span data-i18n="reverb">混响</span><label class="switch"><input type="checkbox" id="fxReverb"></label></div>
           <div class="param"><label data-i18n="reverbTime">混响时间</label><input type="range" id="revTime" min="10" max="500" value="260" step="1"><span id="revTimeVal">2.60 s</span></div>
@@ -295,6 +264,96 @@
           <div class="param"><label data-i18n="ceiling">上限</label><input type="range" id="limiterCeiling" min="-12" max="0" value="-1" step="0.5"><span id="limiterCeilingVal">-1.0 dB</span></div>
           <div class="param"><label data-i18n="lookahead">前瞻</label><input type="range" id="limiterLookahead" min="0.5" max="10" value="2" step="0.5"><span id="limiterLookaheadVal">2.0 ms</span></div>
           <div class="param"><label data-i18n="release">释放</label><input type="range" id="limiterRelease" min="10" max="500" value="60" step="5"><span id="limiterReleaseVal">60 ms</span></div>
+        </div>
+
+        <!-- ============================================================
+             以下为追加的效果器：一律接在「实时音效」列表末尾，
+             使用与上方完全相同的卡片 / 开关 / 折叠 / 参数行结构。
+             ============================================================ -->
+
+        <div class="fx-section" id="dynEqParams">
+          <div class="fx-section-title"><span data-i18n="dynEq">动态 EQ</span><label class="switch"><input type="checkbox" id="fxDynEq"></label></div>
+          <div class="param"><label data-i18n="frequency">频率</label><input type="range" id="dynEqFreq" min="40" max="16000" value="200" step="10"><span id="dynEqFreqVal">200 Hz</span></div>
+          <div class="param"><label data-i18n="q">Q 值</label><input type="range" id="dynEqQ" min="0.3" max="8" value="1.2" step="0.1"><span id="dynEqQVal">1.20</span></div>
+          <div class="param"><label data-i18n="gain">增益</label><input type="range" id="dynEqGain" min="-18" max="18" value="-6" step="0.5"><span id="dynEqGainVal">-6.0 dB</span></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="dynEqThreshold" min="-60" max="0" value="-30" step="1"><span id="dynEqThresholdVal">-30 dB</span></div>
+          <div class="param"><label data-i18n="range">作用范围</label><input type="range" id="dynEqRange" min="0" max="24" value="12" step="1"><span id="dynEqRangeVal">12 dB</span></div>
+          <div class="param"><label data-i18n="attack">启动</label><input type="range" id="dynEqAttack" min="0.5" max="200" value="10" step="0.5"><span id="dynEqAttackVal">10 ms</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="dynEqRelease" min="5" max="1000" value="150" step="5"><span id="dynEqReleaseVal">150 ms</span></div>
+        </div>
+
+        <div class="fx-section" id="mbCompParams">
+          <div class="fx-section-title"><span data-i18n="mbComp">多段压缩</span><label class="switch"><input type="checkbox" id="fxMbComp"></label></div>
+          <div class="param"><label data-i18n="lowXover">低频分频</label><input type="range" id="mbLowXover" min="40" max="800" value="200" step="10"><span id="mbLowXoverVal">200 Hz</span></div>
+          <div class="param"><label data-i18n="highXover">高频分频</label><input type="range" id="mbHighXover" min="1000" max="12000" value="3000" step="100"><span id="mbHighXoverVal">3000 Hz</span></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="mbThreshold" min="-60" max="0" value="-20" step="1"><span id="mbThresholdVal">-20 dB</span></div>
+          <div class="param"><label data-i18n="ratio">压缩比</label><input type="range" id="mbRatio" min="1" max="20" value="3" step="0.5"><span id="mbRatioVal">3.0:1</span></div>
+          <div class="param"><label data-i18n="attack">启动</label><input type="range" id="mbAttack" min="0.5" max="200" value="10" step="0.5"><span id="mbAttackVal">10 ms</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="mbRelease" min="5" max="1000" value="120" step="5"><span id="mbReleaseVal">120 ms</span></div>
+          <div class="param"><label data-i18n="lowGain">低频增益</label><input type="range" id="mbLowGain" min="-24" max="24" value="0" step="0.5"><span id="mbLowGainVal">0.0 dB</span></div>
+          <div class="param"><label data-i18n="midGain">中频增益</label><input type="range" id="mbMidGain" min="-24" max="24" value="0" step="0.5"><span id="mbMidGainVal">0.0 dB</span></div>
+          <div class="param"><label data-i18n="highGain">高频增益</label><input type="range" id="mbHighGain" min="-24" max="24" value="0" step="0.5"><span id="mbHighGainVal">0.0 dB</span></div>
+        </div>
+
+        <div class="fx-section" id="deesserParams">
+          <div class="fx-section-title"><span data-i18n="deesser">去齿音</span><label class="switch"><input type="checkbox" id="fxDeesser"></label></div>
+          <div class="param"><label data-i18n="frequency">频率</label><input type="range" id="dsFreq" min="2000" max="12000" value="6000" step="100"><span id="dsFreqVal">6000 Hz</span></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="dsThreshold" min="-60" max="0" value="-24" step="1"><span id="dsThresholdVal">-24 dB</span></div>
+          <div class="param"><label data-i18n="range">作用范围</label><input type="range" id="dsRange" min="0" max="40" value="12" step="1"><span id="dsRangeVal">12 dB</span></div>
+          <div class="param"><label data-i18n="attack">启动</label><input type="range" id="dsAttack" min="0.1" max="50" value="1" step="0.1"><span id="dsAttackVal">1.0 ms</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="dsRelease" min="5" max="500" value="60" step="5"><span id="dsReleaseVal">60 ms</span></div>
+        </div>
+
+        <div class="fx-section" id="expanderParams">
+          <div class="fx-section-title"><span data-i18n="expander">扩展器</span><label class="switch"><input type="checkbox" id="fxExpander"></label></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="expThreshold" min="-80" max="0" value="-40" step="1"><span id="expThresholdVal">-40 dB</span></div>
+          <div class="param"><label data-i18n="ratio">扩展比</label><input type="range" id="expRatio" min="1" max="10" value="2" step="0.1"><span id="expRatioVal">2.0:1</span></div>
+          <div class="param"><label data-i18n="attack">启动</label><input type="range" id="expAttack" min="0.1" max="100" value="5" step="0.1"><span id="expAttackVal">5.0 ms</span></div>
+          <div class="param"><label data-i18n="release">释放</label><input type="range" id="expRelease" min="5" max="1000" value="150" step="5"><span id="expReleaseVal">150 ms</span></div>
+          <div class="param"><label data-i18n="range">作用范围</label><input type="range" id="expRange" min="0" max="60" value="24" step="1"><span id="expRangeVal">24 dB</span></div>
+        </div>
+
+        <div class="fx-section" id="transientParams">
+          <div class="fx-section-title"><span data-i18n="transient">瞬态整形</span><label class="switch"><input type="checkbox" id="fxTransient"></label></div>
+          <div class="param"><label data-i18n="transientAttack">起音</label><input type="range" id="trAttack" min="0" max="100" value="50" step="1"><span id="trAttackVal">0.50</span></div>
+          <div class="param"><label data-i18n="transientSustain">延音</label><input type="range" id="trSustain" min="0" max="100" value="50" step="1"><span id="trSustainVal">0.50</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="trMix" min="0" max="100" value="100" step="1"><span id="trMixVal">1.00</span></div>
+          <div class="param"><label data-i18n="outputGain">输出</label><input type="range" id="trOutput" min="-24" max="24" value="0" step="0.5"><span id="trOutputVal">0.0 dB</span></div>
+        </div>
+
+        <div class="fx-section" id="clipperParams">
+          <div class="fx-section-title"><span data-i18n="clipper">削波 / 饱和</span><label class="switch"><input type="checkbox" id="fxClipper"></label></div>
+          <div class="param"><label data-i18n="drive">驱动</label><input type="range" id="clipDrive" min="1" max="12" value="2" step="0.1"><span id="clipDriveVal">2.0</span></div>
+          <div class="param"><label data-i18n="mode">模式</label><select id="clipMode" class="full-select"><option value="soft" selected data-i18n="clipSoft">软削波</option><option value="hard" data-i18n="clipHard">硬削波</option></select></div>
+          <div class="param"><label data-i18n="threshold">阈值</label><input type="range" id="clipThreshold" min="-24" max="0" value="-6" step="0.5"><span id="clipThresholdVal">-6.0 dB</span></div>
+          <div class="param"><label data-i18n="ceiling">上限</label><input type="range" id="clipCeiling" min="-12" max="0" value="0" step="0.5"><span id="clipCeilingVal">0.0 dB</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="clipMix" min="0" max="100" value="100" step="1"><span id="clipMixVal">1.00</span></div>
+          <div class="param"><label data-i18n="outputGain">输出</label><input type="range" id="clipOutput" min="-24" max="12" value="0" step="0.5"><span id="clipOutputVal">0.0 dB</span></div>
+        </div>
+
+        <div class="fx-section" id="delayParams">
+          <div class="fx-section-title"><span data-i18n="delay">延迟 / 回声</span><label class="switch"><input type="checkbox" id="fxDelay"></label></div>
+          <div class="param"><label data-i18n="delayTime">延迟时间</label><input type="range" id="delayTime" min="20" max="1000" value="320" step="5"><span id="delayTimeVal">320 ms</span></div>
+          <div class="param"><label data-i18n="feedback">反馈</label><input type="range" id="delayFeedback" min="0" max="90" value="35" step="1"><span id="delayFeedbackVal">0.35</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="delayMix" min="0" max="100" value="25" step="1"><span id="delayMixVal">0.25</span></div>
+          <div class="param"><label data-i18n="delayFilter">反馈滤波</label><input type="range" id="delayFilter" min="1000" max="20000" value="20000" step="100"><span id="delayFilterVal">20000 Hz</span></div>
+          <div class="param"><label data-i18n="pingPong">乒乓</label><select id="delayPingPong" class="full-select"><option value="off" selected data-i18n="off">关</option><option value="on" data-i18n="on">开</option></select></div>
+        </div>
+
+        <div class="fx-section" id="chorusParams">
+          <div class="fx-section-title"><span data-i18n="chorus">合唱</span><label class="switch"><input type="checkbox" id="fxChorus"></label></div>
+          <div class="param"><label data-i18n="rate">速率</label><input type="range" id="chorusRate" min="5" max="800" value="60" step="5"><span id="chorusRateVal">0.60 Hz</span></div>
+          <div class="param"><label data-i18n="depth">深度</label><input type="range" id="chorusDepth" min="0" max="15" value="6" step="0.5"><span id="chorusDepthVal">6.0 ms</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="chorusMix" min="0" max="100" value="40" step="1"><span id="chorusMixVal">0.40</span></div>
+          <div class="param"><label data-i18n="spread">左右错开</label><input type="range" id="chorusSpread" min="0" max="100" value="50" step="1"><span id="chorusSpreadVal">0.50</span></div>
+        </div>
+
+        <div class="fx-section" id="flangerParams">
+          <div class="fx-section-title"><span data-i18n="flanger">镶边</span><label class="switch"><input type="checkbox" id="fxFlanger"></label></div>
+          <div class="param"><label data-i18n="rate">速率</label><input type="range" id="flangerRate" min="5" max="500" value="25" step="5"><span id="flangerRateVal">0.25 Hz</span></div>
+          <div class="param"><label data-i18n="depth">深度</label><input type="range" id="flangerDepth" min="0" max="6" value="3" step="0.1"><span id="flangerDepthVal">3.0 ms</span></div>
+          <div class="param"><label data-i18n="feedback">反馈</label><input type="range" id="flangerFeedback" min="-90" max="90" value="40" step="1"><span id="flangerFeedbackVal">0.40</span></div>
+          <div class="param"><label data-i18n="wet">干湿比</label><input type="range" id="flangerMix" min="0" max="100" value="45" step="1"><span id="flangerMixVal">0.45</span></div>
         </div>
       </div>
       </div>

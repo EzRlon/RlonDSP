@@ -76,6 +76,23 @@ const I18N = {
     updateNewVersionIs: '新版本',
     updatePublishedAt: '发布时间',
     restartNow: '重新启动',
+    dynEq: '动态 EQ',
+    mbComp: '多段压缩',
+    deesser: '去齿音',
+    expander: '扩展器',
+    transient: '瞬态整形',
+    frequency: '频率',
+    q: 'Q 值',
+    gain: '增益',
+    range: '作用范围',
+    lowXover: '低频分频',
+    highXover: '高频分频',
+    lowGain: '低频增益',
+    midGain: '中频增益',
+    highGain: '高频增益',
+    transientAttack: '起音',
+    transientSustain: '延音',
+    delayFilter: '反馈滤波',
     save: '保存',
     delete: '删除',
     export: '导出',
@@ -247,6 +264,23 @@ const I18N = {
     updateNewVersionIs: 'New version',
     updatePublishedAt: 'Published',
     restartNow: 'Restart',
+    dynEq: 'Dynamic EQ',
+    mbComp: 'Multiband Compressor',
+    deesser: 'De-esser',
+    expander: 'Expander',
+    transient: 'Transient Shaper',
+    frequency: 'Frequency',
+    q: 'Q',
+    gain: 'Gain',
+    range: 'Range',
+    lowXover: 'Low crossover',
+    highXover: 'High crossover',
+    lowGain: 'Low gain',
+    midGain: 'Mid gain',
+    highGain: 'High gain',
+    transientAttack: 'Attack',
+    transientSustain: 'Sustain',
+    delayFilter: 'Feedback filter',
     save: 'Save',
     delete: 'Delete',
     export: 'Export',
@@ -367,7 +401,12 @@ const defaultEffects = {
     delay: false,
     chorus: false,
     flanger: false,
-    clipper: false
+    clipper: false,
+    expander: false,
+    transient: false,
+    deesser: false,
+    dynEq: false,
+    mbComp: false
   },
   compressor: { thresholdDB: -24, ratio: 4, attackMs: 10, releaseMs: 120 },
   bass: { gainDB: 6, crossoverHz: 80 },
@@ -381,13 +420,22 @@ const defaultEffects = {
   // 差分环绕：延迟声道（L/R）与延迟毫秒数
   channelDelay: { enabled: false, channel: 'R', ms: 15 },
   // 延迟 / 回声（可交叉反馈做乒乓）
-  delay: { timeMs: 320, feedback: 0.35, mix: 0.25, pingPong: false },
+  delay: { timeMs: 320, feedback: 0.35, mix: 0.25, pingPong: false, filterHz: 20000 },
   // 合唱：速率 / 深度 / 干湿 / 左右错开
   chorus: { rateHz: 0.6, depthMs: 6, mix: 0.4, spread: 0.5 },
   // 镶边：速率 / 深度 / 反馈 / 干湿
   flanger: { rateHz: 0.25, depthMs: 3, feedback: 0.4, mix: 0.45 },
   // 削波 / 饱和：驱动 / 模式 / 输出补偿
-  clipper: { drive: 2, mode: 'soft', outputDB: 0 },
+  clipper: { drive: 2, mode: 'soft', thresholdDB: -6, ceilingDB: 0, mix: 1, outputDB: 0 },
+  // 扩展器 / 瞬态整形 / 去齿音 / 动态 EQ / 多段压缩
+  expander: { threshold: -40, ratio: 2, attackMs: 5, releaseMs: 150, range: 24 },
+  transient: { attack: 0.5, sustain: 0.5, mix: 1, outputDB: 0 },
+  deesser: { freq: 6000, threshold: -24, range: 12, attackMs: 1, releaseMs: 60 },
+  dynEq: { freq: 200, q: 1.2, gainDB: -6, threshold: -30, range: 12, attackMs: 10, releaseMs: 150 },
+  mbComp: {
+    lowXover: 200, highXover: 3000, lowGainDB: 0, midGainDB: 0, highGainDB: 0,
+    threshold: -20, ratio: 3, attackMs: 10, releaseMs: 120
+  },
   ir: { enabled: false, filePath: '', wet: 0.35, predelay: 0.02, highpass: 20, lowpass: 20000, ab: false }
 };
 
@@ -437,6 +485,12 @@ const DSP_BUILTIN_SPECS = [
   { type: 'delay', name: '延迟 / 回声', latencyFrames: 0, tailFrames: 96000, key: 'delay' },
   { type: 'chorus', name: '合唱', latencyFrames: 0, tailFrames: 4096, key: 'chorus' },
   { type: 'flanger', name: '镶边', latencyFrames: 0, tailFrames: 4096, key: 'flanger' },
+  // —— 追加的效果器（按实时音效列表末尾的顺序注册）——
+  { type: 'dyn-eq', name: '动态 EQ', latencyFrames: 0, tailFrames: 0, key: 'dynEq' },
+  { type: 'mb-comp', name: '多段压缩', latencyFrames: 0, tailFrames: 0, key: 'mbComp' },
+  { type: 'deesser', name: '去齿音', latencyFrames: 0, tailFrames: 0, key: 'deesser' },
+  { type: 'expander', name: '扩展器', latencyFrames: 0, tailFrames: 0, key: 'expander' },
+  { type: 'transient', name: '瞬态整形', latencyFrames: 0, tailFrames: 0, key: 'transient' },
   // 卷积在渲染进程的 Web Audio 图里执行，位于内置链条之后
   { type: 'convolution', name: '脉冲卷积（IRS）', latencyFrames: 0, tailFrames: 48000, key: 'ir' }
 ];
@@ -908,6 +962,80 @@ function applyEffectsToUIRaw() {
   $('flangerFeedbackVal').textContent = fx.flanger.feedback.toFixed(2);
   $('flangerMix').value = String(Math.round(fx.flanger.mix * 100));
   $('flangerMixVal').textContent = fx.flanger.mix.toFixed(2);
+  // —— 追加的效果器 ——
+  $('fxDynEq').checked = fx.enabled.dynEq;
+  $('fxMbComp').checked = fx.enabled.mbComp;
+  $('fxDeesser').checked = fx.enabled.deesser;
+  $('fxExpander').checked = fx.enabled.expander;
+  $('fxTransient').checked = fx.enabled.transient;
+  $('clipThreshold').value = String(fx.clipper.thresholdDB);
+  $('clipThresholdVal').textContent = `${fx.clipper.thresholdDB.toFixed(1)} dB`;
+  $('clipCeiling').value = String(fx.clipper.ceilingDB);
+  $('clipCeilingVal').textContent = `${fx.clipper.ceilingDB.toFixed(1)} dB`;
+  $('clipMix').value = String(Math.round(fx.clipper.mix * 100));
+  $('clipMixVal').textContent = fx.clipper.mix.toFixed(2);
+  $('delayFilter').value = String(Math.round(fx.delay.filterHz || 20000));
+  $('delayFilterVal').textContent = `${Math.round(fx.delay.filterHz || 20000)} Hz`;
+  $('dynEqFreq').value = String(fx.dynEq.freq);
+  $('dynEqFreqVal').textContent = `${fx.dynEq.freq} Hz`;
+  $('dynEqQ').value = String(fx.dynEq.q);
+  $('dynEqQVal').textContent = fx.dynEq.q.toFixed(2);
+  $('dynEqGain').value = String(fx.dynEq.gainDB);
+  $('dynEqGainVal').textContent = `${fx.dynEq.gainDB.toFixed(1)} dB`;
+  $('dynEqThreshold').value = String(fx.dynEq.threshold);
+  $('dynEqThresholdVal').textContent = `${fx.dynEq.threshold} dB`;
+  $('dynEqRange').value = String(fx.dynEq.range);
+  $('dynEqRangeVal').textContent = `${fx.dynEq.range} dB`;
+  $('dynEqAttack').value = String(fx.dynEq.attackMs);
+  $('dynEqAttackVal').textContent = `${fx.dynEq.attackMs} ms`;
+  $('dynEqRelease').value = String(fx.dynEq.releaseMs);
+  $('dynEqReleaseVal').textContent = `${fx.dynEq.releaseMs} ms`;
+  $('mbLowXover').value = String(fx.mbComp.lowXover);
+  $('mbLowXoverVal').textContent = `${fx.mbComp.lowXover} Hz`;
+  $('mbHighXover').value = String(fx.mbComp.highXover);
+  $('mbHighXoverVal').textContent = `${fx.mbComp.highXover} Hz`;
+  $('mbThreshold').value = String(fx.mbComp.threshold);
+  $('mbThresholdVal').textContent = `${fx.mbComp.threshold} dB`;
+  $('mbRatio').value = String(fx.mbComp.ratio);
+  $('mbRatioVal').textContent = `${fx.mbComp.ratio.toFixed(1)}:1`;
+  $('mbAttack').value = String(fx.mbComp.attackMs);
+  $('mbAttackVal').textContent = `${fx.mbComp.attackMs} ms`;
+  $('mbRelease').value = String(fx.mbComp.releaseMs);
+  $('mbReleaseVal').textContent = `${fx.mbComp.releaseMs} ms`;
+  $('mbLowGain').value = String(fx.mbComp.lowGainDB);
+  $('mbLowGainVal').textContent = `${fx.mbComp.lowGainDB.toFixed(1)} dB`;
+  $('mbMidGain').value = String(fx.mbComp.midGainDB);
+  $('mbMidGainVal').textContent = `${fx.mbComp.midGainDB.toFixed(1)} dB`;
+  $('mbHighGain').value = String(fx.mbComp.highGainDB);
+  $('mbHighGainVal').textContent = `${fx.mbComp.highGainDB.toFixed(1)} dB`;
+  $('dsFreq').value = String(fx.deesser.freq);
+  $('dsFreqVal').textContent = `${fx.deesser.freq} Hz`;
+  $('dsThreshold').value = String(fx.deesser.threshold);
+  $('dsThresholdVal').textContent = `${fx.deesser.threshold} dB`;
+  $('dsRange').value = String(fx.deesser.range);
+  $('dsRangeVal').textContent = `${fx.deesser.range} dB`;
+  $('dsAttack').value = String(fx.deesser.attackMs);
+  $('dsAttackVal').textContent = `${fx.deesser.attackMs} ms`;
+  $('dsRelease').value = String(fx.deesser.releaseMs);
+  $('dsReleaseVal').textContent = `${fx.deesser.releaseMs} ms`;
+  $('expThreshold').value = String(fx.expander.threshold);
+  $('expThresholdVal').textContent = `${fx.expander.threshold} dB`;
+  $('expRatio').value = String(fx.expander.ratio);
+  $('expRatioVal').textContent = `${fx.expander.ratio.toFixed(1)}:1`;
+  $('expAttack').value = String(fx.expander.attackMs);
+  $('expAttackVal').textContent = `${fx.expander.attackMs} ms`;
+  $('expRelease').value = String(fx.expander.releaseMs);
+  $('expReleaseVal').textContent = `${fx.expander.releaseMs} ms`;
+  $('expRange').value = String(fx.expander.range);
+  $('expRangeVal').textContent = `${fx.expander.range} dB`;
+  $('trAttack').value = String(Math.round(fx.transient.attack * 100));
+  $('trAttackVal').textContent = fx.transient.attack.toFixed(2);
+  $('trSustain').value = String(Math.round(fx.transient.sustain * 100));
+  $('trSustainVal').textContent = fx.transient.sustain.toFixed(2);
+  $('trMix').value = String(Math.round(fx.transient.mix * 100));
+  $('trMixVal').textContent = fx.transient.mix.toFixed(2);
+  $('trOutput').value = String(fx.transient.outputDB);
+  $('trOutputVal').textContent = `${fx.transient.outputDB.toFixed(1)} dB`;
   $('compThreshold').value = String(fx.compressor.thresholdDB);
   $('compThresholdVal').textContent = `${fx.compressor.thresholdDB} dB`;
   $('compRatio').value = String(fx.compressor.ratio);
@@ -1007,6 +1135,46 @@ function updateEffectsFromUIRaw() {
   fx.flanger.depthMs = Number($('flangerDepth').value);
   fx.flanger.feedback = Number($('flangerFeedback').value) / 100;
   fx.flanger.mix = Number($('flangerMix').value) / 100;
+  // —— 追加的效果器 ——
+  fx.enabled.dynEq = $('fxDynEq').checked;
+  fx.enabled.mbComp = $('fxMbComp').checked;
+  fx.enabled.deesser = $('fxDeesser').checked;
+  fx.enabled.expander = $('fxExpander').checked;
+  fx.enabled.transient = $('fxTransient').checked;
+  fx.clipper.thresholdDB = Number($('clipThreshold').value);
+  fx.clipper.ceilingDB = Number($('clipCeiling').value);
+  fx.clipper.mix = Number($('clipMix').value) / 100;
+  fx.delay.filterHz = Number($('delayFilter').value);
+  fx.dynEq.freq = Number($('dynEqFreq').value);
+  fx.dynEq.q = Number($('dynEqQ').value);
+  fx.dynEq.gainDB = Number($('dynEqGain').value);
+  fx.dynEq.threshold = Number($('dynEqThreshold').value);
+  fx.dynEq.range = Number($('dynEqRange').value);
+  fx.dynEq.attackMs = Number($('dynEqAttack').value);
+  fx.dynEq.releaseMs = Number($('dynEqRelease').value);
+  fx.mbComp.lowXover = Number($('mbLowXover').value);
+  fx.mbComp.highXover = Number($('mbHighXover').value);
+  fx.mbComp.threshold = Number($('mbThreshold').value);
+  fx.mbComp.ratio = Number($('mbRatio').value);
+  fx.mbComp.attackMs = Number($('mbAttack').value);
+  fx.mbComp.releaseMs = Number($('mbRelease').value);
+  fx.mbComp.lowGainDB = Number($('mbLowGain').value);
+  fx.mbComp.midGainDB = Number($('mbMidGain').value);
+  fx.mbComp.highGainDB = Number($('mbHighGain').value);
+  fx.deesser.freq = Number($('dsFreq').value);
+  fx.deesser.threshold = Number($('dsThreshold').value);
+  fx.deesser.range = Number($('dsRange').value);
+  fx.deesser.attackMs = Number($('dsAttack').value);
+  fx.deesser.releaseMs = Number($('dsRelease').value);
+  fx.expander.threshold = Number($('expThreshold').value);
+  fx.expander.ratio = Number($('expRatio').value);
+  fx.expander.attackMs = Number($('expAttack').value);
+  fx.expander.releaseMs = Number($('expRelease').value);
+  fx.expander.range = Number($('expRange').value);
+  fx.transient.attack = Number($('trAttack').value) / 100;
+  fx.transient.sustain = Number($('trSustain').value) / 100;
+  fx.transient.mix = Number($('trMix').value) / 100;
+  fx.transient.outputDB = Number($('trOutput').value);
   fx.compressor.thresholdDB = Number($('compThreshold').value);
   fx.compressor.ratio = Number($('compRatio').value);
   fx.compressor.attackMs = Number($('compAttack').value);
@@ -1102,6 +1270,9 @@ function bindEffectInputsRaw() {
     limiterRelease: () => `${$('limiterRelease').value} ms`,
     clipDrive: () => Number($('clipDrive').value).toFixed(1),
     clipOutput: () => `${Number($('clipOutput').value).toFixed(1)} dB`,
+    clipThreshold: () => `${Number($('clipThreshold').value).toFixed(1)} dB`,
+    clipCeiling: () => `${Number($('clipCeiling').value).toFixed(1)} dB`,
+    clipMix: () => (Number($('clipMix').value) / 100).toFixed(2),
     delayTime: () => `${$('delayTime').value} ms`,
     delayFeedback: () => (Number($('delayFeedback').value) / 100).toFixed(2),
     delayMix: () => (Number($('delayMix').value) / 100).toFixed(2),
@@ -1113,6 +1284,37 @@ function bindEffectInputsRaw() {
     flangerDepth: () => `${Number($('flangerDepth').value).toFixed(1)} ms`,
     flangerFeedback: () => (Number($('flangerFeedback').value) / 100).toFixed(2),
     flangerMix: () => (Number($('flangerMix').value) / 100).toFixed(2),
+    delayFilter: () => `${$('delayFilter').value} Hz`,
+    dynEqFreq: () => `${$('dynEqFreq').value} Hz`,
+    dynEqQ: () => Number($('dynEqQ').value).toFixed(2),
+    dynEqGain: () => `${Number($('dynEqGain').value).toFixed(1)} dB`,
+    dynEqThreshold: () => `${$('dynEqThreshold').value} dB`,
+    dynEqRange: () => `${$('dynEqRange').value} dB`,
+    dynEqAttack: () => `${$('dynEqAttack').value} ms`,
+    dynEqRelease: () => `${$('dynEqRelease').value} ms`,
+    mbLowXover: () => `${$('mbLowXover').value} Hz`,
+    mbHighXover: () => `${$('mbHighXover').value} Hz`,
+    mbThreshold: () => `${$('mbThreshold').value} dB`,
+    mbRatio: () => `${Number($('mbRatio').value).toFixed(1)}:1`,
+    mbAttack: () => `${$('mbAttack').value} ms`,
+    mbRelease: () => `${$('mbRelease').value} ms`,
+    mbLowGain: () => `${Number($('mbLowGain').value).toFixed(1)} dB`,
+    mbMidGain: () => `${Number($('mbMidGain').value).toFixed(1)} dB`,
+    mbHighGain: () => `${Number($('mbHighGain').value).toFixed(1)} dB`,
+    dsFreq: () => `${$('dsFreq').value} Hz`,
+    dsThreshold: () => `${$('dsThreshold').value} dB`,
+    dsRange: () => `${$('dsRange').value} dB`,
+    dsAttack: () => `${Number($('dsAttack').value).toFixed(1)} ms`,
+    dsRelease: () => `${$('dsRelease').value} ms`,
+    expThreshold: () => `${$('expThreshold').value} dB`,
+    expRatio: () => `${Number($('expRatio').value).toFixed(1)}:1`,
+    expAttack: () => `${Number($('expAttack').value).toFixed(1)} ms`,
+    expRelease: () => `${$('expRelease').value} ms`,
+    expRange: () => `${$('expRange').value} dB`,
+    trAttack: () => (Number($('trAttack').value) / 100).toFixed(2),
+    trSustain: () => (Number($('trSustain').value) / 100).toFixed(2),
+    trMix: () => (Number($('trMix').value) / 100).toFixed(2),
+    trOutput: () => `${Number($('trOutput').value).toFixed(1)} dB`,
     irWet: () => (Number($('irWet').value) / 100).toFixed(2),
     irPredelay: () => `${(Number($('irPredelay').value) / 100).toFixed(2)} s`,
     irHighpass: () => `${$('irHighpass').value} Hz`,
@@ -1127,7 +1329,8 @@ function bindEffectInputsRaw() {
   [
     'fxCompressor', 'fxBass', 'fxStereo', 'fxSurround', 'fxClarity',
     'fxUltrasonic', 'fxTube', 'fxReverb', 'fxNoiseGate', 'fxLimiter',
-    'fxDelay', 'fxChorus', 'fxFlanger', 'fxClipper'
+    'fxDelay', 'fxChorus', 'fxFlanger', 'fxClipper',
+    'fxDynEq', 'fxMbComp', 'fxDeesser', 'fxExpander', 'fxTransient'
   ].forEach((id) => {
     const el = $(id);
     if (el) el.addEventListener('change', updateEffectsFromUI);
