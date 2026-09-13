@@ -146,6 +146,13 @@ const I18N = {
     vfxDecay: '衰减',
     vfxBranch: '分叉',
     vfxLifetime: '生命周期',
+    vfxModeAuto: '自动',
+    vfxPresetNebulaAurora: '星云极光',
+    vfxPresetFluidElectric: '流体电场',
+    vfxPresetPulseCymatics: '脉冲声波',
+    vfxPresetPlasmaFlow: '等离子流场',
+    vfxPresetAuroraElectric: '极光电场',
+    vfxPresetDeepSpace: '星云三重奏',
     save: '保存',
     delete: '删除',
     export: '导出',
@@ -388,6 +395,13 @@ const I18N = {
     vfxDecay: 'Decay',
     vfxBranch: 'Branch',
     vfxLifetime: 'Lifetime',
+    vfxModeAuto: 'Auto',
+    vfxPresetNebulaAurora: 'Nebula Aurora',
+    vfxPresetFluidElectric: 'Fluid Field',
+    vfxPresetPulseCymatics: 'Pulse Wave',
+    vfxPresetPlasmaFlow: 'Plasma Flow',
+    vfxPresetAuroraElectric: 'Aurora Field',
+    vfxPresetDeepSpace: 'Deep Space Trio',
     save: 'Save',
     delete: 'Delete',
     export: 'Export',
@@ -3282,6 +3296,9 @@ function drawVisualizer() {
 }
 
 document.addEventListener('visibilitychange', () => {
+  // 窗口被最小化 / 被别的窗口完全挡住时，系统会暂停动画；
+  // 回到前台要立刻接着跑，否则第二页会停在最后一帧不动。
+  if (visualEngine) visualEngine.setWindowVisible(!document.hidden);
   if (!document.hidden && state.isPlaying) startVisualizerLoop();
 });
 
@@ -3353,6 +3370,7 @@ function buildVisualCards() {
       if (visualEngine) visualEngine.setEnabled(def.id, toggle.checked);
       card.classList.toggle('is-enabled', toggle.checked);
       updateVisualStats();
+      syncVisualScene();
       persistVisualState();
     });
     host.appendChild(card);
@@ -3360,17 +3378,116 @@ function buildVisualCards() {
   });
 }
 
+/**
+ * 预设条：最左边是「自动」，其余是一条条固定预设（单效果或组合）。
+ * 点自动 → 按音乐节拍自动轮换；点某条预设 → 固定用它。
+ */
+function buildVisualPresets() {
+  const host = document.getElementById('visualPresets');
+  if (!host || !window.RlonVisualEngine) return;
+  host.innerHTML = '';
+  const autoChip = document.createElement('button');
+  autoChip.type = 'button';
+  autoChip.className = 'vfx-chip vfx-chip--auto';
+  autoChip.dataset.vfxAuto = '1';
+  autoChip.innerHTML = '<svg class="icon"><use href="#icon-loop-random"></use></svg><span data-i18n="vfxModeAuto"></span>';
+  autoChip.querySelector('span').textContent = t('vfxModeAuto');
+  autoChip.addEventListener('click', () => {
+    if (!visualEngine) return;
+    if (visualEngine.getMode() === 'auto') visualEngine.setAuto(false);
+    else visualEngine.setAuto(true);
+    syncVisualScene();
+    persistVisualState();
+  });
+  host.appendChild(autoChip);
+  (window.RlonVisualEngine.presets || []).forEach((preset) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'vfx-chip';
+    chip.dataset.vfxPreset = preset.id;
+    chip.dataset.i18n = preset.labelKey;
+    chip.textContent = t(preset.labelKey);
+    chip.addEventListener('click', () => {
+      if (!visualEngine) return;
+      visualEngine.setPreset(preset.id);
+      syncVisualScene();
+      persistVisualState();
+    });
+    host.appendChild(chip);
+  });
+  syncVisualScene();
+}
+
+/** 让界面跟上引擎的真实状态：预设条高亮 + 卡片开关（自动模式换组合时也会对上） */
+function syncVisualScene() {
+  if (!visualEngine) return;
+  const bar = document.getElementById('visualPresets');
+  if (bar) {
+    const mode = visualEngine.getMode();
+    const preset = visualEngine.getPreset();
+    bar.querySelectorAll('.vfx-chip').forEach((chip) => {
+      const active = chip.dataset.vfxAuto === '1'
+        ? mode === 'auto'
+        : (mode !== 'auto' && chip.dataset.vfxPreset === preset);
+      chip.classList.toggle('is-active', active);
+    });
+  }
+  visualCardEls.forEach((el, id) => {
+    const fx = visualEngine.instances.get(id);
+    if (!fx) return;
+    el.toggle.checked = !!fx.enabled;
+    el.card.classList.toggle('is-enabled', !!fx.enabled);
+  });
+  updateVisualStats();
+}
+
 /** 卡片密度随可用宽度自适应：窄窗口收紧列宽并隐藏次要参数 */
 function updateVisualLayout() {
   const host = document.getElementById('visualCards');
   if (!host) return;
   const w = host.clientWidth;
-  host.style.setProperty('--vfx-col', (w < 560 ? 220 : w < 900 ? 250 : 300) + 'px');
-  const compact = w < 620;
+  const h = host.clientHeight;
+  const gap = 8;
+  const count = Math.max(1, host.children.length);
+  /** 平均分给 cols 列之后，每张卡片能拿到多宽 */
+  const share = (cols) => Math.max(120, Math.floor((w - gap * (cols - 1)) / cols));
+  // 按窗口宽度先算出「正常情况下能排几列」
+  const fit = Math.max(1, Math.min(count, Math.floor((w + gap) / (236 + gap))));
+  // 再优先挑一个能把卡片数量整除的列数：每行都排满，右侧不留空白。
+  let cols = 0;
+  for (let c = Math.min(count, 6); c >= 1; c--) {
+    if (count % c === 0 && share(c) >= 195) { cols = c; break; }
+  }
+  if (!cols) cols = fit;
+  host.style.setProperty('--vfx-col', share(cols) + 'px');
+  // 竖向自适应：先试着把全部参数都摆下（整块正好铺满，不留滚动条）；
+  // 摆不下才逐级收起最不常用的参数，而不是让卡片被裁掉一半。
+  const rows = Math.ceil(count / cols);
+  const limit = h - gap * (rows - 1);
+  let level = 0;
+  if (!fits(host, rows, limit, 0)) level = 1;
+  if (!fits(host, rows, limit, 1)) level = 2;
+  applyParamLevel(host, level);
+}
+
+/** 按层级显示参数行：0=全部，1=收起高级，2=再收起次级 */
+function applyParamLevel(host, level) {
   host.querySelectorAll('.param').forEach((row) => {
-    const secondary = row.dataset.priority !== 'core';
-    row.style.display = compact && secondary ? 'none' : '';
+    const priority = row.dataset.priority || 'core';
+    const hide = (level >= 2 && priority !== 'core') || (level === 1 && priority === 'advanced');
+    row.style.display = hide ? 'none' : '';
   });
+}
+
+/** 试摆一次：按 level 显示参数，看看最高的卡片乘行数塞不塞得进可用高度 */
+function fits(host, rows, limit, level) {
+  applyParamLevel(host, level);
+  let tallest = 0;
+  host.querySelectorAll('.vfx-card').forEach((card) => {
+    if (card.offsetHeight > tallest) tallest = card.offsetHeight;
+  });
+  // 留 8px 余量：刚好卡满时容易因为取整冒出一条细滚动条，反而更难看
+  return tallest * rows <= limit - 8;
 }
 
 function updateVisualStats() {
@@ -3403,10 +3520,29 @@ function playWindowAnim(kind) {
 }
 
 function setVizPage(page, animate) {
-  const pager = document.getElementById('vizPager');
-  if (!pager) return;
-  currentVizPage = page === 1 ? 1 : 0;
-  pager.classList.toggle('is-page-2', currentVizPage === 1);
+  const pages = document.querySelectorAll('.viz-page');
+  if (!pages.length) return;
+  const next = page === 1 ? 1 : 0;
+  const prev = currentVizPage;
+  currentVizPage = next;
+  pages.forEach((el) => {
+    const idx = Number(el.dataset.vizPage);
+    el.classList.remove('is-in', 'is-out');
+    el.style.transform = '';
+    el.classList.toggle('is-active', idx === next);
+    if (idx === next) el.removeAttribute('aria-hidden');
+    else el.setAttribute('aria-hidden', 'true');
+  });
+  if (animate && prev !== next) {
+    const incoming = [...pages].find((el) => Number(el.dataset.vizPage) === next);
+    const outgoing = [...pages].find((el) => Number(el.dataset.vizPage) === prev);
+    if (incoming) incoming.classList.add('is-in');
+    if (outgoing) outgoing.classList.add('is-out');
+    window.setTimeout(() => {
+      if (incoming) incoming.classList.remove('is-in');
+      if (outgoing) outgoing.classList.remove('is-out');
+    }, 420);
+  }
   document.querySelectorAll('.viz-dot').forEach((dot) => {
     dot.classList.toggle('active', Number(dot.dataset.vizDot) === currentVizPage);
   });
@@ -3414,32 +3550,21 @@ function setVizPage(page, animate) {
   if (visualEngine) visualEngine.setSceneActive(currentVizPage === 1);
   if (currentVizPage === 0 && state.isPlaying) startVisualizerLoop();
   updateVisualLayout();
-  applyPagerTransform(-currentVizPage * vizPageWidth(), !!animate);
-}
-
-/** 单个页面的宽度（像素）：分页容器是视口的两倍宽，一页 = 一半 */
-function vizPageWidth() {
-  const pager = document.getElementById('vizPager');
-  return pager ? pager.clientWidth / 2 : 1;
 }
 
 /**
- * 把分页位移写成内联 transform：
- *   - animate = true 时保留 CSS 过渡 → 平滑滑动到目标页
- *   - animate = false 时临时关掉过渡（拖动跟手 / 窗口尺寸变化时瞬时对齐）
+ * 拖动跟手：只给当前页一个很小的水平位移（百分比），松手后由 setVizPage 复位。
+ * 位移很小（最多 ±6%）且只在拖动期间存在，因此不会影响静止时的文字清晰度。
  */
-function applyPagerTransform(offsetPx, animate) {
+function applyPagerDrag(dxPx) {
   const pager = document.getElementById('vizPager');
-  if (!pager) return;
-  if (!animate) {
-    pager.classList.add('is-dragging');
-    pager.style.transform = 'translate3d(' + offsetPx + 'px, 0, 0)';
-    // 下一帧再恢复过渡，保证这次位移不被动画化
-    window.requestAnimationFrame(() => pager.classList.remove('is-dragging'));
-    return;
-  }
-  pager.classList.remove('is-dragging');
-  pager.style.transform = 'translate3d(' + offsetPx + 'px, 0, 0)';
+  const active = document.querySelector('.viz-page.is-active');
+  if (!pager || !active) return;
+  const width = pager.clientWidth || 1;
+  let ratio = dxPx / width;
+  if (ratio > 0.06) ratio = 0.06;
+  if (ratio < -0.06) ratio = -0.06;
+  active.style.transform = 'translate3d(' + (ratio * 100).toFixed(2) + '%, 0, 0)';
 }
 
 /**
@@ -3485,19 +3610,13 @@ function setupVizPager() {
       if (locked === 'x') {
         // 指针捕获失败（例如合成事件 / 指针已释放）不影响翻页逻辑
         try { pager.setPointerCapture(pointerId); } catch (error) { /* 忽略 */ }
-        pager.classList.add('is-dragging');
       } else {
         active = false;   // 纵向滚动优先，不再参与翻页判定
         return;
       }
     }
-    // 跟手：当前页位移 + 手指位移（限制在一页范围内，两端有阻尼）
-    const pageW = vizPageWidth();
-    const base = -currentVizPage * pageW;
-    let offset = base + dx;
-    if (offset > 0) offset *= 0.35;
-    else if (offset < -pageW) offset = -pageW + (offset + pageW) * 0.35;
-    applyPagerTransform(offset, false);
+    // 跟手：当前页随手指做小幅位移（最多 ±6%），松手后平滑复位或翻页
+    applyPagerDrag(dx);
     lastX = event.clientX;
     lastT = event.timeStamp;
   });
@@ -3508,7 +3627,6 @@ function setupVizPager() {
     const dt = Math.max(1, event.timeStamp - lastT + 1);
     const velocity = Math.abs(event.clientX - lastX) / dt;
     active = false;
-    pager.classList.remove('is-dragging');
     if (pointerId !== null && pager.hasPointerCapture && pager.hasPointerCapture(pointerId)) {
       try { pager.releasePointerCapture(pointerId); } catch (error) { /* 忽略 */ }
     }
@@ -3535,8 +3653,8 @@ function setupVizPager() {
   });
   window.addEventListener('resize', () => {
     updateVisualLayout();
-    // 窗口尺寸变化时瞬时对齐（不播放过渡），避免看到一次无意义的滑动
-    applyPagerTransform(-currentVizPage * vizPageWidth(), false);
+    const active = document.querySelector('.viz-page.is-active');
+    if (active) active.style.transform = '';
   });
 }
 
@@ -3544,6 +3662,7 @@ function initVisualEngine() {
   const canvas = document.getElementById('visualCanvas');
   if (!canvas || !window.RlonVisualEngine) return;
   buildVisualCards();
+  buildVisualPresets();
   visualEngine = window.RlonVisualEngine.create({
     canvas,
     // 数据全部来自现有分析链路：不做第二次 FFT、不重复计算
@@ -3552,9 +3671,17 @@ function initVisualEngine() {
     getFreqBytes: () => freqData,
     getTimeData: () => timeData,
     getMetrics: () => vizMetrics,
-    onResize: () => updateVisualLayout()
+    onResize: () => updateVisualLayout(),
+    // 自动模式换组合 / 切换预设时，界面上的开关与高亮要跟着变
+    onSceneChange: () => syncVisualScene()
   });
   if (state.settings.visualState) visualEngine.applyState(state.settings.visualState);
+  // 老存档里没有「自动 / 固定」这个选择（mode），以及第一次打开时：
+  // 默认进入自动模式，让画面按节拍自动换组合；用户随时可以点某条预设固定下来。
+  if (!state.settings.visualState || !state.settings.visualState.mode) {
+    visualEngine.setAuto(true);
+    persistVisualState();
+  }
   visualCardEls.forEach((el, id) => {
     const fx = visualEngine.instances.get(id);
     if (!fx) return;
@@ -3568,7 +3695,9 @@ function initVisualEngine() {
     });
   });
   setupVizPager();
+  setVizPage(0, false);   // 启动时第一页为活动页（隐藏页不渲染）
   updateVisualLayout();
+  syncVisualScene();
   updateVisualStats();
   window.setInterval(updateVisualStats, 1000);
 }

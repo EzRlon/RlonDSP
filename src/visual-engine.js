@@ -65,6 +65,9 @@
       bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0,
       beat: false, beatStrength: 0, beatConfidence: 0, bpm: 0,
       timeSinceBeat: 99, pulse: 0,       // 脉冲包络（连续值，含起音/保持/释放）
+      kick: 0,                            // 更快的冲击包络（约 45ms），用于给粒子打一记冲量
+      beatId: 0,                          // 节拍序号：每次检测到节拍 +1，效果可据此在“正好这一拍”触发动作
+      push: 0,                            // 节拍推力包络（约 90ms）：推动粒子本体，比 kick 长一点，动起来才看得见
       phrase: 0,                          // 乐句级慢包络（2~8 秒尺度）
       spectralFlux: 0, transient: 0, energy: 0, loud: 0,
       silence: true,                      // 是否近似静音（决定只跑基础运动）
@@ -82,6 +85,8 @@
     let bassFast = 0;
     let bassSlow = 0;
     let pulseEnv = 0;
+    let kickEnv = 0;
+    let pushEnv = 0;
     let pulseHold = 0;
     let phraseEnv = 0;
     let loudSmooth = 0;
@@ -167,8 +172,11 @@
         value.beatStrength = Math.max(0.22, excess);
         value.beatConfidence = clamp01(0.35 + excess * 0.65);
         pulseEnv = 1;
-        pulseHold = 0.06;
+        kickEnv = 1;
+        pushEnv = 1;
+        pulseHold = 0.05;
         beatTimes.push(performance.now());
+        value.beatId += 1;
         if (beatTimes.length > 12) beatTimes.shift();
         if (beatTimes.length >= 5) {
           const gaps = [];
@@ -188,14 +196,23 @@
       beatTimer += dt;
       value.timeSinceBeat = beatTimer;
 
-      // 脉冲包络：起音（瞬时到 1）→ 保持（60ms）→ 释放（约 0.34s）
+      // 两级包络：
+      //   kick  —— 45ms 时间常数，给粒子一记真正的冲量（打得住节拍）
+      //   pulse —— 75ms 时间常数 + 50ms 保持，用于亮度 / 尺寸 / 压力波
       if (pulseHold > 0) {
         pulseHold -= dt;
       } else {
-        pulseEnv *= Math.exp(-dt / 0.11);
+        pulseEnv *= Math.exp(-dt / 0.075);
         if (pulseEnv < 0.001) pulseEnv = 0;
       }
       value.pulse = pulseEnv;
+      kickEnv *= Math.exp(-dt / 0.045);
+      if (kickEnv < 0.001) kickEnv = 0;
+      value.kick = kickEnv;
+      // 推力比闪光慢一点（90ms）：闪光负责“看见这一拍”，推力负责“粒子真的被推动”
+      pushEnv *= Math.exp(-dt / 0.09);
+      if (pushEnv < 0.001) pushEnv = 0;
+      value.push = pushEnv;
       value.transient = clamp01(pulseEnv * 0.6 + value.spectralFlux * 6);
       // 乐句级慢包络（2~8 秒尺度）：用于颜色 / 形态这类慢变化
       phraseEnv = lerp(phraseEnv, value.energy, clamp01(dt * 0.55));
@@ -266,18 +283,28 @@
       ctx,
       width: 1,
       height: 1,
+      scale: 1,
       time: 0,
       created: false,
       running: false,
       enabled: false,
-      resize(w, h) {
+      w: 0,          // 当前的“可见程度” 0~1：换预设时用它做淡出淡入，不会硬切
+      fadeDur: 0.5,  // 这一档淡入淡出要花几秒
+      /**
+       * w / h 是 CSS 像素（效果内部统一用这个坐标画画），
+       * scale 是屏幕物理像素倍率。画布真正的像素数 = CSS 尺寸 × 倍率，
+       * 所以画面永远按屏幕的物理像素绘制，不会因为放大而发虚。
+       */
+      resize(w, h, scale) {
         const nw = Math.max(2, Math.round(w));
         const nh = Math.max(2, Math.round(h));
-        if (nw === this.width && nh === this.height) return;
+        const s = Math.max(0.5, Number(scale) || 1);
+        if (nw === this.width && nh === this.height && s === this.scale) return;
         this.width = nw;
         this.height = nh;
-        canvas.width = nw;
-        canvas.height = nh;
+        this.scale = s;
+        canvas.width = Math.max(2, Math.round(nw * s));
+        canvas.height = Math.max(2, Math.round(nh * s));
         if (def.resize) def.resize(this, options);
       },
       create() {
@@ -290,7 +317,12 @@
         if (def.update) def.update(this, dt, bus);
       },
       render(bus) {
-        if (def.render) def.render(this, bus);
+        if (!def.render) return;
+        const paint = this.ctx;
+        // 效果内部按 CSS 像素描述几何，实际输出到物理像素：文字与边缘都不会被重采样糊掉
+        paint.setTransform(this.scale, 0, 0, this.scale, 0, 0);
+        def.render(this, bus);
+        paint.setTransform(1, 0, 0, 1, 0, 0);
       },
       pause() { if (def.pause) def.pause(this); },
       resume() { if (def.resume) def.resume(this); },
@@ -337,6 +369,7 @@
       fx.fieldW = 48;
       fx.fieldH = 28;
       fx.wave = 0;      // 脉冲压力波半径
+      fx.lastBeatId = 0; // 上一拍编号：用来判断「这一帧是否正好是一记新节拍」
     },
     update(fx, dt, bus) {
       const ps = fx.ps;
@@ -345,13 +378,28 @@
       const turb = (fx.state.turbulence / 100) * (0.25 + bus.spectralFlux * 22 + bus.phrase * 0.7);
       const pull = fx.state.attraction / 100;
       const pulse = bus.pulse * fx.state.pulseStrength / 100;
+      // 节拍冲击：每次检测到节拍，就给每个粒子一记向外的冲量 + 一点绕中心的旋转，
+      // 然后靠阻尼自己收住，所以是「被打散再聚拢」，不是整体放大。
+      // 阻尼取 6.5：每拍的力量在下一拍到来前基本散干净，节拍才会一下一下地看得出来；
+      // 阻尼太小时力会一直累积，画面就变成匀速乱转，听着有鼓点、看着却跟不上。
+      const drag = 6.5;
+      // 不打拍子时的「慢漂移」手感必须和以前一模一样：
+      // 阻尼变强后持续力会被吃掉，所以按阻尼比例把噪声场与向心吸引同步放大。
+      // 再乘 0.65 是刻意把“背景漂移”放慢一点：底噪降下来，每一拍的冲劲才突出。
+      const sustain = 43.4 / (60 / drag - 1) * 0.65;
+      const kick = bus.kick * (0.35 + fx.state.pulseStrength / 100);
       const cx = fx.width * 0.5;
       const cy = fx.height * 0.5;
       const scale = Math.min(fx.width, fx.height) * 0.46;
 
-      // 脉冲压力波：把能量向外推，但叠加噪声，因此不是完美圆环
-      fx.wave += dt * (1.1 + pulse * 3.4);
-      if (fx.wave > 1.6) fx.wave = 0;
+      // 压力波与节拍同步：每一拍从中心重新发射一圈，向外扩散约 0.35 秒；
+      // 没有节拍时也保持缓慢扩散，画面不会停住。
+      if (bus.beatId !== fx.lastBeatId) {
+        fx.lastBeatId = bus.beatId;
+        fx.wave = 0.05;
+      }
+      fx.wave += dt * (1.5 + pulse * 1.4 + kick * 2.6);
+      if (fx.wave > 1.5) fx.wave = 0;
 
       ps.ensure(fx.state.count, cx, cy, Math.min(fx.width, fx.height) * 0.6);
       const t = fx.time;
@@ -363,11 +411,20 @@
         // 向量场（噪声）+ 向心吸引 + 脉冲径向力
         const c = curl(ps.x[i] / fx.state.noiseScale, ps.y[i] / fx.state.noiseScale, t * 0.12 + seed * 0.001);
         const waveBand = Math.exp(-Math.pow((dist - fx.wave) * 2.6, 2));
-        const radial = -pull * 1.6 + pulse * waveBand * 6.5;
-        const ax = c.x * flow * 0.35 - (dx / dist) * radial + (noise1(seed + t * 0.7) * turb);
-        const ay = c.y * flow * 0.35 - (dy / dist) * radial + (noise1(seed + 40 + t * 0.7) * turb);
-        ps.vx[i] = (ps.vx[i] + ax * dt * 60) * (1 - dt * 1.35);
-        ps.vy[i] = (ps.vy[i] + ay * dt * 60) * (1 - dt * 1.35);
+        // 粒子被压力波扫过时会被点亮，于是一圈扩散的「能量带」看得见，而不是只有一个圆环
+        ps.size[i] = waveBand;
+        // 脉冲 + 冲击共同驱动压力波
+        const radial = -pull * 1.6 + pulse * 6.5 * waveBand;
+        // 冲量必须「短而猛」：45ms 的 kick 打完就收，下一拍之前画面能回到平静，
+        // 节拍才会一下一下地跳出来（推力拖长了就会糊成匀速乱转）。
+        const impulse = kick * 70;
+        const swirl = kick * 30 * ((Math.round(seed) & 1) ? 1 : -1);
+        const ax = (c.x * flow * 0.35 - (dx / dist) * radial + noise1(seed + t * 0.7) * turb) * sustain
+          + (dx / dist) * impulse - (dy / dist) * swirl;
+        const ay = (c.y * flow * 0.35 - (dy / dist) * radial + noise1(seed + 40 + t * 0.7) * turb) * sustain
+          + (dy / dist) * impulse + (dx / dist) * swirl;
+        ps.vx[i] = (ps.vx[i] + ax * dt * 60) * (1 - dt * drag);
+        ps.vy[i] = (ps.vy[i] + ay * dt * 60) * (1 - dt * drag);
         ps.x[i] += ps.vx[i] * dt * flow;
         ps.y[i] += ps.vy[i] * dt * flow;
         ps.life[i] += dt;
@@ -381,10 +438,11 @@
       const ps = fx.ps;
       ctx.clearRect(0, 0, w, h);
       const pulse = bus.pulse;
+      const kick = bus.kick;
       const scale = Math.min(w, h) * 0.46;
       // 背景能量场：缓慢扩散的柔光（基础运动，不依赖节拍）
       const bg = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.62);
-      bg.addColorStop(0, 'hsla(' + hueOf(bus, 12) + ', 70%, 58%, ' + (0.10 + bus.phrase * 0.16).toFixed(3) + ')');
+      bg.addColorStop(0, 'hsla(' + hueOf(bus, 12) + ', 70%, 58%, ' + (0.10 + bus.phrase * 0.16 + kick * 0.10).toFixed(3) + ')');
       bg.addColorStop(1, 'hsla(' + hueOf(bus, -20) + ', 70%, 50%, 0)');
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, w, h);
@@ -392,8 +450,9 @@
       const base = 0.5 + (bus.highMid || 0) * 1.6;
       for (let i = 0; i < ps.count; i++) {
         const z = ps.z[i];
-        const size = base * (0.5 + z * 1.6) * (0.8 + pulse * 1.5);
-        const alpha = (0.08 + z * 0.30) * (0.55 + pulse * 0.65);
+        const glow = ps.size[i];   // 0~1：压力波扫过时的亮度加成
+        const size = base * (0.5 + z * 1.6) * (0.8 + pulse * 1.5 + kick * 1.6 + glow * kick * 2.4);
+        const alpha = (0.08 + z * 0.30) * (0.55 + pulse * 0.65 + kick * 0.8 + glow * kick * 1.8);
         if (alpha < 0.02) continue;
         // 颜色按深度分层：远处偏冷、近处偏暖，随乐句缓慢变化
         const hue = hueOf(bus, (z - 0.5) * 70 + bus.phrase * 40);
@@ -491,8 +550,10 @@
       fx.trailCtx = fx.trailCanvas.getContext('2d');
     },
     resize(fx) {
-      fx.trailCanvas.width = fx.width;
-      fx.trailCanvas.height = fx.height;
+      // 拖尾画布也按物理像素开，最后 1:1 贴回去，边缘不会发虚
+      fx.trailCanvas.width = Math.max(2, Math.round(fx.width * fx.scale));
+      fx.trailCanvas.height = Math.max(2, Math.round(fx.height * fx.scale));
+      fx.trailCtx.setTransform(fx.scale, 0, 0, fx.scale, 0, 0);
       fx.ps.reset();
     },
     update(fx, dt, bus) {
@@ -501,12 +562,18 @@
       const speed = 0.35 + (fx.state.speed / 100) * 2.2;
       // 基础运动：噪声场自然演化；音频只增加扰动强度
       const turb = 0.15 + (fx.state.turbulence / 100) * (0.5 + bus.spectralFlux * 14 + bus.bass * 0.6);
+      // 节拍冲击：每一拍流场整体加速，并沿每个粒子自己的流向补一记推力
+      //（不是整屏平移），所以看到的是「流动突然变快」而不是画面挪一下
+      const kick = bus.kick * (0.5 + fx.state.speed / 100);
+      const push = bus.push * (0.5 + fx.state.speed / 100);
+      const accel = 1 + push * 3.2;
+      const follow = clamp01(dt * (4 + push * 14));
       ps.ensure(fx.state.count, fx.width * 0.5, fx.height * 0.5, Math.max(fx.width, fx.height) * 0.9);
       for (let i = 0; i < ps.count; i++) {
         const c = curl(ps.x[i] / fx.state.noiseScale, ps.y[i] / fx.state.noiseScale, t * 0.09);
         const seed = ps.seed[i];
-        ps.vx[i] = lerp(ps.vx[i], c.x * speed + noise1(seed + t) * turb, clamp01(dt * 4));
-        ps.vy[i] = lerp(ps.vy[i], c.y * speed + noise2(seed + t) * turb, clamp01(dt * 4));
+        ps.vx[i] = lerp(ps.vx[i], c.x * speed * accel + noise1(seed + t) * turb, follow) + c.x * push * 8;
+        ps.vy[i] = lerp(ps.vy[i], c.y * speed * accel + noise2(seed + t) * turb, follow) + c.y * push * 8;
         ps.x[i] += ps.vx[i] * dt * 60 * speed * 0.5;
         ps.y[i] += ps.vy[i] * dt * 60 * speed * 0.5;
         ps.life[i] += dt;
@@ -528,15 +595,15 @@
       const pulse = bus.pulse;
       for (let i = 0; i < ps.count; i++) {
         const z = ps.z[i];
-        const size = 0.6 + z * 1.5 + pulse * 1.2;
-        const alpha = 0.18 + z * 0.35;
+        const size = 0.6 + z * 1.5 + pulse * 1.2 + bus.kick * 2.2;
+        const alpha = (0.18 + z * 0.35) * (1 + bus.kick * 0.8);
         tc.fillStyle = 'hsla(' + hueOf(bus, (z - 0.5) * 90 + bus.phrase * 35) + ', 88%, ' + (60 + z * 16).toFixed(0) + '%, ' + alpha.toFixed(3) + ')';
         tc.beginPath();
         tc.arc(ps.x[i], ps.y[i], size, 0, TAU);
         tc.fill();
       }
       ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(fx.trailCanvas, 0, 0);
+      ctx.drawImage(fx.trailCanvas, 0, 0, w, h);
     }
   });
 
@@ -929,6 +996,27 @@
   }
 
   /* ==========================================================================
+   * 预设：一条预设 = 一组同时打开的效果（单效果 或 组合）
+   * 自动模式会按音乐节拍在这些预设之间随机轮换，切换时淡出淡入，不会突然跳。
+   * ==================================================================== */
+  const presets = [
+    { id: 'organic', labelKey: 'vfxOrganicPulse', effects: ['organicPulse'] },
+    { id: 'nebula', labelKey: 'vfxNebula', effects: ['nebula'] },
+    { id: 'flow', labelKey: 'vfxFlowField', effects: ['flowField'] },
+    { id: 'aurora', labelKey: 'vfxAurora', effects: ['aurora'] },
+    { id: 'fluid', labelKey: 'vfxFluid', effects: ['fluid'] },
+    { id: 'plasma', labelKey: 'vfxPlasma', effects: ['plasma'] },
+    { id: 'cymatics', labelKey: 'vfxCymatics', effects: ['cymatics'] },
+    { id: 'electric', labelKey: 'vfxElectricField', effects: ['electricField'] },
+    { id: 'nebulaAurora', labelKey: 'vfxPresetNebulaAurora', effects: ['nebula', 'aurora'] },
+    { id: 'fluidElectric', labelKey: 'vfxPresetFluidElectric', effects: ['fluid', 'electricField'] },
+    { id: 'pulseCymatics', labelKey: 'vfxPresetPulseCymatics', effects: ['organicPulse', 'cymatics'] },
+    { id: 'plasmaFlow', labelKey: 'vfxPresetPlasmaFlow', effects: ['plasma', 'flowField'] },
+    { id: 'auroraElectric', labelKey: 'vfxPresetAuroraElectric', effects: ['aurora', 'electricField'] },
+    { id: 'deepSpace', labelKey: 'vfxPresetDeepSpace', effects: ['nebula', 'plasma', 'cymatics'] }
+  ];
+
+  /* ==========================================================================
    * 引擎：生命周期、合成、尺寸与画质
    * ==================================================================== */
   function create(options) {
@@ -938,29 +1026,119 @@
     const instances = new Map();
     let sceneActive = false;
     let windowVisible = !document.hidden;
-    let autoScale = 1;
     let rafId = 0;
     let lastTime = 0;
     let frameMsAvg = 16;
     let cssWidth = 2;
     let cssHeight = 2;
     let renderScale = 1;
+    let mode = 'manual';          // manual = 自己勾选；auto = 自动轮换预设
+    let presetId = 'manual';      // 当前固定的预设 id
+    const auto = { pending: false, nextAt: 0, beatId: 0 };
 
     registry.forEach((def) => instances.set(def.id, createEffect(def, options)));
 
     function isRunning(id) {
       const fx = instances.get(id);
-      return !!(fx && fx.enabled && sceneActive && windowVisible);
+      return !!(fx && (fx.enabled || fx.w > 0.05) && sceneActive && windowVisible);
+    }
+
+    function notifyScene() {
+      if (!options.onSceneChange) return;
+      try {
+        options.onSceneChange({ mode, preset: presetId });
+      } catch (error) { /* 界面同步失败不影响画面 */ }
+    }
+
+    /** 打开/关闭某个效果：关闭时先淡出，淡完再真正停（避免画面突然缺一块） */
+    function setFxEnabled(fx, on, fade) {
+      const next = !!on;
+      fx.fadeDur = fade;
+      if (next === !!fx.enabled) return;
+      fx.enabled = next;
+      if (next) {
+        fx.create();
+        fx.running = true;
+        fx.resume();
+      }
+    }
+
+    function effectIds() {
+      const ids = [];
+      instances.forEach((fx, id) => { if (fx.enabled) ids.push(id); });
+      return ids;
+    }
+
+    /** 把「当前开着哪些效果」整体换成 ids（其余淡出），fade 是淡入淡出秒数 */
+    function applyEnabledSet(ids, fade) {
+      const wanted = new Set(ids);
+      instances.forEach((fx, id) => setFxEnabled(fx, wanted.has(id), fade));
+      if (sceneActive && windowVisible) start();
+    }
+
+    /** 自动模式下每一段停留多久：大约 9~15 秒，并按 BPM 对齐到小节（4 拍） */
+    function nextAutoDelay() {
+      const base = 9 + Math.random() * 6;
+      const bpm = bus.value.bpm;
+      if (!bpm || bpm < 50 || bpm > 220) return base * 1000;
+      const beatMs = 60000 / bpm;
+      const beats = Math.max(8, Math.round((base * 1000) / beatMs / 4) * 4);
+      return beats * beatMs;
+    }
+
+    /** 随机挑下一条预设（不挑当前这条，避免连着两次一样） */
+    function pickRandom(excludeId) {
+      const pool = presets.filter((p) => p.id !== excludeId);
+      const list = pool.length ? pool : presets;
+      return list[Math.floor(Math.random() * list.length)];
+    }
+
+    function usePreset(id, fade) {
+      const preset = presets.find((p) => p.id === id);
+      if (!preset) return false;
+      presetId = preset.id;
+      applyEnabledSet(preset.effects, fade);
+      return true;
+    }
+
+    function startAuto() {
+      mode = 'auto';
+      const next = pickRandom(null);
+      presetId = next.id;
+      applyEnabledSet(next.effects, 1.6);
+      auto.pending = false;
+      auto.beatId = bus.value.beatId;
+      auto.nextAt = performance.now() + nextAutoDelay();
+      notifyScene();
+    }
+
+    /**
+     * 画布可用的 CSS 尺寸。
+     * 取父元素（视觉区容器）的 clientWidth/Height —— 它是整数，而且不受
+     * 下面给画布写样式的影响，避免出现「越量越小」的循环。
+     */
+    function hostBox() {
+      const parent = host.parentElement;
+      if (parent && parent.clientWidth >= 2 && parent.clientHeight >= 2) {
+        return { width: parent.clientWidth, height: parent.clientHeight };
+      }
+      const rect = host.getBoundingClientRect();
+      return { width: Math.max(2, rect.width), height: Math.max(2, rect.height) };
     }
 
     function resize() {
-      const rect = host.getBoundingClientRect();
-      cssWidth = Math.max(2, rect.width);
-      cssHeight = Math.max(2, rect.height);
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-      renderScale = dpr * autoScale;
+      const box = hostBox();
+      cssWidth = Math.max(2, box.width);
+      cssHeight = Math.max(2, box.height);
+      // 画质固定为屏幕的物理像素倍率（最高 2 倍）。
+      // 这里绝不再「为了帧率把画面降分辨率」——降分辨率正是之前画面发虚的原因。
+      renderScale = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
       host.width = Math.max(2, Math.round(cssWidth * renderScale));
       host.height = Math.max(2, Math.round(cssHeight * renderScale));
+      // 把画布的 CSS 尺寸对齐到整数个物理像素：
+      // 否则画布像素和屏幕像素对不齐，浏览器会把整幅画面再重采样一次，边缘和亮部就糊了。
+      host.style.width = (host.width / renderScale) + 'px';
+      host.style.height = (host.height / renderScale) + 'px';
       if (options.onResize) options.onResize({ width: cssWidth, height: cssHeight });
     }
 
@@ -978,31 +1156,46 @@
         metrics: options.getMetrics ? options.getMetrics() : {},
         dt
       });
+      // 自动模式：到点了就换下一条预设，并且等一个节拍再换，听感上更顺
+      if (mode === 'auto') {
+        if (!auto.pending && now >= auto.nextAt) auto.pending = true;
+        const onBeat = bus.value.beatId !== auto.beatId;
+        if (auto.pending && (onBeat || now >= auto.nextAt + 2000)) {
+          auto.pending = false;
+          usePreset(pickRandom(presetId).id, 1.6);
+          auto.nextAt = now + nextAutoDelay();
+          notifyScene();
+        }
+        auto.beatId = bus.value.beatId;
+      }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, host.width, host.height);
       let active = 0;
       instances.forEach((fx) => {
-        if (!fx.enabled) return;
+        const target = fx.enabled ? 1 : 0;
+        if (fx.w !== target) {
+          const step = dt / Math.max(0.15, fx.fadeDur || 0.5);
+          fx.w = target > fx.w ? Math.min(target, fx.w + step) : Math.max(target, fx.w - step);
+        }
+        if (fx.w <= 0.005) {
+          // 淡出结束才真正停下，画面不会中途被掐掉
+          if (!fx.enabled && fx.running) { fx.running = false; fx.pause(); }
+          return;
+        }
         active++;
         fx.create();
-        fx.resize(cssWidth, cssHeight);
+        fx.resize(cssWidth, cssHeight, renderScale);
         fx.update(dt, bus.value);
         fx.render(bus.value);
         ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
         ctx.globalCompositeOperation = fx.def.blend || 'lighter';
+        ctx.globalAlpha = fx.w;
         ctx.drawImage(fx.canvas, 0, 0, cssWidth, cssHeight);
       });
+      ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       frameMsAvg = frameMsAvg * 0.92 + dt * 1000 * 0.08;
-      // 自动画质：帧耗时偏高就降低内部渲染倍率（先保 60fps，再保细节）
-      if (frameMsAvg > 20 && autoScale > 0.6) {
-        autoScale = Math.max(0.6, autoScale - 0.05);
-        resize();
-      } else if (frameMsAvg < 13 && autoScale < 1) {
-        autoScale = Math.min(1, autoScale + 0.03);
-        resize();
-      }
       if (active > 0) rafId = requestAnimationFrame(frame);
     }
 
@@ -1019,6 +1212,13 @@
       }
       instances.forEach((fx) => { if (fx.running) { fx.running = false; fx.pause(); } });
     }
+
+    // 窗口尺寸变化（用户拖动窗口边界）时立刻重新量一次画布尺寸，
+    // 否则画布会被 CSS 拉伸，画面就会发虚。
+    const resizeObserver = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => resize())
+      : null;
+    if (resizeObserver) resizeObserver.observe(host.parentElement || host);
 
     return {
       bus,
@@ -1041,16 +1241,33 @@
       setEnabled(id, enabled) {
         const fx = instances.get(id);
         if (!fx) return;
-        fx.enabled = !!enabled;
-        if (fx.enabled) {
-          fx.create();
-          fx.running = true;
-          fx.resume();
-        } else {
-          fx.running = false;
-          fx.pause();
-        }
+        setFxEnabled(fx, !!enabled, 0.45);
+        // 手动改过开关就进入「自定义」，不再挂着某条预设
+        mode = 'manual';
+        presetId = 'manual';
         if (sceneActive && windowVisible) start();
+        notifyScene();
+      },
+      presets,
+      getMode() { return mode; },
+      getPreset() { return presetId; },
+      /** 自动模式：按节拍在这些预设里随机轮换（可传 true/false） */
+      setAuto(on) {
+        if (on) {
+          if (mode === 'auto') return;
+          startAuto();
+        } else {
+          mode = 'manual';
+          presetId = 'manual';
+          applyEnabledSet(effectIds(), 0.6);
+          notifyScene();
+        }
+      },
+      /** 固定选一条预设（单效果或组合） */
+      setPreset(id) {
+        if (!usePreset(id, 1.2)) return;
+        mode = 'manual';
+        notifyScene();
       },
       setParam(id, paramId, value) {
         const fx = instances.get(id);
@@ -1061,11 +1278,14 @@
         instances.forEach((fx, id) => {
           out[id] = { enabled: !!fx.enabled, params: Object.assign({}, fx.state) };
         });
+        out.mode = mode;
+        out.preset = presetId;
         return out;
       },
       applyState(state) {
         if (!state || typeof state !== 'object') return;
         Object.keys(state).forEach((id) => {
+          if (id === 'mode' || id === 'preset') return;
           const fx = instances.get(id);
           if (!fx) return;
           const s = state[id] || {};
@@ -1074,6 +1294,16 @@
             if (fx.state[k] !== undefined) fx.state[k] = s.params[k];
           });
         });
+        mode = state.mode === 'auto' ? 'auto' : 'manual';
+        presetId = typeof state.preset === 'string' ? state.preset : 'manual';
+        // 启动时直接显示，不做淡入（避免刚打开软件时画面是空的）
+        instances.forEach((fx) => { fx.w = fx.enabled ? 1 : 0; fx.fadeDur = 0.5; });
+        if (mode === 'auto') {
+          auto.pending = false;
+          auto.beatId = bus.value.beatId;
+          auto.nextAt = performance.now() + nextAutoDelay();
+        }
+        notifyScene();
       },
       resize,
       isRunning,
@@ -1086,11 +1316,12 @@
         return { frameMs: Math.round(frameMsAvg * 10) / 10, scale: Math.round(renderScale * 100) / 100, raf: rafId !== 0 };
       },
       destroy() {
+        if (resizeObserver) resizeObserver.disconnect();
         stop();
         instances.forEach((fx) => fx.destroy());
       }
     };
   }
 
-  window.RlonVisualEngine = { create, createBus, registry };
+  window.RlonVisualEngine = { create, createBus, registry, presets };
 })();
