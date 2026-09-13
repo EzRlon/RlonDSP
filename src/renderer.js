@@ -93,6 +93,35 @@ const I18N = {
     transientAttack: '起音',
     transientSustain: '延音',
     delayFilter: '反馈滤波',
+    visualPageTitle: '沉浸视觉',
+    vfxHint: '向左滑动进入视觉空间',
+    vfxHeartbeat: '心跳',
+    vfxNebula: '星云',
+    vfxParticles: '粒子星系',
+    vfxLiquid: '液体涟漪',
+    vfxEnergyCore: '能量核心',
+    vfxCymatics: '声波图形',
+    vfxCatLife: '生命',
+    vfxCatCosmic: '宇宙',
+    vfxCatParticle: '粒子',
+    vfxCatFluid: '流体',
+    vfxCatEnergy: '能量',
+    vfxCatScientific: '科学',
+    vfxSensitivity: '灵敏度',
+    vfxGlow: '光晕',
+    vfxEcg: '心电曲线',
+    vfxDensity: '层次',
+    vfxReactivity: '反应强度',
+    vfxDrift: '漂移速度',
+    vfxHueShift: '色相变化',
+    vfxParticleCount: '粒子数量',
+    vfxSpeed: '速度',
+    vfxSpread: '扩散',
+    vfxRipples: '波纹层数',
+    vfxViscosity: '黏度',
+    vfxRays: '射线数量',
+    vfxOrder: '对称阶数',
+    vfxDetail: '细节密度',
     save: '保存',
     delete: '删除',
     export: '导出',
@@ -282,6 +311,35 @@ const I18N = {
     transientAttack: 'Attack',
     transientSustain: 'Sustain',
     delayFilter: 'Feedback filter',
+    visualPageTitle: 'Immersive Visual',
+    vfxHint: 'Swipe left for the visual space',
+    vfxHeartbeat: 'Heartbeat',
+    vfxNebula: 'Nebula',
+    vfxParticles: 'Particle Galaxy',
+    vfxLiquid: 'Liquid Ripple',
+    vfxEnergyCore: 'Energy Core',
+    vfxCymatics: 'Cymatics',
+    vfxCatLife: 'Life',
+    vfxCatCosmic: 'Cosmic',
+    vfxCatParticle: 'Particle',
+    vfxCatFluid: 'Fluid',
+    vfxCatEnergy: 'Energy',
+    vfxCatScientific: 'Scientific',
+    vfxSensitivity: 'Sensitivity',
+    vfxGlow: 'Glow',
+    vfxEcg: 'ECG',
+    vfxDensity: 'Density',
+    vfxReactivity: 'Reactivity',
+    vfxDrift: 'Drift',
+    vfxHueShift: 'Hue shift',
+    vfxParticleCount: 'Particles',
+    vfxSpeed: 'Speed',
+    vfxSpread: 'Spread',
+    vfxRipples: 'Ripples',
+    vfxViscosity: 'Viscosity',
+    vfxRays: 'Rays',
+    vfxOrder: 'Symmetry',
+    vfxDetail: 'Detail',
     save: 'Save',
     delete: 'Delete',
     export: 'Export',
@@ -3080,6 +3138,17 @@ function drawEvents(ctx, width, height) {
 }
 
 function renderVisualization() {
+  refreshAnalysis();
+  drawVisualizationCanvases();
+  return true;
+}
+
+/**
+ * 音频分析（读取频谱 / 时域数据，更新响度与每帧指标）。
+ * 与「绘制」拆开：翻到第二页时第一页不再绘制，但分析必须继续，
+ * 视觉引擎才有实时数据可用 —— 两边共用同一份分析结果，不做第二次 FFT。
+ */
+function refreshAnalysis() {
   const hasSignal = analyser && state.isPlaying;
   if (hasSignal) {
     analyser.getByteFrequencyData(freqData);
@@ -3100,6 +3169,12 @@ function renderVisualization() {
     updateLoudness(monoData, monoCount);
     computeVizMetrics();
   }
+  return hasSignal;
+}
+
+/** 第一页的 10 路可视化绘制（隐藏页不做这一步） */
+function drawVisualizationCanvases() {
+  const hasSignal = analyser && state.isPlaying;
   const keys = ['analyzer', 'scope', 'polar', 'loudness', 'arc', 'octave', 'phase', 'stats', 'centroid', 'events'];
   for (const key of keys) {
     const canvas = getVizCanvas(key);
@@ -3135,12 +3210,18 @@ function renderVisualization() {
 // 渲染循环开关：已经在跑就不重复排队
 function startVisualizerLoop() {
   if (animationFrame) return;
+  // 第二页显示时第一页的渲染完全停表（不是隐藏，而是真的不排队）
+  if (typeof currentVizPage === 'number' && currentVizPage !== 0) return;
   animationFrame = requestAnimationFrame(drawVisualizer);
 }
 
 function drawVisualizer() {
   if (document.hidden) {
     animationFrame = null;
+    return;
+  }
+  if (typeof currentVizPage === 'number' && currentVizPage !== 0) {
+    animationFrame = null;   // 隐藏页：立即停止渲染循环，切回来再启动
     return;
   }
   if (analyser && freqData) renderVisualization();
@@ -3155,6 +3236,278 @@ function drawVisualizer() {
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && state.isPlaying) startVisualizerLoop();
 });
+
+/* ============================================================================
+ * 频谱空间分页 + Audio-Reactive Visual Engine
+ * --------------------------------------------------------------------------
+ * 第一页：现有专业分析（10 路可视化，逻辑不动，只加一处分页门控）。
+ * 第二页：沉浸视觉工作区，效果由视觉引擎驱动，音频数据复用现有分析结果。
+ * 两页同属一个频谱空间：不新建窗口、不新建分析器、不碰 DSP 与音频链路。
+ * ========================================================================== */
+let currentVizPage = 0;
+let visualEngine = null;
+let visualCardEls = new Map();
+
+/** 按注册表生成效果卡片（统一设计语言，尺寸随效果特性自适应） */
+function buildVisualCards() {
+  const host = document.getElementById('visualCards');
+  if (!host || !window.RlonVisualEngine) return;
+  host.innerHTML = '';
+  visualCardEls = new Map();
+  window.RlonVisualEngine.registry.forEach((def) => {
+    const card = document.createElement('div');
+    card.className = 'vfx-card' + (def.layout && def.layout.span > 1 ? ' vfx-card--wide' : '');
+    card.dataset.vfx = def.id;
+    card.innerHTML =
+      '<div class="vfx-head">'
+      + '<button class="fx-caret" type="button"><svg class="icon"><use href="#icon-caret"></use></svg></button>'
+      + '<span class="vfx-name"></span>'
+      + '<span class="vfx-cat"></span>'
+      + '<label class="switch"><input type="checkbox" data-vfx-enable="' + def.id + '"></label>'
+      + '</div>'
+      + '<div class="vfx-body"></div>';
+    card.querySelector('.vfx-name').textContent = t(def.nameKey);
+    const catKey = 'vfxCat' + def.category.charAt(0).toUpperCase() + def.category.slice(1);
+    card.querySelector('.vfx-cat').textContent = t(catKey);
+    const body = card.querySelector('.vfx-body');
+    def.parameters.forEach((p) => {
+      const row = document.createElement('div');
+      row.className = 'param';
+      row.dataset.priority = p.priority || 'core';
+      const label = document.createElement('label');
+      label.textContent = t(p.labelKey);
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = String(p.min);
+      slider.max = String(p.max);
+      slider.step = String(p.step);
+      slider.value = String(p.default);
+      slider.dataset.vfxParam = def.id + ':' + p.id;
+      const out = document.createElement('span');
+      const fmt = (v) => (p.step >= 1 ? String(Math.round(v)) : v.toFixed(2));
+      out.textContent = fmt(p.default);
+      slider.addEventListener('input', () => {
+        const v = Number(slider.value);
+        out.textContent = fmt(v);
+        if (visualEngine) visualEngine.setParam(def.id, p.id, v);
+        persistVisualState();
+      });
+      row.append(label, slider, out);
+      body.appendChild(row);
+    });
+    const caret = card.querySelector('.fx-caret');
+    caret.addEventListener('click', () => {
+      const collapsed = card.classList.toggle('collapsed');
+      caret.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+    const toggle = card.querySelector('[data-vfx-enable]');
+    toggle.addEventListener('change', () => {
+      if (visualEngine) visualEngine.setEnabled(def.id, toggle.checked);
+      card.classList.toggle('is-enabled', toggle.checked);
+      updateVisualStats();
+      persistVisualState();
+    });
+    host.appendChild(card);
+    visualCardEls.set(def.id, { card, toggle });
+  });
+}
+
+/** 卡片密度随可用宽度自适应：窄窗口收紧列宽并隐藏次要参数 */
+function updateVisualLayout() {
+  const host = document.getElementById('visualCards');
+  if (!host) return;
+  const w = host.clientWidth;
+  host.style.setProperty('--vfx-col', (w < 560 ? 220 : w < 900 ? 250 : 300) + 'px');
+  const compact = w < 620;
+  host.querySelectorAll('.param').forEach((row) => {
+    const secondary = row.dataset.priority !== 'core';
+    row.style.display = compact && secondary ? 'none' : '';
+  });
+}
+
+function updateVisualStats() {
+  const el = document.getElementById('visualStats');
+  if (!el || !visualEngine) return;
+  const s = visualEngine.frameStats();
+  el.textContent = 'RUN ' + visualEngine.runningCount() + '  ·  ' + s.frameMs + ' ms  ·  x' + s.scale;
+}
+
+/** 视觉效果的启用状态与参数跟随设置一起保存（不丢配置） */
+function persistVisualState() {
+  if (!visualEngine) return;
+  api.setSettings({ visualState: visualEngine.getState() });
+}
+
+function setVizPage(page, animate) {
+  const pager = document.getElementById('vizPager');
+  if (!pager) return;
+  currentVizPage = page === 1 ? 1 : 0;
+  pager.classList.toggle('is-page-2', currentVizPage === 1);
+  document.querySelectorAll('.viz-dot').forEach((dot) => {
+    dot.classList.toggle('active', Number(dot.dataset.vizDot) === currentVizPage);
+  });
+  // 页面生命周期：只有活动页运行自己的渲染，另一页立即停表
+  if (visualEngine) visualEngine.setSceneActive(currentVizPage === 1);
+  if (currentVizPage === 0 && state.isPlaying) startVisualizerLoop();
+  updateVisualLayout();
+  applyPagerTransform(-currentVizPage * vizPageWidth(), !!animate);
+}
+
+/** 单个页面的宽度（像素）：分页容器是视口的两倍宽，一页 = 一半 */
+function vizPageWidth() {
+  const pager = document.getElementById('vizPager');
+  return pager ? pager.clientWidth / 2 : 1;
+}
+
+/**
+ * 把分页位移写成内联 transform：
+ *   - animate = true 时保留 CSS 过渡 → 平滑滑动到目标页
+ *   - animate = false 时临时关掉过渡（拖动跟手 / 窗口尺寸变化时瞬时对齐）
+ */
+function applyPagerTransform(offsetPx, animate) {
+  const pager = document.getElementById('vizPager');
+  if (!pager) return;
+  if (!animate) {
+    pager.classList.add('is-dragging');
+    pager.style.transform = 'translate3d(' + offsetPx + 'px, 0, 0)';
+    // 下一帧再恢复过渡，保证这次位移不被动画化
+    window.requestAnimationFrame(() => pager.classList.remove('is-dragging'));
+    return;
+  }
+  pager.classList.remove('is-dragging');
+  pager.style.transform = 'translate3d(' + offsetPx + 'px, 0, 0)';
+}
+
+/**
+ * 横向滑动切换页面。
+ * - 只在非交互区域起手（滑杆 / 按钮 / 开关 / 下拉上绝不翻页）
+ * - 方向锁定：横向位移明显大于纵向才认定为翻页，纵向滚动不受影响
+ * - 阈值 + 速度双重判定，避免误触
+ */
+function setupVizPager() {
+  const pager = document.getElementById('vizPager');
+  if (!pager) return;
+  const THRESHOLD = 60;
+  const VELOCITY = 0.35;
+  let active = false;
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let lastX = 0;
+  let lastT = 0;
+  let locked = null;
+
+  const isInteractive = (target) => !!target.closest(
+    'input,button,select,textarea,label,.switch,.fx-caret,.viz-dot,a,[contenteditable="true"]'
+  );
+
+  pager.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || isInteractive(event.target)) return;
+    active = true;
+    locked = null;
+    pointerId = event.pointerId;
+    startX = lastX = event.clientX;
+    startY = event.clientY;
+    lastT = event.timeStamp;
+  });
+
+  pager.addEventListener('pointermove', (event) => {
+    if (!active || event.pointerId !== pointerId) return;
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    if (!locked) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      locked = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+      if (locked === 'x') {
+        // 指针捕获失败（例如合成事件 / 指针已释放）不影响翻页逻辑
+        try { pager.setPointerCapture(pointerId); } catch (error) { /* 忽略 */ }
+        pager.classList.add('is-dragging');
+      } else {
+        active = false;   // 纵向滚动优先，不再参与翻页判定
+        return;
+      }
+    }
+    // 跟手：当前页位移 + 手指位移（限制在一页范围内，两端有阻尼）
+    const pageW = vizPageWidth();
+    const base = -currentVizPage * pageW;
+    let offset = base + dx;
+    if (offset > 0) offset *= 0.35;
+    else if (offset < -pageW) offset = -pageW + (offset + pageW) * 0.35;
+    applyPagerTransform(offset, false);
+    lastX = event.clientX;
+    lastT = event.timeStamp;
+  });
+
+  const finish = (event) => {
+    if (!active || (pointerId !== null && event.pointerId !== pointerId)) return;
+    const dx = event.clientX - startX;
+    const dt = Math.max(1, event.timeStamp - lastT + 1);
+    const velocity = Math.abs(event.clientX - lastX) / dt;
+    active = false;
+    pager.classList.remove('is-dragging');
+    if (pointerId !== null && pager.hasPointerCapture && pager.hasPointerCapture(pointerId)) {
+      try { pager.releasePointerCapture(pointerId); } catch (error) { /* 忽略 */ }
+    }
+    pointerId = null;
+    if (locked !== 'x') return;
+    const far = Math.abs(dx) > THRESHOLD;
+    const fast = velocity > VELOCITY && Math.abs(dx) > 24;
+    // 松手后统一走 setVizPage：够阈值就翻页，不够就平滑吸附回原页
+    if ((far || fast) && dx < 0 && currentVizPage === 0) setVizPage(1, true);
+    else if ((far || fast) && dx > 0 && currentVizPage === 1) setVizPage(0, true);
+    else setVizPage(currentVizPage, true);
+  };
+
+  pager.addEventListener('pointerup', finish);
+  pager.addEventListener('pointercancel', finish);
+  document.querySelectorAll('.viz-dot').forEach((dot) => {
+    dot.addEventListener('click', () => setVizPage(Number(dot.dataset.vizDot), true));
+  });
+  window.addEventListener('keydown', (event) => {
+    const modal = document.getElementById('effectsModal');
+    if (modal && !modal.hidden) return;
+    if (event.key === 'ArrowRight' && currentVizPage === 0) setVizPage(1, true);
+    if (event.key === 'ArrowLeft' && currentVizPage === 1) setVizPage(0, true);
+  });
+  window.addEventListener('resize', () => {
+    updateVisualLayout();
+    // 窗口尺寸变化时瞬时对齐（不播放过渡），避免看到一次无意义的滑动
+    applyPagerTransform(-currentVizPage * vizPageWidth(), false);
+  });
+}
+
+function initVisualEngine() {
+  const canvas = document.getElementById('visualCanvas');
+  if (!canvas || !window.RlonVisualEngine) return;
+  buildVisualCards();
+  visualEngine = window.RlonVisualEngine.create({
+    canvas,
+    // 数据全部来自现有分析链路：不做第二次 FFT、不重复计算
+    // 第二页期间由引擎每帧调用 refreshAnalysis()，保证分析数据持续更新
+    beforeFrame: () => refreshAnalysis(),
+    getFreqBytes: () => freqData,
+    getTimeData: () => timeData,
+    getMetrics: () => vizMetrics,
+    onResize: () => updateVisualLayout()
+  });
+  if (state.settings.visualState) visualEngine.applyState(state.settings.visualState);
+  visualCardEls.forEach((el, id) => {
+    const fx = visualEngine.instances.get(id);
+    if (!fx) return;
+    el.toggle.checked = !!fx.enabled;
+    el.card.classList.toggle('is-enabled', !!fx.enabled);
+    el.card.querySelectorAll('.param').forEach((row) => {
+      const slider = row.querySelector('input[type=range]');
+      if (!slider) return;
+      const key = slider.dataset.vfxParam.split(':')[1];
+      if (fx.state[key] !== undefined) slider.value = String(fx.state[key]);
+    });
+  });
+  setupVizPager();
+  updateVisualLayout();
+  updateVisualStats();
+  window.setInterval(updateVisualStats, 1000);
+}
 
 function openSettings() {
   $('themeSelect').value = state.settings.theme;
@@ -3595,6 +3948,7 @@ async function init() {
   if (state.settings.outputDeviceId) applyOutputDevice(state.settings.outputDeviceId);
   await safeRunAsync('版本信息初始化', initUpdateSection);
   await safeRunAsync('置顶状态同步', syncAlwaysOnTopUI);
+  await safeRunAsync('视觉引擎初始化', initVisualEngine);
   // 后台自动检查更新：默认开启，启动后延迟进行，只提示、不打扰播放
   if (state.settings.autoCheckUpdate !== false) {
     window.setTimeout(() => {

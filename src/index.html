@@ -103,6 +103,9 @@
     </aside>
 
     <main class="main-panel lg-surface lg-surface--panel">
+      <!-- 频谱空间：两个横向页面。左右滑动切换（左滑到第二页视觉空间） -->
+      <div class="viz-pager" id="vizPager">
+      <section class="viz-page viz-page--analysis" data-viz-page="0">
       <div class="viz-stage">
         <div class="viz-grid">
           <div class="viz-card" data-cell="a">
@@ -146,6 +149,26 @@
             <canvas class="viz-canvas" data-viz="events"></canvas>
           </div>
         </div>
+      </div>
+      </section>
+
+      <section class="viz-page viz-page--visual" data-viz-page="1">
+        <div class="visual-workspace">
+          <div class="visual-main">
+            <canvas class="visual-canvas" id="visualCanvas"></canvas>
+            <div class="visual-hud" id="visualHud">
+              <span class="visual-hud-title" data-i18n="visualPageTitle">沉浸视觉</span>
+              <span class="visual-hud-stats" id="visualStats">—</span>
+            </div>
+          </div>
+          <div class="visual-cards" id="visualCards"></div>
+        </div>
+      </section>
+      </div>
+
+      <div class="viz-dots" id="vizDots">
+        <button class="viz-dot active" data-viz-dot="0" aria-label="Professional Analysis"></button>
+        <button class="viz-dot" data-viz-dot="1" aria-label="Immersive Visual"></button>
       </div>
     </main>
 
@@ -502,6 +525,7 @@
   <script src="glass-motion.js"></script>
   <script src="dsp-host.js"></script>
   <script src="ir-generator.js"></script>
+  <script src="visual-engine.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
