@@ -78,3 +78,21 @@
 - 如需重新登录：`gh auth login`；如需补权限：`gh auth refresh -s repo,read:org,workflow`。
 
 命令直接使用 `git` 与 `gh`。若二者未加入系统 `PATH`，请先将其所在目录加入 `PATH`，或在命令中改用完整路径。
+
+### 网络：必须经过本机代理
+
+本机**不能直连 GitHub**：直连时会报
+`Failed to connect to github.com port 443` / `connectex: An attempt was made to access a socket in a way forbidden by its access permissions`。
+
+本机常驻一个本地代理（监听 `127.0.0.1:7897`，由用户的代理/加速客户端提供）。因此：
+
+- `gh` 命令：先设置环境变量
+  ```powershell
+  $env:HTTPS_PROXY='http://127.0.0.1:7897'; $env:HTTP_PROXY='http://127.0.0.1:7897'
+  ```
+- `git` 命令：加两个参数（或写入仓库本地配置）
+  ```powershell
+  git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 push origin main
+  ```
+
+若上述端口没有在监听，说明代理客户端没开，需要先启动它再执行同步操作。
