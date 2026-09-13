@@ -1218,26 +1218,21 @@ function renderPresets() {
   if (list) {
     list.innerHTML = '';
     state.presets.filter((preset) => preset.type !== 'pulse').forEach((preset) => {
+      const isActive = activePresetId === preset.id;
       const row = document.createElement('div');
-      row.className = 'preset-row';
+      // 「正在使用」的条目加蓝边 + 淡蓝底，与未启用的条目一眼区分
+      row.className = 'preset-row' + (isActive ? ' active' : '');
       row.innerHTML = `
-        <input type="text" class="preset-name-input" maxlength="40" spellcheck="false" data-preset-name="${preset.id}">
+        <input type="text" class="preset-name-input" maxlength="40" spellcheck="false" data-preset-name="${preset.id}" title="${t('rename')}">
         <div class="preset-row-actions">
-          <button class="mini-btn lg-button" data-preset-rename="${preset.id}"><svg class="icon icon-sm"><use href="#icon-edit"></use></svg><span></span></button>
-          <button class="mini-btn lg-button" data-preset-del="${preset.id}"><svg class="icon icon-sm"><use href="#icon-trash"></use></svg><span></span></button>
+          <button class="mini-btn lg-button" data-preset-del="${preset.id}" title="${t('delete')}"><svg class="icon icon-sm"><use href="#icon-trash"></use></svg></button>
         </div>
-        <label class="switch"><input type="checkbox" data-preset-toggle="${preset.id}"${activePresetId === preset.id ? ' checked' : ''}></label>
+        <label class="switch"><input type="checkbox" data-preset-toggle="${preset.id}"${isActive ? ' checked' : ''}></label>
       `;
       row.querySelector('[data-preset-name]').value = preset.name || DEFAULT_PRESET_NAME;
-      const labels = row.querySelectorAll('.preset-row-actions span');
-      labels[0].textContent = t('rename');
-      labels[1].textContent = t('delete');
       list.appendChild(row);
     });
 
-    list.querySelectorAll('[data-preset-rename]').forEach((btn) => {
-      btn.addEventListener('click', () => renamePreset(btn.dataset.presetRename));
-    });
     list.querySelectorAll('[data-preset-del]').forEach((btn) => {
       btn.addEventListener('click', () => deletePreset(btn.dataset.presetDel));
     });
@@ -1245,8 +1240,17 @@ function renderPresets() {
       toggle.addEventListener('change', () => togglePreset(toggle.dataset.presetToggle, toggle.checked));
     });
     list.querySelectorAll('[data-preset-name]').forEach((input) => {
+      // 名称框本身就是可编辑的：点进去直接改，
+      // 回车或点到别处即保存。所以右侧不再需要「重命名」按钮。
       input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') { event.preventDefault(); renamePreset(input.dataset.presetName); }
+        if (event.key === 'Escape') { event.preventDefault(); input.blur(); renderPresets(); }
+      });
+      input.addEventListener('change', () => {
+        const preset = state.presets.find((p) => p.id === input.dataset.presetName);
+        if (preset && String(input.value || '').trim() !== (preset.name || '')) {
+          renamePreset(input.dataset.presetName);
+        }
       });
     });
   }

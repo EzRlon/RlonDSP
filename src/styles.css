@@ -728,6 +728,22 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
   background: transparent;
 }
 
+/* 正在使用的预设：蓝边 + 淡蓝底，与未启用的条目一眼区分 */
+.preset-row.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* 条目右侧的操作按钮只留图标：正方形、图标居中，不再带文字 */
+.preset-row .preset-row-actions .mini-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .preset-new-tag {
   display: inline-flex;
   align-items: center;
