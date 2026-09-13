@@ -1745,3 +1745,333 @@ body.win-anim-out { animation: winAnimOut 0.18s ease-in forwards; }
   body.win-anim-in,
   body.win-anim-out { animation: none; }
 }
+
+/* ============================================================================
+   RlonDSP Tactile Vector UI
+   --------------------------------------------------------------------------
+   这一层负责“手感”：让软件内部所有按钮共用同一套设计与状态机。
+
+   结构（从下往上）：
+     Button Surface  →  微边框/斜面  →  顶部高光  →  矢量图标  →  交互状态
+
+   硬性约束（改这一块时必须遵守）：
+     1. 只动 transform / opacity / 颜色 / 阴影，绝不动 width / height / padding，
+        所以卡片高度、工具栏宽度、播放栏位置都不会变化；
+     2. 不使用 will-change、不把控件提升成合成层（层一多，文字就会发虚）；
+     3. 不使用大范围发光、厚重 3D、弹跳动画 —— 这是生产工具，不是游戏界面。
+   ========================================================================== */
+:root {
+  /* ---- 表面阶梯 ---- */
+  --tl-surface: rgba(255, 255, 255, 0.66);
+  --tl-surface-hover: rgba(255, 255, 255, 0.92);
+  --tl-surface-pressed: rgba(232, 237, 246, 0.88);
+  --tl-surface-active: rgba(76, 125, 255, 0.14);
+  --tl-surface-disabled: rgba(240, 242, 247, 0.55);
+
+  /* ---- 边框 ---- */
+  --tl-border: rgba(16, 22, 36, 0.10);
+  --tl-border-hover: rgba(16, 22, 36, 0.16);
+  --tl-border-pressed: rgba(16, 22, 36, 0.22);
+
+  /* ---- 高光 / 阴影（一层高光 + 一层环境阴影 = 微立体） ---- */
+  --tl-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --tl-highlight-active: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --tl-shadow-rest: 0 1px 2px rgba(16, 22, 36, 0.10), 0 2px 7px rgba(16, 22, 36, 0.06);
+  --tl-shadow-hover: 0 2px 5px rgba(16, 22, 36, 0.14), 0 8px 20px rgba(16, 22, 36, 0.12);
+  --tl-shadow-pressed: 0 1px 1px rgba(16, 22, 36, 0.08);
+  --tl-inset-pressed: inset 0 1.5px 3px rgba(16, 22, 36, 0.16), inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+
+  /* ---- 图标色 ---- */
+  --tl-icon-disabled: rgba(120, 128, 145, 0.55);
+
+  /* ---- 焦点圈（键盘 Tab 用，鼠标点击不出现） ---- */
+  --tl-focus-ring: 0 0 0 2px rgba(76, 125, 255, 0.5);
+
+  /* ---- 动效令牌：全软件统一的时间与曲线 ---- */
+  --motion-instant: 70ms;
+  --motion-fast: 120ms;
+  --motion-normal: 160ms;
+  --motion-slow: 240ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---- 触感位移：0.5px 视觉抬升 + 1px 按压深度 ---- */
+  --tl-lift: -0.5px;
+  --tl-press: 1px;
+}
+
+[data-theme="dark"] {
+  --tl-surface: rgba(255, 255, 255, 0.07);
+  --tl-surface-hover: rgba(255, 255, 255, 0.13);
+  --tl-surface-pressed: rgba(0, 0, 0, 0.28);
+  --tl-surface-active: rgba(111, 146, 255, 0.18);
+  --tl-surface-disabled: rgba(255, 255, 255, 0.03);
+
+  --tl-border: rgba(255, 255, 255, 0.10);
+  --tl-border-hover: rgba(255, 255, 255, 0.18);
+  --tl-border-pressed: rgba(255, 255, 255, 0.05);
+
+  --tl-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --tl-highlight-active: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --tl-shadow-rest: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.22);
+  --tl-shadow-hover: 0 2px 6px rgba(0, 0, 0, 0.45), 0 10px 22px rgba(0, 0, 0, 0.34);
+  --tl-shadow-pressed: 0 1px 1px rgba(0, 0, 0, 0.30);
+  --tl-inset-pressed: inset 0 1.5px 3px rgba(0, 0, 0, 0.45), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+
+  --tl-icon-disabled: rgba(255, 255, 255, 0.28);
+  --tl-focus-ring: 0 0 0 2px rgba(111, 146, 255, 0.55);
+}
+
+/* ---------------------------------------------------------------------------
+   1) 统一状态机：所有内部按钮共用同一套时间与曲线
+   ------------------------------------------------------------------------- */
+.tb-btn,
+.icon-btn,
+.round-btn,
+.mini-btn,
+.ghost-btn,
+.tool-btn,
+.primary-btn,
+.fx-caret,
+.vfx-chip,
+.viz-dot {
+  /* 离开 hover 时的回归：稍快一点，不能“拖泥带水” */
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out);
+}
+
+/* 图标层单独过渡：按压时图标跟着表面一起“陷”下去一点点 */
+.tb-btn > .icon,
+.icon-btn > .icon,
+.round-btn > .icon,
+.mini-btn > .icon,
+.ghost-btn > .icon,
+.tool-btn > .icon,
+.primary-btn > .icon,
+.fx-caret > .icon {
+  transition:
+    transform var(--motion-fast) var(--motion-ease-out),
+    opacity var(--motion-fast) var(--motion-ease-out);
+}
+
+/* 鼠标移入：只做 0.5px 视觉抬升 + 阴影稍微变实，绝不放大跳动 */
+@media (hover: hover) {
+  .tb-btn:not(.tb-close):hover,
+  .icon-btn:hover,
+  .mini-btn:hover,
+  .ghost-btn:hover,
+  .tool-btn:hover,
+  .fx-caret:hover {
+    transform: translateY(var(--tl-lift));
+    border-color: var(--tl-border-hover);
+    box-shadow: var(--tl-highlight), var(--tl-shadow-hover);
+  }
+
+  .tb-btn:not(.tb-close):hover > .icon,
+  .icon-btn:hover > .icon,
+  .mini-btn:hover > .icon,
+  .ghost-btn:hover > .icon,
+  .tool-btn:hover > .icon,
+  .fx-caret:hover > .icon {
+    transform: translateY(var(--tl-lift));
+  }
+
+  /* 播放控制：原来的 hover 会放大 8%，属于“游戏按钮感”，改成微抬升 */
+  .round-btn:not(.play):hover {
+    transform: translateY(var(--tl-lift));
+    box-shadow: var(--tl-highlight), var(--tl-shadow-hover);
+  }
+
+  .round-btn:not(.play):hover > .icon { transform: translateY(var(--tl-lift)); }
+
+  .round-btn.play:hover {
+    transform: translateY(var(--tl-lift));
+    box-shadow: 0 2px 6px rgba(16, 22, 36, 0.16), 0 8px 20px rgba(76, 125, 255, 0.28);
+  }
+
+  .vfx-chip:hover { transform: translateY(var(--tl-lift)); box-shadow: var(--tl-shadow-rest); }
+  .viz-dot:hover { transform: translateY(var(--tl-lift)); }
+}
+
+/* 按下：表面内陷 + 阴影收缩 + 图标跟着下沉，1px 深度，不做夸张弹跳。
+   注意：这里必须带上 :not() 版本，否则上面「鼠标移入」的规则优先级更高，
+   按住不放时看到的还是 hover 状态（圆形按钮曾出现这个问题）。 */
+.tb-btn:active,
+.tb-btn:not(.tb-close):active,
+.icon-btn:active,
+.round-btn:active,
+.round-btn:not(.play):active,
+.round-btn.play:active,
+.mini-btn:active,
+.ghost-btn:active,
+.tool-btn:active,
+.primary-btn:active,
+.fx-caret:active,
+.vfx-chip:active {
+  transform: translateY(var(--tl-press)) scale(0.988);
+  box-shadow: var(--tl-inset-pressed);
+}
+
+.tb-btn:active > .icon,
+.tb-btn:not(.tb-close):active > .icon,
+.icon-btn:active > .icon,
+.round-btn:active > .icon,
+.round-btn:not(.play):active > .icon,
+.round-btn.play:active > .icon,
+.mini-btn:active > .icon,
+.ghost-btn:active > .icon,
+.tool-btn:active > .icon,
+.primary-btn:active > .icon,
+.fx-caret:active > .icon {
+  transform: translateY(var(--tl-press)) scale(0.97);
+}
+
+/* 键盘焦点：克制的焦点圈，鼠标点击不会出现（:focus-visible） */
+.tb-btn:focus-visible,
+.icon-btn:focus-visible,
+.round-btn:focus-visible,
+.mini-btn:focus-visible,
+.ghost-btn:focus-visible,
+.tool-btn:focus-visible,
+.primary-btn:focus-visible,
+.fx-caret:focus-visible,
+.vfx-chip:focus-visible,
+.viz-dot:focus-visible {
+  outline: none;
+  box-shadow: var(--tl-focus-ring), var(--tl-highlight);
+}
+
+/* 禁用：整体变淡变平，不响应 hover 位移 */
+.tb-btn:disabled,
+.icon-btn:disabled,
+.round-btn:disabled,
+.mini-btn:disabled,
+.ghost-btn:disabled,
+.tool-btn:disabled,
+.primary-btn:disabled {
+  transform: none;
+  cursor: default;
+  opacity: 0.5;
+  box-shadow: none;
+  color: var(--tl-icon-disabled);
+}
+
+/* 选中态（例如置顶、随机、单曲循环）：只染底色与图标色，不做发光 */
+.tb-btn.is-active,
+.mini-btn.is-active,
+.tool-btn.is-active,
+.ghost-btn.is-active,
+.round-btn.is-active {
+  background: var(--tl-surface-active);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------------------------------------------------------------------------
+   2) 图标状态变化：Play↔Pause、音量↔静音 之类的“软切换”
+   （几何差异大的图标不做强行变形，只做 140ms 的轻微淡入+微缩放，避免畸形）
+   ------------------------------------------------------------------------- */
+.icon.is-swapping {
+  animation: iconSwap var(--motion-normal) var(--motion-ease-out);
+}
+
+@keyframes iconSwap {
+  from { opacity: 0.45; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ---------------------------------------------------------------------------
+   3) 开关（Toggle）：Track + Thumb + 高低面 + 主题色指示
+   尺寸保持原样（34 × 19，滑块 13），只换成更精致的表面与更顺的过渡
+   ------------------------------------------------------------------------- */
+.switch input[type="checkbox"] {
+  background: rgba(120, 128, 145, 0.32);
+  border: 1px solid var(--tl-border);
+  box-shadow: inset 0 1px 2px rgba(16, 22, 36, 0.16);
+  transition:
+    background-color var(--motion-normal) var(--motion-ease-out),
+    border-color var(--motion-normal) var(--motion-ease-out),
+    box-shadow var(--motion-normal) var(--motion-ease-out);
+}
+
+[data-theme="dark"] .switch input[type="checkbox"] {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.switch input[type="checkbox"]::after {
+  /* 用 transform 平移：不再修改 left（修改 left 会让浏览器重新排版） */
+  left: 2px;
+  transform: translateX(0);
+  box-shadow:
+    0 1px 2px rgba(16, 22, 36, 0.28),
+    0 2px 5px rgba(16, 22, 36, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition:
+    transform var(--motion-normal) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+.switch input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: transparent;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.switch input[type="checkbox"]:checked::after {
+  left: 2px;
+  transform: translateX(15px);
+  box-shadow:
+    0 1px 2px rgba(16, 22, 36, 0.30),
+    0 2px 6px rgba(16, 22, 36, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+@media (hover: hover) {
+  .switch:hover input[type="checkbox"]:not(:checked) {
+    background: rgba(120, 128, 145, 0.42);
+    border-color: var(--tl-border-hover);
+  }
+}
+
+.switch input[type="checkbox"]:active::after { transform: translateX(0) scale(0.94); }
+.switch input[type="checkbox"]:checked:active::after { transform: translateX(15px) scale(0.94); }
+
+.switch input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--tl-focus-ring), inset 0 1px 2px rgba(16, 22, 36, 0.16);
+}
+
+/* ---------------------------------------------------------------------------
+   4) 标题栏标识：由 PNG 换成矢量标记（任意 DPI 都清晰，不再是位图）
+   ------------------------------------------------------------------------- */
+.titlebar-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: block;
+  overflow: hidden;
+}
+
+/* 尊重系统「减少动态效果」设置 */
+@media (prefers-reduced-motion: reduce) {
+  .tb-btn,
+  .icon-btn,
+  .round-btn,
+  .mini-btn,
+  .ghost-btn,
+  .tool-btn,
+  .primary-btn,
+  .fx-caret,
+  .vfx-chip,
+  .viz-dot,
+  .switch input[type="checkbox"],
+  .switch input[type="checkbox"]::after {
+    transition-duration: 1ms !important;
+  }
+  .icon.is-swapping { animation: none; }
+}

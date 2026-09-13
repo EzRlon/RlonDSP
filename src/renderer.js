@@ -791,11 +791,29 @@ function toggleMiniMode() {
   api.toggleMini();
 }
 
+/**
+ * 图标状态切换（播放↔暂停、音量↔静音、循环模式、最大化↔还原）。
+ * 只做两件事：换成新的矢量图标 + 在它身上播一段 160ms 的轻微淡入/微缩放。
+ * 不延时、不拦截功能：功能状态立即生效，动画只是视觉上的顺滑。
+ */
+function swapIcon(useEl, href) {
+  if (!useEl) return;
+  if (useEl.getAttribute('href') === href) return;
+  useEl.setAttribute('href', href);
+  const svg = useEl.ownerSVGElement;
+  if (!svg) return;
+  svg.classList.remove('is-swapping');
+  // 强制重新开始动画（连续快速切换时也要重播）
+  void svg.getBoundingClientRect();
+  svg.classList.add('is-swapping');
+  window.setTimeout(() => svg.classList.remove('is-swapping'), 220);
+}
+
 function updateModeButton() {
   const icon = $('modeBtnIcon');
   if (!icon) return;
   const map = { list: '#icon-loop-list', single: '#icon-loop-single', random: '#icon-loop-random' };
-  icon.setAttribute('href', map[state.mode] || '#icon-loop-list');
+  swapIcon(icon, map[state.mode] || '#icon-loop-list');
   $('modeBtn').title = t('playbackMode');
 }
 
@@ -1135,7 +1153,7 @@ function togglePlay() {
 function setPlayButton(playing) {
   state.isPlaying = playing;
   const icon = $('playBtnIcon');
-  if (icon) icon.setAttribute('href', playing ? '#icon-pause' : '#icon-play');
+  swapIcon(icon, playing ? '#icon-pause' : '#icon-play');
   $('playBtn').title = playing ? t('pause') || '暂停' : t('play') || '播放';
   // 恢复播放时立即恢复频谱渲染
   if (playing) startVisualizerLoop();
@@ -1159,7 +1177,7 @@ function toggleMute() {
   state.muted = !state.muted;
   if (audioElement) audioElement.muted = state.muted;
   const icon = $('muteBtnIcon');
-  if (icon) icon.setAttribute('href', state.muted ? '#icon-mute' : '#icon-volume');
+  swapIcon(icon, state.muted ? '#icon-mute' : '#icon-volume');
   $('muteBtn').title = state.muted ? t('unmute') || '取消静音' : t('mute') || '静音';
 }
 
@@ -4004,6 +4022,14 @@ function bindUI() {
     const modal = $('effectsModal');
     if (modal) modal.hidden = false;
   });
+  // 图标系统自检：只做登记与比对，不改任何画面。
+  // 如果哪天某个按钮引用了不存在的图标，控制台会直接点名，方便定位。
+  if (window.RlonIcons) {
+    const report = window.RlonIcons.audit();
+    if (report.missing.length) {
+      console.warn('[RlonDSP 图标] 引用了但没有绘制的图标:', report.missing.join(', '));
+    }
+  }
   on('closeEffectsBtn', 'click', () => {
     const modal = $('effectsModal');
     if (modal) modal.hidden = true;
@@ -4050,7 +4076,7 @@ function bindUI() {
       // 最大化时窗口铺满屏幕，四角要恢复直角（见 styles.css 的窗口圆角说明）
       document.documentElement.classList.toggle('is-maximized', !!value);
       const icon = $('winMaxIcon');
-      if (icon) icon.setAttribute('href', value ? '#icon-win-restore' : '#icon-win-max');
+      swapIcon(icon, value ? '#icon-win-restore' : '#icon-win-max');
       const btn = $('winMaxBtn');
       if (btn) btn.title = value ? '还原' : '最大化';
     });
