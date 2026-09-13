@@ -1023,6 +1023,9 @@
       enabled: false,
       w: 0,          // 当前的“可见程度” 0~1：换预设时用它做淡出淡入，不会硬切
       fadeDur: 0.5,  // 这一档淡入淡出要花几秒
+      page: 0,       // 这个效果的归属页（0=沉浸视觉页）。隐藏页 = 直接跳过，不 update 不 render
+      updCount: 0,   // 诊断计数：真正执行过多少次 update
+      rndCount: 0,   // 诊断计数：真正执行过多少次 render
       /**
        * w / h 是 CSS 像素（效果内部统一用这个坐标画画），
        * scale 是屏幕物理像素倍率。画布真正的像素数 = CSS 尺寸 × 倍率，
@@ -1916,6 +1919,8 @@
         fx.resize(cssWidth, cssHeight, renderScale);
         fx.update(dt, bus.value);
         fx.render(bus.value);
+        fx.updCount++;
+        fx.rndCount++;
         ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
         ctx.globalCompositeOperation = fx.def.blend || 'lighter';
         ctx.globalAlpha = fx.w;
@@ -2043,6 +2048,33 @@
       },
       frameStats() {
         return { frameMs: Math.round(frameMsAvg * 10) / 10, scale: Math.round(renderScale * 100) / 100, raf: rafId !== 0 };
+      },
+      /**
+       * 内部的“页面独占运行时”诊断（不加 UI，只给控制台/测试用）。
+       * 规则：只有 windowVisible && sceneActive && fx.enabled && fx.w <= 0.005 之外的效果
+       * 才会被 update / render —— 隐藏页与未启用效果一律 0 次，不可能偷偷计算。
+       */
+      pageMetrics() {
+        let upd = 0, rnd = 0, active = 0, inactive = 0;
+        let frameUpd = 0, frameRnd = 0;
+        instances.forEach((fx) => {
+          upd += fx.updCount;
+          rnd += fx.rndCount;
+          if (fx.updCount > 0) { frameUpd += 1; }
+          if (fx.rndCount > 0) { frameRnd += 1; }
+          if (fx.enabled) active++; else inactive++;
+        });
+        return {
+          activePage: sceneActive ? 1 : 0,
+          windowVisible,
+          page2UpdateCount: upd,
+          page2RenderCount: rnd,
+          activeGeneratorCount: active,
+          inactiveGeneratorCount: inactive,
+          hiddenPageRuntime: sceneActive ? 0 : (rafId !== 0 ? 1 : 0),
+          frameMs: Math.round(frameMsAvg * 10) / 10,
+          generatorsTouched: { update: frameUpd, render: frameRnd }
+        };
       },
       destroy() {
         if (resizeObserver) resizeObserver.disconnect();
