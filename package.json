@@ -1,6 +1,6 @@
 {
   "name": "rlondsp-player",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Local music player with real-time audio effects",
   "main": "main.js",
   "author": "RlonDSP",

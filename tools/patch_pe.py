@@ -28,8 +28,9 @@ def main():
         "EchoMusic": "RlonDSP",
         "hoowhoami": "RlonDSP",
         "LocalTune": "RlonDSP",
-        "2.3.2-beta.3": "1.0.0.0",
-        "2.3.2.0": "1.0.0.0",
+        "2.3.2-beta.3": "1.0.1.0",
+        "2.3.2.0": "1.0.1.0",
+        "1.0.0.0": "1.0.1.0",
     }
     for old, new in replacements.items():
         data = replace_all(data, old, new)

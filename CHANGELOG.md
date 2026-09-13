@@ -5,7 +5,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [未发布]
+## [1.0.1] - 2026-09-13
 
 ### 修复
 
@@ -134,5 +134,5 @@
 
 ---
 
-[未发布]: https://github.com/EzRlon/RlonDSP/compare/v1.0.0...HEAD
+[1.0.1]: https://github.com/EzRlon/RlonDSP/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/EzRlon/RlonDSP/releases/tag/v1.0.0

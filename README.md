@@ -10,7 +10,7 @@
 
 [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-lightgrey.svg)](#-系统要求)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.1-green.svg)](CHANGELOG.md)
 [![Electron](https://img.shields.io/badge/Electron-43.6.0-47848F.svg)](https://www.electronjs.org/)
 [![Web Audio](https://img.shields.io/badge/Web%20Audio-AudioWorklet-orange.svg)](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Audio_API)
 [![No Cloud](https://img.shields.io/badge/100%25-%E7%BA%AF%E6%9C%AC%E5%9C%B0-red.svg)](#-核心特性)
@@ -160,8 +160,8 @@ RlonDSP 是一款**纯本地**的 Windows 桌面音频工作站与播放器。�
 
 | 版本 | 文件名 | 说明 |
 | :--- | :--- | :--- |
-| 便携版 | `RlonDSP-1.0.0-portable-x64.zip` | 解压后双击 `RlonDSP.exe` 即可使用，**免安装** |
-| 安装版 | `RlonDSP-1.0.0-setup-x64.exe` | 向导式安装，可选安装目录，自动创建桌面与开始菜单快捷方式 |
+| 便携版 | `RlonDSP-1.0.1-portable-x64.zip` | 解压后双击 `RlonDSP.exe` 即可使用，**免安装** |
+| 安装版 | `RlonDSP-1.0.1-setup-x64.exe` | 向导式安装，可选安装目录，自动创建桌面与开始菜单快捷方式 |
 
 **零基础三步走：**
 
