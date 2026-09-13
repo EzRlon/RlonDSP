@@ -223,46 +223,513 @@
   }
 
   /* ==========================================================================
-   * 粒子系统：Emitter → Pool → Initializer → Simulation → Operators → Renderer
-   * 所有数据放在 TypedArray 中，运行期不分配对象。
+   * Particle Agent 生态内核（V2 重构）
+   * --------------------------------------------------------------------------
+   * 设计目标：
+   *   1. 每个粒子都是“个体”：有性格、能量、记忆和生命周期，不是 x/y/vx/vy 四个数字；
+   *   2. 运动永远走 acceleration → velocity → position，保留惯性与过冲；
+   *   3. 音乐不是“遥控每个粒子”，而是先改变世界（局部能量区域），
+   *      附近个体先感受到，再通过邻居互动传播出去；
+   *   4. 邻居查询用均匀网格（O(N)），不做 O(N²) 暴力比较；
+   *   5. 全部数据放在 TypedArray 里，运行期不创建对象 / 数组，避免 GC 抖动。
    * ==================================================================== */
-  function createParticles(capacity) {
+
+  /** 稳定哈希：同一个 seed 永远得到同一个 0~1 值（性格不会每帧变化） */
+  function hash01(seed, salt) {
+    let h = Math.imul(seed | 0, 374761393) + Math.imul(salt | 0, 668265263);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
+  /* 生命周期阶段：每个粒子处在不同阶段，禁止全体同步 */
+  const AG_BIRTH = 0, AG_AWAKEN = 1, AG_EXPLORE = 2, AG_INTERACT = 3,
+        AG_EXCITED = 4, AG_DRIFT = 5, AG_DECAY = 6;
+
+  /** 局部环境的临时输出缓冲（预分配，避免每帧建对象） */
+  const ENV_OUT = new Float32Array(7);
+
+  /**
+   * 粒子个体池。所有字段都是 TypedArray，按索引访问同一个粒子。
+   * 性格字段在“出生”时按 seed 生成一次，之后整个生命周期保持不变。
+   */
+  function createAgents(capacity) {
     const n = Math.max(1, Math.floor(capacity));
-    const P = {
+    const A = {
       n,
       count: 0,
       x: new Float32Array(n),
       y: new Float32Array(n),
       vx: new Float32Array(n),
       vy: new Float32Array(n),
+      age: new Float32Array(n),
       life: new Float32Array(n),
-      maxLife: new Float32Array(n),
-      size: new Float32Array(n),
+      energy: new Float32Array(n),
+      inertia: new Float32Array(n),
       seed: new Float32Array(n),
-      z: new Float32Array(n),        // 伪深度，用于大小/亮度分层
-      spawnAt(i, cx, cy, spread) {
-        P.x[i] = cx + (Math.random() - 0.5) * spread;
-        P.y[i] = cy + (Math.random() - 0.5) * spread;
-        P.vx[i] = 0;
-        P.vy[i] = 0;
-        P.maxLife[i] = 3 + Math.random() * 7;
-        P.life[i] = Math.random() * P.maxLife[i];
-        P.seed[i] = Math.random() * 1000;
-        P.z[i] = Math.random();
-      },
-      /** 按容量补齐到 want 个（只增不减，避免运行期抖动） */
-      ensure(want, cx, cy, spread) {
-        const target = Math.min(P.n, Math.max(0, Math.floor(want)));
-        if (target > P.count) {
-          for (let i = P.count; i < target; i++) P.spawnAt(i, cx, cy, spread);
+      wander: new Float32Array(n),
+      curiosity: new Float32Array(n),
+      social: new Float32Array(n),
+      cohesion: new Float32Array(n),
+      separ: new Float32Array(n),
+      align: new Float32Array(n),
+      audioSens: new Float32Array(n),
+      beatSens: new Float32Array(n),
+      noisePhase: new Float32Array(n),
+      noiseSpeed: new Float32Array(n),
+      state: new Uint8Array(n),
+      stateTimer: new Float32Array(n),
+      stateDur: new Float32Array(n),
+      memEnergy: new Float32Array(n),
+      memDirX: new Float32Array(n),
+      memDirY: new Float32Array(n),
+      memBeat: new Float32Array(n),
+      rot: new Float32Array(n),
+      rotV: new Float32Array(n),
+      opacity: new Float32Array(n),
+      size: new Float32Array(n),
+      depth: new Float32Array(n),
+      glow: new Float32Array(n),
+      local: new Float32Array(n),
+      link: new Float32Array(n),      // 最近邻居索引（-1 表示没有）
+      nb: new Uint8Array(n),          // 邻居数量（生命周期与渲染都会用到）
+      cell: new Uint32Array(n),       // 网格归属（邻居查询用）
+
+      /** 让第 i 个粒子“出生”：随机挑选性格，并给它一个错开的年龄 */
+      spawn(i, w, h, env, cfg) {
+        const c = cfg || EMPTY_CFG;
+        // 位置：整屏随机，再按局部区域偏一点 → 有密度差、有空旷区，但四角都有生命
+        let px = Math.random() * w;
+        let py = Math.random() * h;
+        if (env && env.n) {
+          const z = (Math.random() * env.n) | 0;
+          const bias = (c.zoneBias === undefined ? 0.35 : c.zoneBias) * (0.4 + Math.random() * 0.9);
+          px = px * (1 - bias) + (env.x[z] + (Math.random() - 0.5) * env.r[z] * 1.7) * bias;
+          py = py * (1 - bias) + (env.y[z] + (Math.random() - 0.5) * env.r[z] * 1.7) * bias;
         }
-        P.count = target;
+        A.x[i] = px < 1 ? 1 : (px > w - 1 ? w - 1 : px);
+        A.y[i] = py < 1 ? 1 : (py > h - 1 ? h - 1 : py);
+        const a0 = Math.random() * TAU;
+        const sp = (c.spawnSpeed === undefined ? 8 : c.spawnSpeed) * (0.4 + Math.random());
+        A.vx[i] = Math.cos(a0) * sp;
+        A.vy[i] = Math.sin(a0) * sp;
+
+        const seed = Math.random() * 100000;
+        A.seed[i] = seed;
+        const s = seed | 0;
+        A.wander[i] = 0.25 + hash01(s, 11) * 1.7;              // 爱不爱自己乱走
+        A.curiosity[i] = 0.2 + hash01(s, 12) * 1.7;            // 探索欲望
+        A.social[i] = hash01(s, 13);                            // 0 喜欢独处 → 1 喜欢群体
+        A.cohesion[i] = 0.1 + hash01(s, 14) * 1.0;              // 聚拢倾向
+        A.separ[i] = 0.35 + hash01(s, 15) * 1.5;                // 保持距离倾向
+        A.align[i] = hash01(s, 16) * 1.0;                       // 跟随邻居方向倾向
+        A.audioSens[i] = 0.25 + hash01(s, 17) * 1.6;            // 对音乐敏感度
+        A.beatSens[i] = Math.pow(hash01(s, 18), 3) * 2.4;       // 只有少数粒子对节拍特别敏感
+        A.inertia[i] = 0.35 + hash01(s, 19) * 1.5;              // 惯性大小
+        A.noiseSpeed[i] = 0.05 + hash01(s, 20) * 0.25;
+        A.noisePhase[i] = hash01(s, 21) * 200;
+        A.rot[i] = Math.random() * TAU;
+        A.rotV[i] = (Math.random() - 0.5) * 2.4;
+        A.size[i] = 0.7 + Math.random() * 1.8;
+        A.opacity[i] = 0.22 + Math.random() * 0.5;
+        A.depth[i] = Math.random();
+
+        const minLife = c.minLife === undefined ? 8 : c.minLife;
+        const span = c.lifeSpan === undefined ? 22 : c.lifeSpan;
+        A.life[i] = minLife + Math.random() * span;
+        // 关键：初始年龄随机 → 同一时刻所有粒子处在不同生命阶段，不会一起生一起死
+        A.age[i] = Math.random() * A.life[i] * 0.92;
+        const f = A.age[i] / A.life[i];
+        A.state[i] = f < 0.05 ? AG_BIRTH : f < 0.18 ? AG_AWAKEN : f < 0.72 ? AG_EXPLORE : f < 0.86 ? AG_DRIFT : AG_DECAY;
+        A.stateDur[i] = 0.6 + Math.random() * 1.6;
+        A.stateTimer[i] = A.stateDur[i] * Math.random();
+        A.energy[i] = 0.4 + Math.random() * 0.5;
+        A.memEnergy[i] = 0;
+        // 方向记忆一开始就朝向它出生的方向（单位向量），否则兴奋时没有方向可推
+        A.memDirX[i] = Math.cos(a0);
+        A.memDirY[i] = Math.sin(a0);
+        A.memBeat[i] = 0;
+        A.glow[i] = 0;
+        A.local[i] = 0;
+        A.link[i] = -1;
       },
-      reset() {
-        P.count = 0;
+
+      /** 按需补齐到 want 个（只增不减，避免运行期抖动） */
+      ensure(want, w, h, env, cfg) {
+        const target = Math.min(A.n, Math.max(0, Math.floor(want)));
+        if (target > A.count) {
+          for (let i = A.count; i < target; i++) A.spawn(i, w, h, env, cfg);
+        }
+        A.count = target;
+      },
+
+      reset() { A.count = 0; }
+    };
+    return A;
+  }
+
+  const EMPTY_CFG = {};
+
+  /**
+   * 局部环境：若干块缓慢漂移的“区域”（高能区 / 安静区 / 吸引区 / 排斥区 / 流动区）。
+   * 音乐不会直接推粒子，而是先给这些区域注入能量 —— 靠近的粒子先受影响。
+   */
+  function createEnvironment(count) {
+    const n = Math.max(3, Math.floor(count));
+    const E = {
+      n,
+      x: new Float32Array(n),
+      y: new Float32Array(n),
+      r: new Float32Array(n),
+      vx: new Float32Array(n),
+      vy: new Float32Array(n),
+      energy: new Float32Array(n),
+      base: new Float32Array(n),
+      pull: new Float32Array(n),
+      beatPulse: new Float32Array(n),
+      lastBeat: -1,
+      w: 1,
+      h: 1,
+      drift: 1,
+      init(w, h) {
+        E.w = Math.max(2, w);
+        E.h = Math.max(2, h);
+        for (let k = 0; k < E.n; k++) {
+          const a = (k / E.n) * TAU + Math.random() * 0.6;
+          E.x[k] = E.w * (0.5 + Math.cos(a) * (0.18 + Math.random() * 0.26));
+          E.y[k] = E.h * (0.5 + Math.sin(a) * (0.18 + Math.random() * 0.26));
+          E.r[k] = Math.min(E.w, E.h) * (0.16 + Math.random() * 0.24);
+          const sp = 3 + Math.random() * 9;
+          E.vx[k] = Math.cos(a + 1.7) * sp;
+          E.vy[k] = Math.sin(a + 1.7) * sp;
+          E.base[k] = 0.25 + Math.random() * 0.55;
+          // 一半区域吸引、一半排斥，另有安静区（负能量）
+          const roll = Math.random();
+          E.pull[k] = roll < 0.34 ? 0.5 + Math.random() * 0.9 : (roll < 0.58 ? -(0.4 + Math.random() * 0.8) : 0);
+          E.energy[k] = E.base[k];
+          E.beatPulse[k] = 0;
+        }
+        // 关键：把整体漂移扣掉。
+        // 如果几块区域的速度方向凑巧偏同一侧，整屏粒子会被一起推着往一个方向走，
+        // 看起来就是“全体同步” —— 这是必须避免的。扣掉平均值后，环境整体不流动，
+        // 只有局部在互相推挤。
+        let mvx = 0, mvy = 0;
+        for (let k = 0; k < E.n; k++) { mvx += E.vx[k]; mvy += E.vy[k]; }
+        mvx /= E.n;
+        mvy /= E.n;
+        for (let k = 0; k < E.n; k++) { E.vx[k] -= mvx; E.vy[k] -= mvy; }
+      },
+      resize(w, h) {
+        const sx = Math.max(2, w) / E.w;
+        const sy = Math.max(2, h) / E.h;
+        for (let k = 0; k < E.n; k++) { E.x[k] *= sx; E.y[k] *= sy; }
+        E.w = Math.max(2, w);
+        E.h = Math.max(2, h);
+      },
+      update(dt, bus, speed) {
+        const sp = speed === undefined ? 1 : speed;
+        for (let k = 0; k < E.n; k++) {
+          E.x[k] += E.vx[k] * dt * sp;
+          E.y[k] += E.vy[k] * dt * sp;
+          if (E.x[k] < -E.r[k]) { E.x[k] = -E.r[k]; E.vx[k] = Math.abs(E.vx[k]); }
+          else if (E.x[k] > E.w + E.r[k]) { E.x[k] = E.w + E.r[k]; E.vx[k] = -Math.abs(E.vx[k]); }
+          if (E.y[k] < -E.r[k]) { E.y[k] = -E.r[k]; E.vy[k] = Math.abs(E.vy[k]); }
+          else if (E.y[k] > E.h + E.r[k]) { E.y[k] = E.h + E.r[k]; E.vy[k] = -Math.abs(E.vy[k]); }
+          E.beatPulse[k] = Math.max(0, E.beatPulse[k] - dt * 1.5);
+          // 音乐只改变“世界的能量水平”，再由粒子自己去感受
+          const target = E.base[k] * (0.45 + bus.energy * 1.3) + bus.pulse * 0.25 * E.base[k];
+          E.energy[k] += (target - E.energy[k]) * clamp01(dt * 1.6);
+        }
+        // 一记节拍只砸在 1~2 个区域上：于是“某个角落先动起来”，再往旁边传
+        if (bus.beatId !== E.lastBeat) {
+          E.lastBeat = bus.beatId;
+          const hits = 1 + ((Math.random() * 2) | 0);
+          for (let h = 0; h < hits; h++) {
+            const k = (Math.random() * E.n) | 0;
+            E.beatPulse[k] = Math.min(1.8, E.beatPulse[k] + 0.9 + bus.beatStrength * 0.7);
+            E.energy[k] = Math.min(1.8, E.energy[k] + 0.35);
+          }
+        }
       }
     };
-    return P;
+    return E;
+  }
+
+  /** 采样某个点的局部环境：能量 / 流动 / 吸引 / 节拍脉冲 / 最近区域中心 */
+  function sampleEnv(E, x, y, out) {
+    let e = 0, fx = 0, fy = 0, pull = 0, hit = 0;
+    let bestD = Infinity, bx = x, by = y;
+    for (let k = 0; k < E.n; k++) {
+      const dx = x - E.x[k];
+      const dy = y - E.y[k];
+      const r = E.r[k];
+      const w = 1 / (1 + (dx * dx + dy * dy) / (r * r));
+      e += E.energy[k] * w;
+      fx += E.vx[k] * w;
+      fy += E.vy[k] * w;
+      pull += E.pull[k] * w;
+      hit += E.beatPulse[k] * w;
+      if (dx * dx + dy * dy < bestD) { bestD = dx * dx + dy * dy; bx = E.x[k]; by = E.y[k]; }
+    }
+    out[0] = e;
+    out[1] = fx;
+    out[2] = fy;
+    out[3] = pull;
+    out[4] = hit;
+    out[5] = bx;
+    out[6] = by;
+  }
+
+  /* --------------------------------------------------------------------------
+   * 均匀网格：邻居查询。先按格子做一次计数排序（O(N)），
+   * 每个粒子只看自己所在格子与周围 8 个格子，避免 O(N²) 两两比较。
+   * ------------------------------------------------------------------------ */
+  function createGrid(capacity, cellSize) {
+    const n = Math.max(1, Math.floor(capacity));
+    return {
+      cell: cellSize,
+      cols: 1,
+      rows: 1,
+      cells: 1,
+      counts: new Uint32Array(4),
+      starts: new Uint32Array(8),
+      cursor: new Uint32Array(4),
+      items: new Uint32Array(n),
+      order: new Uint32Array(n)
+    };
+  }
+
+  function resizeGrid(G, w, h, cellSize) {
+    const cols = Math.max(1, Math.ceil(w / cellSize));
+    const rows = Math.max(1, Math.ceil(h / cellSize));
+    const cells = cols * rows;
+    G.cell = cellSize;
+    G.cols = cols;
+    G.rows = rows;
+    G.w = w;
+    G.h = h;
+    if (cells + 1 > G.counts.length) {
+      G.counts = new Uint32Array(cells + 1);
+      G.starts = new Uint32Array(cells + 1);
+      G.cursor = new Uint32Array(cells + 1);
+    }
+    G.cells = cells;
+  }
+
+  /** 把当前所有粒子按格子归位（计数排序），供邻居查询使用 */
+  function buildGrid(G, A) {
+    const cells = G.cells;
+    const counts = G.counts;
+    const starts = G.starts;
+    const cursor = G.cursor;
+    const order = G.order;
+    const count = A.count;
+    counts.fill(0, 0, cells + 1);
+    for (let i = 0; i < count; i++) {
+      let cx = (A.x[i] / G.cell) | 0;
+      let cy = (A.y[i] / G.cell) | 0;
+      if (cx < 0) cx = 0; else if (cx >= G.cols) cx = G.cols - 1;
+      if (cy < 0) cy = 0; else if (cy >= G.rows) cy = G.rows - 1;
+      const c = cy * G.cols + cx;
+      A.cell[i] = c;
+      counts[c]++;
+    }
+    let acc = 0;
+    for (let c = 0; c < cells; c++) {
+      starts[c] = acc;
+      cursor[c] = acc;
+      acc += counts[c];
+    }
+    starts[cells] = acc;
+    for (let i = 0; i < count; i++) order[cursor[A.cell[i]]++] = i;
+  }
+
+  /**
+   * 生态演化主循环（所有粒子效果共用，靠 cfg 参数区分“这个世界的性格”）。
+   *
+   * 一帧里每个粒子依次经历：
+   *   局部环境采样 → 自主游走 → 环境推力 → 邻居互动 → 节拍能量 → 记忆衰减
+   *   → 加速度积分 → 惯性阻尼 → 位置更新 → 生命周期推进（到点重生）
+   *
+   * cfg 可调：
+   *   wander / flow / pull / neighbor / beat / drag / maxSpeed / stateBase
+   *   nbRadius / maxNb / minLife / lifeSpan / zoneBias / spawnSpeed
+   */
+  function stepAgents(A, dt, bus, E, G, cfg, t) {
+    const n = A.count;
+    if (!n) return;
+    const nbR = cfg.nbRadius === undefined ? 34 : cfg.nbRadius;
+    const nbR2 = nbR * nbR;
+    const maxNb = cfg.maxNb === undefined ? 14 : cfg.maxNb;
+    const drag = cfg.drag === undefined ? 0.9 : cfg.drag;
+    const maxSpeed = cfg.maxSpeed === undefined ? 90 : cfg.maxSpeed;
+    const stateBase = cfg.stateBase === undefined ? 1.4 : cfg.stateBase;
+    const out = ENV_OUT;
+
+    for (let i = 0; i < n; i++) {
+      /* ---------------- 1. 局部环境：这个世界此刻在这个位置是什么样 ---------------- */
+      sampleEnv(E, A.x[i], A.y[i], out);
+      const envEnergy = out[0];
+      const envHit = out[4];
+      A.local[i] = envEnergy + envHit;
+
+      /* ---------------- 2. 自主游走：每个粒子有自己的噪声相位与速度 ---------------- */
+      const ph = A.noisePhase[i] + t * A.noiseSpeed[i];
+      const wanderAmt = A.wander[i] * (0.5 + A.curiosity[i] * 0.5) * cfg.wander;
+      // 注意：noise1 / noise2 本身已经是 [-1, 1] 的居中噪声。
+      // 这里绝不能再写 (n * 2 - 1)：那会把居中值硬生生变成 -1 的常数偏置，
+      // 于是每个粒子都被恒定往同一个方向推 —— 整片粒子集体同向漂移。
+      let ax = noise1(ph * 1.3) * wanderAmt;
+      let ay = noise2(ph * 1.1) * wanderAmt;
+
+      /* ---------------- 3. 环境推力：流动 / 吸引 / 排斥 ---------------- */
+      if (cfg.flow) {
+        ax += out[1] * cfg.flow * 0.01;
+        ay += out[2] * cfg.flow * 0.01;
+      }
+      const pull = out[3];
+      if (pull !== 0 && cfg.pull) {
+        const dxz = out[5] - A.x[i];
+        const dyz = out[6] - A.y[i];
+        const dz = Math.sqrt(dxz * dxz + dyz * dyz) + 1e-3;
+        ax += (dxz / dz) * pull * cfg.pull;
+        ay += (dyz / dz) * pull * cfg.pull;
+      }
+
+      /* ---------------- 4. 邻居互动：分离 / 排列 / 聚集（网格查询） ---------------- */
+      const cxi = A.cell[i] % G.cols;
+      const cyi = (A.cell[i] / G.cols) | 0;
+      let nb = 0;
+      let sepX = 0, sepY = 0, cohX = 0, cohY = 0, aliX = 0, aliY = 0, nbBeat = 0;
+      let closest = -1, closestD = nbR2;
+      for (let gy = cyi - 1; gy <= cyi + 1; gy++) {
+        if (gy < 0 || gy >= G.rows) continue;
+        for (let gx = cxi - 1; gx <= cxi + 1; gx++) {
+          if (gx < 0 || gx >= G.cols) continue;
+          const c = gy * G.cols + gx;
+          const s = G.starts[c];
+          const e = G.starts[c + 1];
+          for (let k = s; k < e; k++) {
+            const j = G.order[k];
+            if (j === i) continue;
+            const dx = A.x[j] - A.x[i];
+            const dy = A.y[j] - A.y[i];
+            const d2 = dx * dx + dy * dy;
+            if (d2 > nbR2) continue;
+            const d = Math.sqrt(d2) + 1e-3;
+            const inv = 1 / d;
+            sepX -= dx * inv * inv * nbR;
+            sepY -= dy * inv * inv * nbR;
+            cohX += dx;
+            cohY += dy;
+            aliX += A.vx[j];
+            aliY += A.vy[j];
+            nbBeat += A.memBeat[j];
+            nb++;
+            if (d2 < closestD) { closestD = d2; closest = j; }
+            if (nb >= maxNb) break;
+          }
+          if (nb >= maxNb) break;
+        }
+        if (nb >= maxNb) break;
+      }
+      A.nb[i] = nb > 255 ? 255 : nb;
+      A.link[i] = closest;
+      if (nb > 0) {
+        const inv = 1 / nb;
+        // 三种力分开加权：分离要够强（个体感），排列必须很弱，
+        // 否则整片粒子会迅速锁成一个方向 —— 那就是“全体同步”，必须避免。
+        const sepW = cfg.sepW === undefined ? 0.6 : cfg.sepW;
+        const cohW = cfg.cohW === undefined ? 0.04 : cfg.cohW;
+        const aliW = cfg.alignW === undefined ? 0.05 : cfg.alignW;
+        ax += (sepX * A.separ[i] * sepW + cohX * inv * A.cohesion[i] * cohW +
+          (aliX * inv - A.vx[i]) * A.align[i] * aliW) * cfg.neighbor;
+        ay += (sepY * A.separ[i] * sepW + cohY * inv * A.cohesion[i] * cohW +
+          (aliY * inv - A.vy[i]) * A.align[i] * aliW) * cfg.neighbor;
+        // 邻居刚刚兴奋过 → 自己也被轻微带动（这是“局部传播”的关键）
+        A.memBeat[i] = Math.min(1.6, A.memBeat[i] + nbBeat * inv * 0.35 * dt);
+      }
+
+      /* ---------------- 5. 节拍：不是遥控，而是世界给这个地方加了一点能量 ---------------- */
+      // 敏感度是个体差异：多数粒子只被轻微带一下，少数才会真的“跳起来”。
+      // 这里刻意把系数压小，否则所有人都会顶到能量上限，又变成全体同步。
+      const sens = A.beatSens[i] * (0.4 + A.audioSens[i] * 0.5);
+      // 关键：节拍只在“这一记鼓点”的瞬间起作用（kick 只有 45ms），再乘上它所在位置的
+      // 局部能量。环境能量绝不能作为持续输入 —— 那会让所有个体很快顶到上限，
+      // 于是又变回“全体同步”，这正是本任务要消灭的现象。
+      const localBoost = 0.5 + Math.min(1.5, envEnergy) * 0.35 + envHit * 0.35;
+      const beatOnly = cfg.beat * bus.kick * sens * 0.5 * localBoost;
+      if (beatOnly > 0) {
+        A.memBeat[i] = Math.min(1.5, A.memBeat[i] + beatOnly * dt * 4);
+        A.energy[i] = Math.min(1.6, A.energy[i] + beatOnly * dt * 1.2);
+      }
+      // 对音乐越敏感的个体，兴奋消退得越慢（记忆也有个体差异）
+      const decay = (cfg.memDecay === undefined ? 1.2 : cfg.memDecay) *
+        (1.25 - 0.6 * Math.min(1, A.beatSens[i] / 2));
+      A.memBeat[i] = Math.max(0, A.memBeat[i] - dt * decay);
+      A.memEnergy[i] += (A.energy[i] - A.memEnergy[i]) * clamp01(dt * 1.2);
+      // 平时靠“所在区域的能量”给一点常态底色：这是空间差异，不是时间上的全体同步
+      A.energy[i] = Math.min(1.6, A.energy[i] + (0.25 + envEnergy * 0.12) * dt * 0.5);
+
+      /* ---------------- 6. 兴奋：沿记忆方向持续一段，再衰减（不是闪一下就没） ---------------- */
+      const excite = A.memBeat[i];
+      if (excite > 0.08) {
+        const dirX = A.memDirX[i], dirY = A.memDirY[i];
+        const curl2 = curl(A.x[i] / 220, A.y[i] / 220, t * 0.3 + A.noisePhase[i]);
+        const push = (cfg.exciteAccel === undefined ? 26 : cfg.exciteAccel) * excite;
+        ax += dirX * push + curl2.x * push * 0.35;
+        ay += dirY * push + curl2.y * push * 0.35;
+        A.rotV[i] += (curl2.x - curl2.y) * excite * dt * 6;
+      }
+      A.rot[i] += A.rotV[i] * dt;
+      A.rotV[i] *= (1 - dt * 1.2);
+
+      /* ---------------- 7. 惯性积分：加速度 → 速度 → 位置 ---------------- */
+      const dmp = drag / A.inertia[i];
+      A.vx[i] += (ax - A.vx[i] * dmp) * dt;
+      A.vy[i] += (ay - A.vy[i] * dmp) * dt;
+      const sp2 = A.vx[i] * A.vx[i] + A.vy[i] * A.vy[i];
+      if (sp2 > maxSpeed * maxSpeed) {
+        const k = maxSpeed / Math.sqrt(sp2);
+        A.vx[i] *= k;
+        A.vy[i] *= k;
+      }
+      A.x[i] += A.vx[i] * dt;
+      A.y[i] += A.vy[i] * dt;
+
+      // 方向记忆保存的是“单位方向”（不是速度大小），这样兴奋时的推力大小可控，
+      // 不会因为速度越大推力越大而把所有人顶到同一个上限。
+      const spd = Math.sqrt(A.vx[i] * A.vx[i] + A.vy[i] * A.vy[i]) + 1e-4;
+      A.memDirX[i] += (A.vx[i] / spd - A.memDirX[i]) * clamp01(dt * 0.9);
+      A.memDirY[i] += (A.vy[i] / spd - A.memDirY[i]) * clamp01(dt * 0.9);
+      A.energy[i] = Math.max(0, A.energy[i] - dt * 0.45);
+      A.glow[i] = A.memBeat[i];
+
+      /* ---------------- 8. 边界：环绕（保证整屏都有生命，不会都堆在中间） ---------------- */
+      const bx = cfg.wrap === undefined ? 12 : cfg.wrap;
+      if (A.x[i] < -bx) A.x[i] = G.w + bx; else if (A.x[i] > G.w + bx) A.x[i] = -bx;
+      if (A.y[i] < -bx) A.y[i] = G.h + bx; else if (A.y[i] > G.h + bx) A.y[i] = -bx;
+
+      /* ---------------- 9. 生命周期推进 ---------------- */
+      A.age[i] += dt;
+      A.stateTimer[i] -= dt;
+      const frac = A.age[i] / A.life[i];
+      let st = A.state[i];
+      if (A.stateTimer[i] <= 0) {
+        if (st === AG_BIRTH) st = AG_AWAKEN;
+        else if (st === AG_AWAKEN) st = AG_EXPLORE;
+        else if (st === AG_EXPLORE) st = (nb >= 3 && A.social[i] > 0.55) ? AG_INTERACT : (frac > 0.55 ? AG_DRIFT : AG_EXPLORE);
+        else if (st === AG_INTERACT) st = (A.memBeat[i] > 0.7 || A.energy[i] > 1.1) ? AG_EXCITED : (nb < 2 ? AG_EXPLORE : AG_INTERACT);
+        else if (st === AG_EXCITED) st = AG_INTERACT;
+        else if (st === AG_DRIFT) st = frac > 0.85 ? AG_DECAY : AG_EXPLORE;
+        else st = AG_DECAY;
+        A.state[i] = st;
+        A.stateDur[i] = stateBase * (0.55 + Math.random() * 0.95) * (st === AG_INTERACT ? 0.75 : 1);
+        A.stateTimer[i] = A.stateDur[i];
+      }
+      if (frac >= 1 || (st === AG_DECAY && A.stateTimer[i] <= 0)) {
+        A.spawn(i, G.w, G.h, E, cfg);
+      }
+    }
   }
 
   /* ==========================================================================
@@ -364,102 +831,80 @@
       { id: 'noiseScale', labelKey: 'vfxNoiseScale', min: 20, max: 300, step: 5, default: 120, priority: 'advanced' }
     ],
     create(fx) {
-      fx.ps = createParticles(2800);
-      fx.field = new Float32Array(48 * 28);
-      fx.fieldW = 48;
-      fx.fieldH = 28;
-      fx.wave = 0;      // 脉冲压力波半径
-      fx.lastBeatId = 0; // 上一拍编号：用来判断「这一帧是否正好是一记新节拍」
+      // 一个“生态”：个体池 + 局部环境 + 邻居网格
+      fx.agents = createAgents(2600);
+      fx.env = createEnvironment(6);
+      fx.grid = createGrid(2600, 42);
+      fx.cfg = {};
+      fx.ready = false;
     },
     update(fx, dt, bus) {
-      const ps = fx.ps;
-      // 基础运动始终存在：没有音乐时噪声场依然缓慢演化
-      const flow = 0.25 + (fx.state.flow / 100) * 1.9;
-      const turb = (fx.state.turbulence / 100) * (0.25 + bus.spectralFlux * 22 + bus.phrase * 0.7);
-      const pull = fx.state.attraction / 100;
-      const pulse = bus.pulse * fx.state.pulseStrength / 100;
-      // 节拍冲击：每次检测到节拍，就给每个粒子一记向外的冲量 + 一点绕中心的旋转，
-      // 然后靠阻尼自己收住，所以是「被打散再聚拢」，不是整体放大。
-      // 阻尼取 6.5：每拍的力量在下一拍到来前基本散干净，节拍才会一下一下地看得出来；
-      // 阻尼太小时力会一直累积，画面就变成匀速乱转，听着有鼓点、看着却跟不上。
-      const drag = 6.5;
-      // 不打拍子时的「慢漂移」手感必须和以前一模一样：
-      // 阻尼变强后持续力会被吃掉，所以按阻尼比例把噪声场与向心吸引同步放大。
-      // 再乘 0.65 是刻意把“背景漂移”放慢一点：底噪降下来，每一拍的冲劲才突出。
-      const sustain = 43.4 / (60 / drag - 1) * 0.65;
-      const kick = bus.kick * (0.35 + fx.state.pulseStrength / 100);
-      const cx = fx.width * 0.5;
-      const cy = fx.height * 0.5;
-      const scale = Math.min(fx.width, fx.height) * 0.46;
-
-      // 压力波与节拍同步：每一拍从中心重新发射一圈，向外扩散约 0.35 秒；
-      // 没有节拍时也保持缓慢扩散，画面不会停住。
-      if (bus.beatId !== fx.lastBeatId) {
-        fx.lastBeatId = bus.beatId;
-        fx.wave = 0.05;
-      }
-      fx.wave += dt * (1.5 + pulse * 1.4 + kick * 2.6);
-      if (fx.wave > 1.5) fx.wave = 0;
-
-      ps.ensure(fx.state.count, cx, cy, Math.min(fx.width, fx.height) * 0.6);
-      const t = fx.time;
-      for (let i = 0; i < ps.count; i++) {
-        const dx = (ps.x[i] - cx) / scale;
-        const dy = (ps.y[i] - cy) / scale;
-        const dist = Math.sqrt(dx * dx + dy * dy) + 1e-4;
-        const seed = ps.seed[i];
-        // 向量场（噪声）+ 向心吸引 + 脉冲径向力
-        const c = curl(ps.x[i] / fx.state.noiseScale, ps.y[i] / fx.state.noiseScale, t * 0.12 + seed * 0.001);
-        const waveBand = Math.exp(-Math.pow((dist - fx.wave) * 2.6, 2));
-        // 粒子被压力波扫过时会被点亮，于是一圈扩散的「能量带」看得见，而不是只有一个圆环
-        ps.size[i] = waveBand;
-        // 脉冲 + 冲击共同驱动压力波
-        const radial = -pull * 1.6 + pulse * 6.5 * waveBand;
-        // 冲量必须「短而猛」：45ms 的 kick 打完就收，下一拍之前画面能回到平静，
-        // 节拍才会一下一下地跳出来（推力拖长了就会糊成匀速乱转）。
-        const impulse = kick * 70;
-        const swirl = kick * 30 * ((Math.round(seed) & 1) ? 1 : -1);
-        const ax = (c.x * flow * 0.35 - (dx / dist) * radial + noise1(seed + t * 0.7) * turb) * sustain
-          + (dx / dist) * impulse - (dy / dist) * swirl;
-        const ay = (c.y * flow * 0.35 - (dy / dist) * radial + noise1(seed + 40 + t * 0.7) * turb) * sustain
-          + (dy / dist) * impulse + (dx / dist) * swirl;
-        ps.vx[i] = (ps.vx[i] + ax * dt * 60) * (1 - dt * drag);
-        ps.vy[i] = (ps.vy[i] + ay * dt * 60) * (1 - dt * drag);
-        ps.x[i] += ps.vx[i] * dt * flow;
-        ps.y[i] += ps.vy[i] * dt * flow;
-        ps.life[i] += dt;
-        if (ps.life[i] > ps.maxLife[i] || ps.x[i] < -40 || ps.x[i] > fx.width + 40 || ps.y[i] < -40 || ps.y[i] > fx.height + 40) {
-          ps.spawnAt(i, cx, cy, scale * 1.1);
-        }
-      }
+      const A = fx.agents;
+      if (!fx.ready) { fx.env.init(fx.width, fx.height); fx.ready = true; }
+      // 现有滑杆映射到新模型：不新增控件，但每个滑杆现在真的改变“世界的规则”
+      const cfg = fx.cfg;
+      cfg.wander = 14 + (fx.state.flow / 100) * 45;            // 流动速度 → 个体自主游走强度
+      cfg.flow = 0.8 + (fx.state.turbulence / 100) * 3.4;      // 扰动 → 环境流动影响
+      cfg.pull = (fx.state.attraction / 100) * 2.4;            // 吸引 / 排斥（可为负）
+      cfg.neighbor = 0.55 + (fx.state.pulseStrength / 100) * 0.8; // 脉冲强度 → 邻居互动强度
+      cfg.beat = 1.0 + (fx.state.pulseStrength / 100) * 0.9;      // 脉冲强度 → 对音乐事件的敏感度
+      // 阻尼偏大：每一拍的推力变成“一记冲劲 + 随后收住”，而不是越积越快
+      cfg.drag = 1.4 + (fx.state.flow / 100) * 1.0;
+      cfg.maxSpeed = 60 + (fx.state.flow / 100) * 110;
+      cfg.nbRadius = 26 + (fx.state.noiseScale / 300) * 30;    // 噪声尺度 → 感知半径
+      cfg.maxNb = 14;
+      cfg.minLife = 7;
+      cfg.lifeSpan = 20;
+      cfg.zoneBias = 0.35;
+      cfg.spawnSpeed = 9;
+      cfg.stateBase = 1.5;
+      cfg.memDecay = 1.2;
+      cfg.alignW = 0.05;
+      cfg.sepW = 0.8;
+      cfg.cohW = 0.03;
+      cfg.exciteAccel = 30;
+      fx.env.update(dt, bus, 1);
+      resizeGrid(fx.grid, fx.width, fx.height, cfg.nbRadius);
+      A.ensure(fx.state.count, fx.width, fx.height, fx.env, cfg);
+      buildGrid(fx.grid, A);
+      stepAgents(A, dt, bus, fx.env, fx.grid, cfg, fx.time);
     },
     render(fx, bus) {
       const { ctx, width: w, height: h } = fx;
-      const ps = fx.ps;
+      const A = fx.agents;
       ctx.clearRect(0, 0, w, h);
-      const pulse = bus.pulse;
-      const kick = bus.kick;
-      const scale = Math.min(w, h) * 0.46;
-      // 背景能量场：缓慢扩散的柔光（基础运动，不依赖节拍）
-      const bg = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.62);
-      bg.addColorStop(0, 'hsla(' + hueOf(bus, 12) + ', 70%, 58%, ' + (0.10 + bus.phrase * 0.16 + kick * 0.10).toFixed(3) + ')');
-      bg.addColorStop(1, 'hsla(' + hueOf(bus, -20) + ', 70%, 50%, 0)');
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, w, h);
       ctx.globalCompositeOperation = 'lighter';
-      const base = 0.5 + (bus.highMid || 0) * 1.6;
-      for (let i = 0; i < ps.count; i++) {
-        const z = ps.z[i];
-        const glow = ps.size[i];   // 0~1：压力波扫过时的亮度加成
-        const size = base * (0.5 + z * 1.6) * (0.8 + pulse * 1.5 + kick * 1.6 + glow * kick * 2.4);
-        const alpha = (0.08 + z * 0.30) * (0.55 + pulse * 0.65 + kick * 0.8 + glow * kick * 1.8);
-        if (alpha < 0.02) continue;
-        // 颜色按深度分层：远处偏冷、近处偏暖，随乐句缓慢变化
-        const hue = hueOf(bus, (z - 0.5) * 70 + bus.phrase * 40);
-        ctx.fillStyle = 'hsla(' + hue + ', 88%, ' + (58 + z * 20).toFixed(0) + '%, ' + alpha.toFixed(3) + ')';
+      const hueBase = hueOf(bus, 0);
+      // 个体亮度/大小来自它自己的能量与节拍记忆 —— 没有“全屏统一闪一下”
+      for (let i = 0; i < A.count; i++) {
+        const depth = A.depth[i];
+        const lit = A.energy[i] + A.memBeat[i];
+        const size = A.size[i] * (0.55 + depth * 1.5) * (0.75 + Math.min(1.6, lit) * 0.55);
+        let alpha = A.opacity[i] * (0.4 + Math.min(1.4, lit) * 0.55);
+        const st = A.state[i];
+        if (st === AG_BIRTH) alpha *= 0.35;
+        else if (st === AG_DECAY) alpha *= 0.5;
+        else if (st === AG_EXCITED) alpha *= 1.35;
+        if (alpha < 0.015) continue;
+        const hue = (hueBase + (depth - 0.5) * 70 + A.rot[i] * 5 + bus.phrase * 30 + 360) % 360;
+        ctx.fillStyle = 'hsla(' + hue + ', 88%, ' + (56 + depth * 22).toFixed(0) + '%, ' + alpha.toFixed(3) + ')';
         ctx.beginPath();
-        ctx.arc(ps.x[i], ps.y[i], size, 0, TAU);
+        ctx.arc(A.x[i], A.y[i], size, 0, TAU);
         ctx.fill();
+      }
+      // 关系层：正在互动的个体与最近邻居之间有一条很淡的线（看得出“它们在互相影响”）
+      ctx.lineWidth = 0.6;
+      for (let i = 0; i < A.count; i++) {
+        const st = A.state[i];
+        if (st !== AG_INTERACT && st !== AG_EXCITED) continue;
+        const j = A.link[i];
+        if (j < 0 || j <= i) continue;
+        const glow = (A.glow[i] + A.glow[j]) * 0.5;
+        ctx.strokeStyle = 'hsla(' + ((hueBase + 20) % 360) + ', 85%, 70%, ' + (0.03 + glow * 0.14).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.moveTo(A.x[i], A.y[i]);
+        ctx.lineTo(A.x[j], A.y[j]);
+        ctx.stroke();
       }
       ctx.globalCompositeOperation = 'source-over';
     }
@@ -545,7 +990,12 @@
       { id: 'noiseScale', labelKey: 'vfxNoiseScale', min: 40, max: 400, step: 10, default: 160, priority: 'advanced' }
     ],
     create(fx) {
-      fx.ps = createParticles(3200);
+      // 流场：个体在环境流里自主移动，邻居只做很弱的呼应（保持“被风带走”的观感）
+      fx.agents = createAgents(3200);
+      fx.env = createEnvironment(5);
+      fx.grid = createGrid(3200, 46);
+      fx.cfg = {};
+      fx.ready = false;
       fx.trailCanvas = document.createElement('canvas');
       fx.trailCtx = fx.trailCanvas.getContext('2d');
     },
@@ -554,52 +1004,52 @@
       fx.trailCanvas.width = Math.max(2, Math.round(fx.width * fx.scale));
       fx.trailCanvas.height = Math.max(2, Math.round(fx.height * fx.scale));
       fx.trailCtx.setTransform(fx.scale, 0, 0, fx.scale, 0, 0);
-      fx.ps.reset();
+      if (fx.agents) fx.agents.reset();
     },
     update(fx, dt, bus) {
-      const ps = fx.ps;
-      const t = fx.time;
-      const speed = 0.35 + (fx.state.speed / 100) * 2.2;
-      // 基础运动：噪声场自然演化；音频只增加扰动强度
-      const turb = 0.15 + (fx.state.turbulence / 100) * (0.5 + bus.spectralFlux * 14 + bus.bass * 0.6);
-      // 节拍冲击：每一拍流场整体加速，并沿每个粒子自己的流向补一记推力
-      //（不是整屏平移），所以看到的是「流动突然变快」而不是画面挪一下
-      const kick = bus.kick * (0.5 + fx.state.speed / 100);
-      const push = bus.push * (0.5 + fx.state.speed / 100);
-      const accel = 1 + push * 3.2;
-      const follow = clamp01(dt * (4 + push * 14));
-      ps.ensure(fx.state.count, fx.width * 0.5, fx.height * 0.5, Math.max(fx.width, fx.height) * 0.9);
-      for (let i = 0; i < ps.count; i++) {
-        const c = curl(ps.x[i] / fx.state.noiseScale, ps.y[i] / fx.state.noiseScale, t * 0.09);
-        const seed = ps.seed[i];
-        ps.vx[i] = lerp(ps.vx[i], c.x * speed * accel + noise1(seed + t) * turb, follow) + c.x * push * 8;
-        ps.vy[i] = lerp(ps.vy[i], c.y * speed * accel + noise2(seed + t) * turb, follow) + c.y * push * 8;
-        ps.x[i] += ps.vx[i] * dt * 60 * speed * 0.5;
-        ps.y[i] += ps.vy[i] * dt * 60 * speed * 0.5;
-        ps.life[i] += dt;
-        if (ps.life[i] > ps.maxLife[i] || ps.x[i] < -20 || ps.x[i] > fx.width + 20 || ps.y[i] < -20 || ps.y[i] > fx.height + 20) {
-          ps.spawnAt(i, Math.random() * fx.width, Math.random() * fx.height, 4);
-        }
-      }
+      const A = fx.agents;
+      if (!fx.ready) { fx.env.init(fx.width, fx.height); fx.ready = true; }
+      const cfg = fx.cfg;
+      cfg.wander = 10 + (fx.state.speed / 100) * 30;
+      cfg.flow = 2 + (fx.state.turbulence / 100) * 5.5;
+      cfg.pull = 0;
+      cfg.neighbor = 0.12 + (fx.state.turbulence / 100) * 0.5;
+      cfg.beat = 0.35 + (fx.state.speed / 100) * 0.95;
+      cfg.drag = 0.9 + (fx.state.trail / 100) * 0.6;
+      cfg.maxSpeed = 60 + (fx.state.speed / 100) * 150;
+      cfg.nbRadius = 30 + (fx.state.noiseScale / 400) * 34;
+      cfg.maxNb = 8;
+      cfg.minLife = 5;
+      cfg.lifeSpan = 12;
+      cfg.zoneBias = 0.2;      // 流场更均匀一些，但仍有密度差
+      cfg.spawnSpeed = 18;
+      cfg.stateBase = 1.1;
+      cfg.memDecay = 1.1;
+      fx.env.update(dt, bus, 1.6);
+      resizeGrid(fx.grid, fx.width, fx.height, cfg.nbRadius);
+      A.ensure(fx.state.count, fx.width, fx.height, fx.env, cfg);
+      buildGrid(fx.grid, A);
+      stepAgents(A, dt, bus, fx.env, fx.grid, cfg, fx.time);
     },
     render(fx, bus) {
       const { ctx, width: w, height: h } = fx;
       const tc = fx.trailCtx;
+      const A = fx.agents;
       // 拖尾：一层淡出，让流线自然连成流动感
       const fade = 0.06 + (1 - fx.state.trail / 100) * 0.35;
       tc.globalCompositeOperation = 'destination-out';
       tc.fillStyle = 'rgba(0,0,0,' + fade.toFixed(3) + ')';
       tc.fillRect(0, 0, w, h);
       tc.globalCompositeOperation = 'lighter';
-      const ps = fx.ps;
-      const pulse = bus.pulse;
-      for (let i = 0; i < ps.count; i++) {
-        const z = ps.z[i];
-        const size = 0.6 + z * 1.5 + pulse * 1.2 + bus.kick * 2.2;
-        const alpha = (0.18 + z * 0.35) * (1 + bus.kick * 0.8);
-        tc.fillStyle = 'hsla(' + hueOf(bus, (z - 0.5) * 90 + bus.phrase * 35) + ', 88%, ' + (60 + z * 16).toFixed(0) + '%, ' + alpha.toFixed(3) + ')';
+      for (let i = 0; i < A.count; i++) {
+        const depth = A.depth[i];
+        const lit = A.energy[i] + A.memBeat[i];
+        const size = 0.5 + depth * 1.4 + Math.min(1.2, lit) * 1.1;
+        const alpha = (0.14 + depth * 0.3) * (0.6 + Math.min(1.2, lit) * 0.6);
+        if (alpha < 0.02) continue;
+        tc.fillStyle = 'hsla(' + hueOf(bus, (depth - 0.5) * 90 + bus.phrase * 35) + ', 88%, ' + (58 + depth * 18).toFixed(0) + '%, ' + alpha.toFixed(3) + ')';
         tc.beginPath();
-        tc.arc(ps.x[i], ps.y[i], size, 0, TAU);
+        tc.arc(A.x[i], A.y[i], size, 0, TAU);
         tc.fill();
       }
       ctx.clearRect(0, 0, w, h);
@@ -878,31 +1328,35 @@
       const mode = Math.round(fx.state.mode);
       const react = fx.state.reactivity / 100;
       const decay = 0.3 + (fx.state.decay / 100) * 0.7;
-      const cx = w / 2;
-      const cy = h / 2;
-      const R = Math.min(w, h) * 0.46;
+      // 三个缓慢漂移的波源：声音在空间里长出结构，而不是绕着屏幕正中画同心圆
+      const t = fx.time;
+      const sx = [w * (0.5 + Math.sin(t * 0.070) * 0.30), w * (0.5 + Math.cos(t * 0.050 + 2.1) * 0.34), w * (0.5 + Math.sin(t * 0.045 + 4.2) * 0.30)];
+      const sy = [h * (0.5 + Math.cos(t * 0.060 + 1.2) * 0.30), h * (0.5 + Math.sin(t * 0.048 + 3.3) * 0.32), h * (0.5 + Math.cos(t * 0.052 + 5.1) * 0.30)];
+      const R = Math.min(w, h) * 0.55;
       ctx.globalCompositeOperation = 'lighter';
       for (let r = 4; r <= n; r += 2) {
         const u = r / n;
         const bandIdx = Math.min(bins - 1, Math.round(Math.pow(u, 1.8) * (bins - 1)));
         const amp = bins ? (spec[bandIdx] / 255) : bus.energy * 0.4;
         const energy = Math.pow(amp, 1.25) * react * Math.exp(-u * decay);
-        ctx.beginPath();
         const rad = u * R;
-        for (let a = 0; a <= 72; a++) {
-          const ang = (a / 72) * TAU;
-          // 波的干涉：两种模式叠加 + 噪声扰动，避免出现完美圆环
-          const wave = Math.sin(ang * mode + fx.time * 0.3) * 0.6
-            + Math.sin(ang * (mode * 2 + 1) - fx.time * 0.17) * 0.4
-            + noise1(ang * 3.3 + r * 0.7) * 0.35;
-          const rr = rad * (1 + wave * energy * 0.42);
-          const x = cx + Math.cos(ang) * rr;
-          const y = cy + Math.sin(ang) * rr;
-          if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        for (let s = 0; s < 3; s++) {
+          ctx.beginPath();
+          for (let a = 0; a <= 48; a++) {
+            const ang = (a / 48) * TAU;
+            // 波的干涉：两种模式叠加 + 噪声扰动，避免出现完美圆环
+            const wave = Math.sin(ang * mode + t * 0.3 + s) * 0.6
+              + Math.sin(ang * (mode * 2 + 1) - t * 0.17 + s * 1.7) * 0.4
+              + noise1(ang * 3.3 + r * 0.7 + s * 13) * 0.35;
+            const rr = rad * (1 + wave * energy * 0.42);
+            const x = sx[s] + Math.cos(ang) * rr;
+            const y = sy[s] + Math.sin(ang) * rr;
+            if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = 'hsla(' + hueOf(bus, u * 110 + s * 40) + ', 86%, ' + (62 - u * 12).toFixed(0) + '%, ' + ((0.05 + energy * 0.5) / (1 + s * 0.8)).toFixed(3) + ')';
+          ctx.lineWidth = 0.8 + energy * 1.8;
+          ctx.stroke();
         }
-        ctx.strokeStyle = 'hsla(' + hueOf(bus, u * 110) + ', 86%, ' + (62 - u * 12).toFixed(0) + '%, ' + (0.05 + energy * 0.5).toFixed(3) + ')';
-        ctx.lineWidth = 0.8 + energy * 1.8;
-        ctx.stroke();
       }
       ctx.globalCompositeOperation = 'source-over';
     }
@@ -924,76 +1378,85 @@
       { id: 'life', labelKey: 'vfxLifetime', min: 10, max: 100, step: 1, default: 45, priority: 'secondary' }
     ],
     create(fx) {
-      fx.bolts = [];
-      for (let i = 0; i < 26; i++) {
-        fx.bolts.push({ life: Math.random(), sd: i * 71.3 });
-      }
+      // 电场：个体之间追逐 / 排斥，靠近到一定程度就发生一次局部放电（连接）
+      fx.agents = createAgents(1400);
+      fx.env = createEnvironment(4);
+      fx.grid = createGrid(1400, 58);
+      fx.cfg = {};
+      fx.ready = false;
+      fx.discharge = new Float32Array(1400);
     },
     update(fx, dt, bus) {
-      const life = 0.35 + fx.state.life / 100 * 1.6;
-      for (let i = 0; i < fx.bolts.length; i++) {
-        const b = fx.bolts[i];
-        b.life -= dt / life;
-        // 放电由瞬态/高频触发，闪烁间隔随机 → 不是固定节奏动画
-        const trigger = bus.transient * fx.state.reactivity / 100 * (0.6 + framelessRand(i));
-        if (b.life <= 0 && (bus.silence ? Math.random() < 0.02 : Math.random() < 0.15 + trigger)) {
-          b.life = 1;
-          b.sd = Math.random() * 1000;
-          b.x0 = Math.random() * fx.width;
-          b.y0 = Math.random() * fx.height;
-          b.x1 = b.x0 + (Math.random() - 0.5) * fx.width * 0.9;
-          b.y1 = b.y0 + (Math.random() - 0.5) * fx.height * 0.9;
-        }
+      const A = fx.agents;
+      if (!fx.ready) { fx.env.init(fx.width, fx.height); fx.ready = true; }
+      const cfg = fx.cfg;
+      cfg.wander = 14 + (fx.state.branch / 100) * 26;          // 分叉 → 个体自主性
+      cfg.flow = 0.6;
+      cfg.pull = 0.9;                                           // 天生想靠近别人
+      cfg.neighbor = 1.1 + (fx.state.reactivity / 100) * 2.4;    // 反应强度 → 互相影响有多强
+      cfg.beat = 0.5 + (fx.state.reactivity / 100) * 1.6;
+      cfg.drag = 0.8 + (fx.state.life / 100) * 1.0;             // 生命周期 → 收得多快
+      cfg.maxSpeed = 70 + (fx.state.reactivity / 100) * 130;
+      cfg.nbRadius = 60;
+      cfg.maxNb = 6;
+      cfg.minLife = 6;
+      cfg.lifeSpan = 14;
+      cfg.zoneBias = 0.4;
+      cfg.spawnSpeed = 12;
+      cfg.stateBase = 1.0;
+      cfg.memDecay = 0.9;
+      fx.env.update(dt, bus, 1.2);
+      resizeGrid(fx.grid, fx.width, fx.height, cfg.nbRadius);
+      A.ensure(Math.min(1400, Math.round(fx.state.arcs) * 60), fx.width, fx.height, fx.env, cfg);
+      buildGrid(fx.grid, A);
+      stepAgents(A, dt, bus, fx.env, fx.grid, cfg, fx.time);
+      // 放电：刚兴奋过、又刚好有邻居的个体，会亮起一条连接（局部放电事件）
+      const D = fx.discharge;
+      for (let i = 0; i < A.count; i++) {
+        D[i] = Math.max(0, D[i] - dt * 2.2);
+        if (A.memBeat[i] > 0.55 && A.link[i] >= 0) D[i] = Math.min(1, D[i] + A.memBeat[i] * dt * 6);
       }
     },
     render(fx, bus) {
       const { ctx, width: w, height: h } = fx;
+      const A = fx.agents;
       ctx.clearRect(0, 0, w, h);
       ctx.globalCompositeOperation = 'lighter';
-      const arcs = Math.round(fx.state.arcs);
-      const branch = fx.state.branch / 100;
-      for (let i = 0; i < arcs && i < fx.bolts.length; i++) {
-        const b = fx.bolts[i];
-        if (b.life <= 0) continue;
-        const alpha = Math.pow(b.life, 1.6) * (0.25 + bus.transient * 0.6);
-        const hue = hueOf(bus, (i * 17) % 90);
-        const segments = 14;
+      const hueBase = hueOf(bus, -20);
+      const D = fx.discharge;
+      // 主体是“关系”：个体之间的连接线，而不是一根根孤立的闪电
+      for (let i = 0; i < A.count; i++) {
+        const j = A.link[i];
+        if (j < 0 || j <= i) continue;
+        const dx = A.x[j] - A.x[i];
+        const dy = A.y[j] - A.y[i];
+        const d2 = dx * dx + dy * dy;
+        if (d2 > 8100) continue;
+        const near = 1 - Math.sqrt(d2) / 90;
+        const d = D[i];
+        const alpha = (0.05 + near * 0.22 + d * 0.5) * (0.6 + bus.energy * 0.6);
+        if (alpha < 0.02) continue;
+        ctx.strokeStyle = 'hsla(' + ((hueBase + 40 + near * 60 + 360) % 360) + ', 92%, ' + (66 + d * 18).toFixed(0) + '%, ' + alpha.toFixed(3) + ')';
+        ctx.lineWidth = 0.5 + d * 1.8 + near * 0.6;
         ctx.beginPath();
-        for (let s = 0; s <= segments; s++) {
-          const u = s / segments;
-          const jitter = (noise1(b.sd + u * 7 + fx.time * 9) * 26) * (0.3 + branch);
-          const x = lerp(b.x0, b.x1, u) + jitter;
-          const y = lerp(b.y0, b.y1, u) + (noise2(b.sd + u * 6 + fx.time * 7) * 26) * (0.3 + branch);
-          if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = 'hsla(' + hue + ', 92%, ' + (68 + bus.treble * 20).toFixed(0) + '%, ' + alpha.toFixed(3) + ')';
-        ctx.lineWidth = 0.7 + alpha * 2.2;
+        ctx.moveTo(A.x[i], A.y[i]);
+        ctx.lineTo(A.x[j], A.y[j]);
         ctx.stroke();
-        // 分叉支线
-        if (branch > 0.25 && (i % 2 === 0)) {
-          ctx.beginPath();
-          const mx = lerp(b.x0, b.x1, 0.5);
-          const my = lerp(b.y0, b.y1, 0.5);
-          for (let s = 0; s <= 6; s++) {
-            const u = s / 6;
-            const x = lerp(mx, b.x1, u) + noise1(b.sd + u * 11 + fx.time * 11) * 18 * branch;
-            const y = lerp(my, b.y1, u) + noise2(b.sd + u * 13 + fx.time * 12) * 18 * branch;
-            if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-          }
-          ctx.strokeStyle = 'hsla(' + ((hue + 40) % 360) + ', 92%, 72%, ' + (alpha * 0.6).toFixed(3) + ')';
-          ctx.lineWidth = 0.6 + alpha * 1.4;
-          ctx.stroke();
-        }
+      }
+      // 个体
+      for (let i = 0; i < A.count; i++) {
+        const lit = A.energy[i] + A.memBeat[i];
+        const r = 0.8 + A.depth[i] * 1.6 + Math.min(1.5, lit) * 1.4;
+        const a = 0.18 + Math.min(1.4, lit) * 0.5;
+        if (a < 0.03) continue;
+        ctx.fillStyle = 'hsla(' + ((hueBase + A.depth[i] * 80 + 360) % 360) + ', 92%, 72%, ' + a.toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(A.x[i], A.y[i], r, 0, TAU);
+        ctx.fill();
       }
       ctx.globalCompositeOperation = 'source-over';
     }
   });
-
-  /** 供效果内部使用的轻量伪随机（避免每帧 new 对象 / 影响主随机流） */
-  function framelessRand(i) {
-    const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
-    return x - Math.floor(x);
-  }
 
   /* ==========================================================================
    * 预设：一条预设 = 一组同时打开的效果（单效果 或 组合）
