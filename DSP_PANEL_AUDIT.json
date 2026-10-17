@@ -1,0 +1,171 @@
+{
+  "audit": "DSP_PANEL_AUDIT",
+  "date": "2026-09-14",
+  "scope": "realtime-effects-panel",
+  "result": "FAIL",
+  "summary": {
+    "total": 13,
+    "p0": 0,
+    "p1": 4,
+    "p2": 9
+  },
+  "tests": {
+    "command": "node --test tools/tests/*.test.js",
+    "passed": 78,
+    "failed": 0,
+    "total": 78
+  },
+  "issues": [
+    {
+      "id": "P1-01",
+      "effect": "Spatial",
+      "parameter": "surroundRoom",
+      "type": "UI parameter exists but DSP does not use it",
+      "phenomenon": "调整“空间感”只改变 state.effects.surround.roomSize；DSP stageSpatial 只使用 crossfeed/width/depth/center。",
+      "source": "src/renderer.js:1767,1904; src/dsp-worklet.js:733,1223",
+      "severity": "P1",
+      "oldProblem": false,
+      "status": "open"
+    },
+    {
+      "id": "P1-02",
+      "effect": "Preset",
+      "parameter": "Preset apply",
+      "type": "state restore error / DSP graph not synchronized",
+      "phenomenon": "加载启用 Reverb 的 Preset 后 UI 显示启用，但 __dspHost.executionPlan() 仍只有 limiter，Reverb 未进入 AudioWorklet 执行计划。",
+      "source": "src/renderer.js:2372 applyPreset; missing syncDspGraph()",
+      "severity": "P1",
+      "oldProblem": true,
+      "status": "open"
+    },
+    {
+      "id": "P1-03",
+      "effect": "Preset",
+      "parameter": "all advanced params",
+      "type": "state restore error / parameter overwritten by invalid value",
+      "phenomenon": "旧 Preset 缺少 V7/V8 新增字段时，浅层 Object.assign 产生 undefined；Compressor knee 显示 NaN dB。",
+      "source": "src/renderer.js:2372-2376 applyPreset",
+      "severity": "P1",
+      "oldProblem": false,
+      "status": "open"
+    },
+    {
+      "id": "P1-04",
+      "effect": "Gate",
+      "parameter": "gateHysteresis",
+      "type": "UI parameter exists but DSP does not use it",
+      "phenomenon": "closeThresholdLin 已计算但 stageGate 仍只使用 thresholdLin；单独改变 hysteresis 不改变门限行为。",
+      "source": "src/dsp-worklet.js:336,1387-1404; src/renderer.js:770",
+      "severity": "P1",
+      "oldProblem": false,
+      "status": "open"
+    },
+    {
+      "id": "P2-01",
+      "effect": "Limiter",
+      "parameter": "limiterLookahead",
+      "type": "UI range mismatch",
+      "phenomenon": "UI min=0.5，DSP 支持 0；0 值无法通过滑杆设置。",
+      "source": "src/index.html:322; src/dsp-worklet.js:761",
+      "severity": "P2",
+      "oldProblem": true,
+      "status": "open"
+    },
+    {
+      "id": "P2-02",
+      "effect": "Dynamic EQ",
+      "parameter": "dynEqRange",
+      "type": "0 value mismatch",
+      "phenomenon": "UI 允许 0，DSP clampNum 将 0 改为 0.1。",
+      "source": "src/index.html Dynamic EQ section; src/dsp-worklet.js:887",
+      "severity": "P2",
+      "oldProblem": false,
+      "status": "open"
+    },
+    {
+      "id": "P2-03",
+      "effect": "Tube",
+      "parameter": "tubeDrive",
+      "type": "0 value is not neutral",
+      "phenomenon": "drive=0 时 tubeDrive=1，仍执行 Math.tanh；启用且 mix=1 时不是透明干声。",
+      "source": "src/dsp-worklet.js:746,1249",
+      "severity": "P2",
+      "oldProblem": true,
+      "status": "open"
+    },
+    {
+      "id": "P2-04",
+      "effect": "Limiter",
+      "parameter": "limiterOversample",
+      "type": "conditional parameter",
+      "phenomenon": "只有 truePeak=true 时 oversampling 才参与检测；单独改 oversampling 无听觉变化。",
+      "source": "src/dsp-worklet.js:754-755,1615",
+      "severity": "P2",
+      "oldProblem": false,
+      "status": "open"
+    },
+    {
+      "id": "P2-05",
+      "effect": "Preset/Reset",
+      "parameter": "IR / Convolution",
+      "type": "DSP state not refreshed",
+      "phenomenon": "applyPreset/resetEffects 未调用 updateIRGraph()，IR dry/wet 与滤波可能保持旧状态。",
+      "source": "src/renderer.js:2158-2161,2372-2378,2509",
+      "severity": "P2",
+      "oldProblem": true,
+      "status": "open"
+    },
+    {
+      "id": "P2-06",
+      "effect": "Reset",
+      "parameter": "all effects",
+      "type": "DSP graph plan stale",
+      "phenomenon": "Reset 后 state 回到默认，但 executionPlan 仍保留 Reset 前节点；当前由 enabled 参数部分兜底。",
+      "source": "src/renderer.js:2158-2161",
+      "severity": "P2",
+      "oldProblem": true,
+      "status": "open"
+    },
+    {
+      "id": "P2-07",
+      "effect": "i18n",
+      "parameter": "advanced select options",
+      "type": "language sync error",
+      "phenomenon": "动态生成的 On/Off、oversampling、Filter Type 选项不随语言切换刷新。",
+      "source": "src/renderer.js buildAdvancedEffectControls/buildEqAdvancedControls; applyLanguage:1159-1165",
+      "severity": "P2",
+      "oldProblem": false,
+      "status": "open"
+    },
+    {
+      "id": "P2-08",
+      "effect": "DSP audio thread",
+      "parameter": "all params",
+      "type": "allocation on parameter update",
+      "phenomenon": "applyParams 使用 Array.from、对象展开和按需 new Float32Array，快速参数变化可能产生 GC 抖动。",
+      "source": "src/dsp-worklet.js:540-660,714",
+      "severity": "P2",
+      "oldProblem": true,
+      "status": "open"
+    },
+    {
+      "id": "P2-09",
+      "effect": "Limiter",
+      "parameter": "truePeak/oversample",
+      "type": "algorithm accuracy limitation",
+      "phenomenon": "True Peak 过采样使用线性插值近似，没有完整抗混叠多相滤波。",
+      "source": "src/dsp-worklet.js:1603-1661",
+      "severity": "P2",
+      "oldProblem": false,
+      "status": "open"
+    }
+  ],
+  "regression": {
+    "reverb_wet_zero": "PASS",
+    "limiter_ceiling_zero": "PASS",
+    "noise_gate_allocation": "PASS",
+    "dynamic_eq_range": "PASS",
+    "clipper_soft_continuity": "PASS",
+    "audio_worklet_process_allocation": "PASS"
+  }
+}

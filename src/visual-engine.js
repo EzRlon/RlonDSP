@@ -103,6 +103,97 @@
   }
 
   /* ==========================================================================
+   * Music Motion Field V8
+   * --------------------------------------------------------------------------
+   * 音频事件先注入这里，再由所有效果共享采样。波源带“出生时间 + 传播速度”，
+   * 因此冲击不会全屏同一帧出现，而是按距离出现传播延迟。
+   * ==================================================================== */
+  const FIELD_OUT = { x: 0, y: 0, pressure: 0, shock: 0, radial: 0 };
+
+  function createMotionField() {
+    const MAX_WAVES = 24;
+    const wx = new Float32Array(MAX_WAVES);
+    const wy = new Float32Array(MAX_WAVES);
+    const birth = new Float32Array(MAX_WAVES);
+    const strength = new Float32Array(MAX_WAVES);
+    const speed = new Float32Array(MAX_WAVES);
+    const width = new Float32Array(MAX_WAVES);
+    const life = new Float32Array(MAX_WAVES);
+    const kind = new Uint8Array(MAX_WAVES);
+    let head = 0;
+    let live = 0;
+    let clock = 0;
+    let fieldBase = 0.5;
+    let fieldMicro = 0;
+
+    function emit(nx, ny, power, type, delay, spread, travel, lifespan) {
+      const i = head;
+      head = (head + 1) % MAX_WAVES;
+      if (live < MAX_WAVES) live++;
+      wx[i] = clamp01(nx);
+      wy[i] = clamp01(ny);
+      birth[i] = clock + Math.max(0, delay || 0);
+      strength[i] = Math.max(0, power || 0);
+      speed[i] = travel === undefined ? 0.55 : travel;
+      width[i] = spread === undefined ? 0.08 : spread;
+      life[i] = lifespan === undefined ? 1.4 : lifespan;
+      kind[i] = type === 'kick' ? 1 : type === 'snare' ? 2 : type === 'hat' ? 3 : 0;
+    }
+
+    function update(dt, bus) {
+      clock += dt;
+      const base = 0.55 + bus.motion.role.mid * 1.6;
+      const bass = bus.motion.role.bass;
+      const micro = bus.motion.role.treble + bus.motion.role.highMid * 0.6;
+      fieldBase = base + bass * 0.8;
+      fieldMicro = micro;
+      for (let i = 0; i < live; i++) {
+        strength[i] *= Math.max(0, 1 - dt * (kind[i] === 3 ? 1.1 : 0.42));
+      }
+    }
+
+    function sample(nx, ny, t, out) {
+      const c = curl(nx * 2.4, ny * 2.4, t * 0.17);
+      let fx = c.x * (0.32 + fieldMicro * 1.6);
+      let fy = c.y * (0.32 + fieldMicro * 1.6);
+      let pressure = 0;
+      let shock = 0;
+      const dxc = nx - 0.5;
+      const dyc = ny - 0.5;
+      const dc = Math.sqrt(dxc * dxc + dyc * dyc) + 1e-5;
+      const radial = fieldBase * 0.35;
+      fx += (dxc / dc) * radial * 0.18;
+      fy += (dyc / dc) * radial * 0.18;
+      for (let i = 0; i < live; i++) {
+        const age = t - birth[i];
+        if (age < 0 || age > life[i]) continue;
+        const dx = nx - wx[i];
+        const dy = ny - wy[i];
+        const d = Math.sqrt(dx * dx + dy * dy) + 1e-5;
+        const front = age * speed[i];
+        const w = width[i];
+        const ring = Math.exp(-Math.pow((d - front) / w, 2));
+        const decay = Math.max(0, 1 - age / life[i]);
+        const amp = strength[i] * ring * decay;
+        if (amp <= 0.0001) continue;
+        const inv = 1 / d;
+        const tangential = kind[i] === 2 ? 0.45 : kind[i] === 3 ? 0.65 : 0.12;
+        fx += (dx * inv * amp) * (1 - tangential) + (-dy * inv) * amp * tangential;
+        fy += (dy * inv * amp) * (1 - tangential) + (dx * inv) * amp * tangential;
+        pressure += amp * (kind[i] === 1 ? 1.2 : 0.65);
+        if (amp > shock) shock = amp;
+      }
+      out.x = fx;
+      out.y = fy;
+      out.pressure = pressure;
+      out.shock = shock;
+      return out;
+    }
+
+    return { emit, update, sample, wx, wy, birth, strength, speed, width, life, kind, get count() { return live; } };
+  }
+
+  /* ==========================================================================
    * Audio Reactive Bus —— 全引擎唯一的数据总线
    * ==================================================================== */
   function createBus() {
@@ -120,6 +211,11 @@
       stereoWidth: 0, correlation: 0, balance: 0,
       spectrum: null, waveform: null, albumHue: 200
     };
+    value.impulse = {
+      kick: 0, snare: 0, hat: 0, onset: 0, combined: 0,
+      seq: 0, accent: 1, lastKick: 0, lastSnare: 0, lastHat: 0
+    };
+    value.motionField = createMotionField();
     /**
      * Music Motion Core 的对外读数：所有效果都从这里取“音乐时间”。
      * 单位：phase 为 0~1（一拍一圈），时间单位为秒。
@@ -163,9 +259,17 @@
     let bassFilled = 0;
     let fluxFilled = 0;
     let beatTimer = 0;
+    let snareTimer = 0;
+    let hatTimer = 0;
+    let onsetTimer = 0;
     let fluxAvg = 0;
     let bassFast = 0;
     let bassSlow = 0;
+    let snareFast = 0;
+    let snareSlow = 0;
+    let hatFast = 0;
+    let hatSlow = 0;
+    let lastImpulseSeq = 0;
     let pulseEnv = 0;
     let kickEnv = 0;
     let pushEnv = 0;
@@ -295,6 +399,54 @@
       pushEnv *= Math.exp(-dt / 0.09);
       if (pushEnv < 0.001) pushEnv = 0;
       value.push = pushEnv;
+
+      /* ---------------- V8 瞬时冲击：鼓点 → 即时力，而不是慢亮度包络 ---------------- */
+      const snareNow = clamp01(value.lowMid * 0.45 + value.mid * 0.75 + value.highMid * 0.5);
+      const hatNow = clamp01(value.treble * 0.75 + value.highMid * 0.35);
+      snareFast += (snareNow - snareFast) * (snareNow > snareFast ? fastAtk : fastRel);
+      snareSlow += (snareNow - snareSlow) * (snareNow > snareSlow ? slowAtk : slowRel);
+      hatFast += (hatNow - hatFast) * (hatNow > hatFast ? (1 - Math.exp(-dt / 0.004)) : (1 - Math.exp(-dt / 0.035)));
+      hatSlow += (hatNow - hatSlow) * (hatNow > hatSlow ? (1 - Math.exp(-dt / 0.12)) : (1 - Math.exp(-dt / 0.28)));
+      const snareOnset = snareFast - snareSlow;
+      const hatOnset = hatFast - hatSlow;
+      const fluxOnset = value.spectralFlux / Math.max(0.0006, fluxAvg);
+      const imp = value.impulse;
+      imp.kick *= Math.exp(-dt / 0.055);
+      imp.snare *= Math.exp(-dt / 0.075);
+      imp.hat *= Math.exp(-dt / 0.040);
+      imp.onset *= Math.exp(-dt / 0.090);
+      snareTimer += dt;
+      hatTimer += dt;
+      onsetTimer += dt;
+      if (value.beat && kickEnv > 0.5 && beatTimer < 0.05) {
+        const accent = value.motion.downbeatAccent || 1;
+        imp.kick = Math.min(1.8, value.beatStrength * 1.15 * accent);
+        imp.lastKick = performance.now() / 1000;
+        value.motionField.emit(0.42 + Math.random() * 0.16, 0.42 + Math.random() * 0.16, imp.kick, 'kick', 0, 0.09, 0.62, 1.7);
+      }
+      if (snareTimer > 0.16 && snareOnset > 0.045 && snareFast > 0.22) {
+        imp.snare = Math.min(1.6, snareOnset * 7.5 + value.beatStrength * 0.35);
+        imp.lastSnare = performance.now() / 1000;
+        snareTimer = 0;
+        const nx = 0.25 + Math.random() * 0.5;
+        const ny = 0.25 + Math.random() * 0.5;
+        value.motionField.emit(nx, ny, imp.snare, 'snare', 0, 0.06, 0.78, 1.15);
+        value.motionField.emit(nx, ny, imp.snare * 0.65, 'snare', 0.035, 0.05, 0.92, 0.9);
+      }
+      if (hatTimer > 0.075 && hatOnset > 0.035 && hatFast > 0.16) {
+        imp.hat = Math.min(1.4, hatOnset * 9 + value.treble * 0.25);
+        imp.lastHat = performance.now() / 1000;
+        hatTimer = 0;
+        value.motionField.emit(0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7, imp.hat * 0.7, 'hat', 0, 0.035, 0.95, 0.55);
+      }
+      if (onsetTimer > 0.11 && fluxOnset > 1.8 && value.spectralFlux > 0.0015) {
+        imp.onset = Math.min(1.5, (fluxOnset - 1) * 0.55 + 0.25);
+        onsetTimer = 0;
+        value.motionField.emit(0.5, 0.5, imp.onset * 0.8, 'onset', 0, 0.12, 0.48, 1.9);
+      }
+      imp.combined = clamp01(imp.kick * 0.55 + imp.snare * 0.28 + imp.hat * 0.12 + imp.onset * 0.05);
+      if (imp.kick > 0.25 || imp.snare > 0.25 || imp.onset > 0.25) imp.seq++;
+
       value.transient = clamp01(pulseEnv * 0.6 + value.spectralFlux * 6);
       // 乐句级慢包络（2~8 秒尺度）：用于颜色 / 形态这类慢变化
       phraseEnv = lerp(phraseEnv, value.energy, clamp01(dt * 0.55));
@@ -447,6 +599,7 @@
         const v = readThemeHue();
         if (v >= 0) value.albumHue = v;
       }
+      value.motionField.update(dt, value);
     }
 
     return { value, update };
@@ -523,6 +676,13 @@
       link: new Float32Array(n),      // 最近邻居索引（-1 表示没有）
       beatPhaseOffset: new Float32Array(n), // 个体拍点偏移：±0.15 拍（有人先动、有人正拍、有人稍后回弹）
       dirMix: new Float32Array(n),          // 0=径向为主 / 1=切向为主，避免所有效果都变成“中心爆炸”
+      anchorX: new Float32Array(n),         // Spring-Damper 的静止锚点
+      anchorY: new Float32Array(n),
+      springK: new Float32Array(n),         // 恢复力
+      dampC: new Float32Array(n),           // 阻尼
+      dissipate: new Float32Array(n),       // 强冲击后的碎裂/消散
+      forceX: new Float32Array(n),          // 最近一次音乐力，供渲染读取
+      forceY: new Float32Array(n),
       nb: new Uint8Array(n),          // 邻居数量（生命周期与渲染都会用到）
       cell: new Uint32Array(n),       // 网格归属（邻居查询用）
 
@@ -563,6 +723,13 @@
         A.rotV[i] = (Math.random() - 0.5) * 2.4;
         A.beatPhaseOffset[i] = (hash01(s, 31) - 0.5) * 0.3;   // ±0.15 拍
         A.dirMix[i] = hash01(s, 32);
+        A.anchorX[i] = A.x[i];
+        A.anchorY[i] = A.y[i];
+        A.springK[i] = 0.35 + hash01(s, 33) * 2.6;
+        A.dampC[i] = 0.6 + hash01(s, 34) * 2.2;
+        A.dissipate[i] = 0;
+        A.forceX[i] = 0;
+        A.forceY[i] = 0;
         A.size[i] = 0.7 + Math.random() * 1.8;
         A.opacity[i] = 0.22 + Math.random() * 0.5;
         A.depth[i] = Math.random();
@@ -594,6 +761,37 @@
           for (let i = A.count; i < target; i++) A.spawn(i, w, h, env, cfg);
         }
         A.count = target;
+      },
+
+      /** 生命周期到点：只重置“生命阶段与位置”，保留 seed / 性格 / 身份连续性。 */
+      revive(i, w, h, env, cfg) {
+        const c = cfg || EMPTY_CFG;
+        const a0 = Math.random() * TAU;
+        const sp = (c.spawnSpeed === undefined ? 8 : c.spawnSpeed) * (0.35 + Math.random() * 0.9);
+        A.x[i] = Math.random() * w;
+        A.y[i] = Math.random() * h;
+        if (env && env.n) {
+          const z = (Math.random() * env.n) | 0;
+          const bias = (c.zoneBias === undefined ? 0.35 : c.zoneBias) * 0.75;
+          A.x[i] = A.x[i] * (1 - bias) + (env.x[z] + (Math.random() - 0.5) * env.r[z]) * bias;
+          A.y[i] = A.y[i] * (1 - bias) + (env.y[z] + (Math.random() - 0.5) * env.r[z]) * bias;
+        }
+        A.x[i] = Math.max(1, Math.min(w - 1, A.x[i]));
+        A.y[i] = Math.max(1, Math.min(h - 1, A.y[i]));
+        A.vx[i] = Math.cos(a0) * sp;
+        A.vy[i] = Math.sin(a0) * sp;
+        A.anchorX[i] = A.x[i];
+        A.anchorY[i] = A.y[i];
+        A.age[i] = 0;
+        const minLife = c.minLife === undefined ? 7 : c.minLife;
+        const span = c.lifeSpan === undefined ? 20 : c.lifeSpan;
+        A.life[i] = minLife + Math.random() * span;
+        A.state[i] = AG_BIRTH;
+        A.stateTimer[i] = 0.5 + Math.random();
+        A.energy[i] = 0.35 + Math.random() * 0.35;
+        A.memBeat[i] = 0;
+        A.dissipate[i] = 0;
+        A.link[i] = -1;
       },
 
       reset() { A.count = 0; }
@@ -805,6 +1003,9 @@
       const envEnergy = out[0];
       const envHit = out[4];
       A.local[i] = envEnergy + envHit;
+      const musicField = bus.motionField;
+      musicField.sample(A.x[i] / G.w, A.y[i] / G.h, t, FIELD_OUT);
+      const v8 = bus.impulse;
 
       /* ---------------- 2. 自主游走：每个粒子有自己的噪声相位与速度 ---------------- */
       const ph = A.noisePhase[i] + t * A.noiseSpeed[i];
@@ -829,6 +1030,35 @@
         ay += (dyz / dz) * pull * cfg.pull;
       }
 
+      /* ---------------- 3b. V8 Music Motion Field：音乐先改变场，再改变速度 ---------------- */
+      const halfMin = Math.min(G.w, G.h) * 0.5 + 1e-3;
+      const rx = (A.x[i] - G.w * 0.5) / halfMin;
+      const ry = (A.y[i] - G.h * 0.5) / halfMin;
+      const sens = 0.35 + A.audioSens[i];
+      const fieldW = cfg.field === undefined ? 32 : cfg.field;
+      ax += FIELD_OUT.x * fieldW * sens;
+      ay += FIELD_OUT.y * fieldW * sens;
+      ax += rx * FIELD_OUT.pressure * 58 * sens;
+      ay += ry * FIELD_OUT.pressure * 58 * sens;
+      ax += rx * v8.kick * (cfg.kickForce === undefined ? 92 : cfg.kickForce) * sens * (0.45 + A.beatSens[i] * 0.55);
+      ay += ry * v8.kick * (cfg.kickForce === undefined ? 92 : cfg.kickForce) * sens * (0.45 + A.beatSens[i] * 0.55);
+      const snarePush = v8.snare * (cfg.snareForce === undefined ? 54 : cfg.snareForce) * sens;
+      ax += -rx * snarePush * 0.35 + FIELD_OUT.x * snarePush;
+      ay += -ry * snarePush * 0.35 + FIELD_OUT.y * snarePush;
+      const hatPush = v8.hat * (cfg.hatForce === undefined ? 38 : cfg.hatForce) * sens;
+      ax += noise1(ph * 7.3 + t * 3.1) * hatPush;
+      ay += noise2(ph * 6.9 + t * 3.1) * hatPush;
+      ax += (A.anchorX[i] - A.x[i]) * A.springK[i];
+      ay += (A.anchorY[i] - A.y[i]) * A.springK[i];
+      ax -= A.vx[i] * A.dampC[i];
+      ay -= A.vy[i] * A.dampC[i];
+      A.dissipate[i] = Math.max(0, A.dissipate[i] - dt * (0.55 + A.beatSens[i]));
+      if (v8.combined > 0.62 && A.energy[i] > 0.55) {
+        A.dissipate[i] = Math.min(1, A.dissipate[i] + (v8.combined - 0.5) * 1.6);
+      }
+      A.forceX[i] = ax;
+      A.forceY[i] = ay;
+
       /* ---------------- 4. 邻居互动：分离 / 排列 / 聚集（网格查询） ---------------- */
       const cxi = A.cell[i] % G.cols;
       const cyi = (A.cell[i] / G.cols) | 0;
@@ -851,8 +1081,9 @@
             if (d2 > nbR2) continue;
             const d = Math.sqrt(d2) + 1e-3;
             const inv = 1 / d;
-            sepX -= dx * inv * inv * nbR;
-            sepY -= dy * inv * inv * nbR;
+            const collision = d < nbR * 0.45 ? (1 - d / (nbR * 0.45)) : 0;
+            sepX -= dx * inv * (inv * nbR + collision * 2.6);
+            sepY -= dy * inv * (inv * nbR + collision * 2.6);
             cohX += dx;
             cohY += dy;
             aliX += A.vx[j];
@@ -872,8 +1103,8 @@
         const inv = 1 / nb;
         // 三种力分开加权：分离要够强（个体感），排列必须很弱，
         // 否则整片粒子会迅速锁成一个方向 —— 那就是“全体同步”，必须避免。
-        const sepW = cfg.sepW === undefined ? 0.6 : cfg.sepW;
-        const cohW = cfg.cohW === undefined ? 0.04 : cfg.cohW;
+        const sepW = (cfg.sepW === undefined ? 0.6 : cfg.sepW) * (1 + bus.impulse.snare * 1.8);
+        const cohW = (cfg.cohW === undefined ? 0.04 : cfg.cohW) * (1 - A.dissipate[i] * 0.65);
         const aliW = cfg.alignW === undefined ? 0.05 : cfg.alignW;
         ax += (sepX * A.separ[i] * sepW + cohX * inv * A.cohesion[i] * cohW +
           (aliX * inv - A.vx[i]) * A.align[i] * aliW) * cfg.neighbor;
@@ -912,7 +1143,6 @@
       A.energy[i] = Math.min(1.6, A.energy[i] + (0.25 + envEnergy * 0.12) * dt * 0.5);
 
       /* ---------------- 5b. BeatForce：方向混合（径向 + 切向 + 空间场），不是纯爆炸 ------- */
-      const halfMin = Math.min(G.w, G.h) * 0.5 + 1e-3;
       const bxn = (A.x[i] - G.w * 0.5) / halfMin;
       const byn = (A.y[i] - G.h * 0.5) / halfMin;
       const fieldX = noise1(A.x[i] * 0.0035 + mt.beatPhase * 1.7 + A.noisePhase[i] * 0.02);
@@ -993,7 +1223,7 @@
         A.stateTimer[i] = A.stateDur[i];
       }
       if (frac >= 1 || (st === AG_DECAY && A.stateTimer[i] <= 0)) {
-        A.spawn(i, G.w, G.h, E, cfg);
+        A.revive(i, G.w, G.h, E, cfg);
       }
     }
   }
@@ -1197,7 +1427,41 @@
     create(fx) {
       fx.clouds = [];
       for (let i = 0; i < 12; i++) {
-        fx.clouds.push({ sd: i * 91.7, r: 0.24 + (i % 4) * 0.09, hue: i * 29 });
+        fx.clouds.push({
+          sd: i * 91.7,
+          r: 0.24 + (i % 4) * 0.09,
+          hue: i * 29,
+          x: 0.5 + Math.sin(i * 2.3) * 0.34,
+          y: 0.5 + Math.cos(i * 1.7) * 0.32,
+          vx: 0,
+          vy: 0,
+          s: 0.5 + (i % 5) * 0.24
+        });
+      }
+    },
+    update(fx, dt, bus) {
+      const imp = bus.impulse;
+      for (let i = 0; i < fx.clouds.length; i++) {
+        const c = fx.clouds[i];
+        bus.motionField.sample(c.x, c.y, fx.time, FIELD_OUT);
+        const sens = c.s;
+        c.vx += (FIELD_OUT.x * 4.5 + FIELD_OUT.pressure * 10) * sens * dt;
+        c.vy += (FIELD_OUT.y * 4.5 + FIELD_OUT.pressure * 10) * sens * dt;
+        const dx = 0.5 - c.x;
+        const dy = 0.5 - c.y;
+        const d = Math.sqrt(dx * dx + dy * dy) + 0.08;
+        c.vx += (dx / d) * imp.kick * 12 * sens * dt;
+        c.vy += (dy / d) * imp.kick * 12 * sens * dt;
+        c.vx += (-dy / d) * imp.snare * 9 * sens * dt;
+        c.vy += (dx / d) * imp.snare * 9 * sens * dt;
+        c.vx *= Math.max(0, 1 - dt * (1.1 + fx.state.diffusion * 0.012));
+        c.vy *= Math.max(0, 1 - dt * (1.1 + fx.state.diffusion * 0.012));
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        if (c.x < 0.08) { c.x = 0.08; c.vx = Math.abs(c.vx); }
+        if (c.x > 0.92) { c.x = 0.92; c.vx = -Math.abs(c.vx); }
+        if (c.y < 0.08) { c.y = 0.08; c.vy = Math.abs(c.vy); }
+        if (c.y > 0.92) { c.y = 0.92; c.vy = -Math.abs(c.vy); }
       }
     },
     render(fx, bus) {
@@ -1213,8 +1477,8 @@
         const c = fx.clouds[i];
         const nx = noise1(c.sd + t * drift);
         const ny = noise2(c.sd + 31 + t * drift * 0.77);
-        const cx = w * (0.5 + nx * 0.36);
-        const cy = h * (0.5 + ny * 0.34);
+        const cx = w * (c.x + nx * 0.06);
+        const cy = h * (c.y + ny * 0.055);
         // 音频只调制「大小与亮度」，不改变整体构图 → 不是整幅画面缩放
         const density = 0.75 + bus.phrase * react * 0.5 + bus.bass * react * 0.45;
         const radius = Math.min(w, h) * c.r * density;
@@ -1342,6 +1606,26 @@
       { id: 'shimmer', labelKey: 'vfxShimmer', min: 0, max: 100, step: 1, default: 55, priority: 'secondary' },
       { id: 'spread', labelKey: 'vfxSpread', min: 20, max: 100, step: 1, default: 70, priority: 'advanced' }
     ],
+    create(fx) {
+      fx.ribbonOffset = new Float32Array(14);
+      fx.ribbonVel = new Float32Array(14);
+      fx.ribbonPhase = new Float32Array(14);
+      for (let i = 0; i < 14; i++) fx.ribbonPhase[i] = Math.random() * 10;
+    },
+    update(fx, dt, bus) {
+      const imp = bus.impulse;
+      for (let i = 0; i < 14; i++) {
+        const px = 0.15 + (i / 14) * 0.7;
+        const py = 0.25 + ((i * 37) % 100) / 180;
+        bus.motionField.sample(px, py, fx.time, FIELD_OUT);
+        const kick = imp.kick * (0.55 + (i % 5) * 0.12);
+        const snare = imp.snare * (i % 2 ? -1 : 1);
+        fx.ribbonVel[i] += (FIELD_OUT.y * 6 + FIELD_OUT.pressure * 12 + kick * 18 + snare * 6) * dt;
+        fx.ribbonOffset[i] += fx.ribbonVel[i] * dt;
+        fx.ribbonOffset[i] *= Math.max(0, 1 - dt * (1.25 + fx.state.shimmer * 0.006));
+        fx.ribbonVel[i] *= Math.max(0, 1 - dt * 1.4);
+      }
+    },
     render(fx, bus) {
       const { ctx, width: w, height: h } = fx;
       ctx.clearRect(0, 0, w, h);
@@ -1354,7 +1638,7 @@
       ctx.globalCompositeOperation = 'lighter';
       for (let r = 0; r < n; r++) {
         const seed = r * 53.1;
-        const baseY = h * (0.22 + (r / n) * 0.62);
+        const baseY = h * (0.22 + (r / n) * 0.62) + fx.ribbonOffset[r] * h * 0.09;
         const amp = h * 0.16 * (0.5 + shimmer) * (1 + bus.phrase * 0.7);
         const hue = hueOf(bus, r * 22 + bus.phrase * 45);
         ctx.beginPath();
@@ -1365,7 +1649,8 @@
           const y = baseY
             + noise1(seed + u * 3.1 + t * flow) * amp
             + noise2(seed * 0.7 + u * 6.3 - t * flow * 0.8) * amp * 0.5
-            + Math.sin(u * 6.2 + t * 0.4 + r) * amp * 0.25 * (0.4 + bus.mid);
+            + Math.sin(u * 6.2 + t * 0.4 + r) * amp * 0.25 * (0.4 + bus.mid)
+            + fx.ribbonOffset[r] * amp * 0.16;
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.lineWidth = Math.max(2, bandH / n * 0.9);
@@ -1414,6 +1699,8 @@
       fx.v = new Float32Array(gw * gh);
       fx.dye = new Float32Array(gw * gh);
       fx.tmp = new Float32Array(gw * gh);
+      fx.pressure = new Float32Array(gw * gh);
+      fx.tmpPressure = new Float32Array(gw * gh);
       fx.img = document.createElement('canvas');
       fx.img.width = gw;
       fx.img.height = gh;
@@ -1438,6 +1725,19 @@
           const c = curl(x * 0.09, y * 0.09, t * 0.05);
           u[i] = u[i] * visc + (c.x * 0.02 + bus.bass * 0.02) * (0.4 + inject);
           v[i] = v[i] * visc + (c.y * 0.02 - bus.mid * 0.015) * (0.4 + inject);
+          bus.motionField.sample(x / gw, y / gh, t, FIELD_OUT);
+          fx.pressure[i] = fx.pressure[i] * (0.90 + visc * 0.04)
+            + FIELD_OUT.pressure * (0.08 + bus.impulse.kick * 0.12);
+        }
+      }
+      // 压力场 → 速度场：真实的“音乐推动纸盆”，不是只给染料加速度
+      for (let y = 1; y < gh - 1; y++) {
+        for (let x = 1; x < gw - 1; x++) {
+          const i = y * gw + x;
+          const px = fx.pressure[i - 1] - fx.pressure[i + 1];
+          const py = fx.pressure[i - gw] - fx.pressure[i + gw];
+          u[i] += px * 0.035 * (0.4 + inject);
+          v[i] += py * 0.035 * (0.4 + inject);
         }
       }
       // 染料平流（半拉格朗日，最简形式） + 音频在固定位置注入
@@ -1464,6 +1764,7 @@
       const cy = Math.floor(gh * (0.5 + noise2(t * 0.06) * 0.25));
       const strength = (0.10 + bus.energy * 0.55) * (1 + bus.pulse);
       const r = 2 + Math.round(bus.bass * 4);
+      const impulse = bus.impulse.kick * 1.2 + bus.impulse.snare * 0.75;
       for (let y = -r; y <= r; y++) {
         for (let x = -r; x <= r; x++) {
           const px = cx + x;
@@ -1473,6 +1774,7 @@
           if (d > 1) continue;
           const i = py * gw + px;
           dye[i] = Math.min(1.6, dye[i] + strength * (1 - d) * 0.5);
+          fx.pressure[i] = Math.min(2.4, fx.pressure[i] + impulse * (1 - d) * 0.9);
         }
       }
     },
@@ -1526,13 +1828,32 @@
       fx.grid.height = 54;
       fx.gridCtx = fx.grid.getContext('2d');
       fx.pixels = fx.gridCtx.createImageData(96, 54);
+      fx.phys = { x: 0.5, y: 0.5, vx: 0.03, vy: -0.02, phase: 0 };
+    },
+    update(fx, dt, bus) {
+      const p = fx.phys;
+      const imp = bus.impulse;
+      bus.motionField.sample(p.x, p.y, fx.time, FIELD_OUT);
+      p.vx += (FIELD_OUT.x * 0.16 + (0.5 - p.x) * imp.kick * 0.22) * dt;
+      p.vy += (FIELD_OUT.y * 0.16 + (0.5 - p.y) * imp.kick * 0.22) * dt;
+      p.vx += (FIELD_OUT.y * imp.snare * 0.18) * dt;
+      p.vy += (-FIELD_OUT.x * imp.snare * 0.18) * dt;
+      p.vx *= Math.max(0, 1 - dt * 1.1);
+      p.vy *= Math.max(0, 1 - dt * 1.1);
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      if (p.x < 0.12) { p.x = 0.12; p.vx = Math.abs(p.vx); }
+      if (p.x > 0.88) { p.x = 0.88; p.vx = -Math.abs(p.vx); }
+      if (p.y < 0.12) { p.y = 0.12; p.vy = Math.abs(p.vy); }
+      if (p.y > 0.88) { p.y = 0.88; p.vy = -Math.abs(p.vy); }
+      p.phase += dt * (0.25 + imp.combined * 1.8);
     },
     render(fx, bus) {
       const { ctx, width: w, height: h } = fx;
       const gw = 96;
       const gh = 54;
       const data = fx.pixels.data;
-      const t = fx.time * (0.15 + fx.state.speed / 100 * 0.9);
+      const t = fx.time * (0.15 + fx.state.speed / 100 * 0.9) + fx.phys.phase;
       const k = 1 / fx.state.scale;
       const react = fx.state.reactivity / 100;
       const contrast = 1 + fx.state.contrast / 100 * 2.2;
@@ -1541,8 +1862,8 @@
       for (let y = 0; y < gh; y++) {
         for (let x = 0; x < gw; x++) {
           const i = (y * gw + x) * 4;
-          const nx = x * k;
-          const ny = y * k * 1.6;
+          const nx = x * k + fx.phys.x * 3.2;
+          const ny = y * k * 1.6 + fx.phys.y * 2.6;
           let v = Math.sin(nx * 3.1 + t * 1.3)
             + Math.sin(ny * 2.7 - t * 1.1)
             + Math.sin((nx + ny) * 1.9 + t * 0.7)
@@ -1588,6 +1909,31 @@
       { id: 'reactivity', labelKey: 'vfxReactivity', min: 0, max: 100, step: 1, default: 70, priority: 'core' },
       { id: 'decay', labelKey: 'vfxDecay', min: 0, max: 100, step: 1, default: 45, priority: 'secondary' }
     ],
+    create(fx) {
+      fx.waveClock = 0;
+      fx.waveHead = 0;
+      fx.waveX = new Float32Array(10);
+      fx.waveY = new Float32Array(10);
+      fx.waveBirth = new Float32Array(10);
+      fx.wavePower = new Float32Array(10);
+      fx.waveSpeed = new Float32Array(10);
+      fx.waveLive = 0;
+    },
+    update(fx, dt, bus) {
+      fx.waveClock += dt;
+      const imp = bus.impulse;
+      const power = Math.max(imp.kick, imp.snare * 0.85, imp.onset * 0.7);
+      if (power > 0.32) {
+        const i = fx.waveHead;
+        fx.waveHead = (fx.waveHead + 1) % fx.waveX.length;
+        if (fx.waveLive < fx.waveX.length) fx.waveLive++;
+        fx.waveX[i] = 0.2 + Math.random() * 0.6;
+        fx.waveY[i] = 0.2 + Math.random() * 0.6;
+        fx.waveBirth[i] = fx.waveClock;
+        fx.wavePower[i] = power;
+        fx.waveSpeed[i] = 0.38 + power * 0.45;
+      }
+    },
     render(fx, bus) {
       const { ctx, width: w, height: h } = fx;
       ctx.clearRect(0, 0, w, h);
@@ -1626,6 +1972,27 @@
           ctx.lineWidth = 0.8 + energy * 1.8;
           ctx.stroke();
         }
+      }
+      // V8：音乐冲击以有限速度从波源向外传播，支持延迟与干涉
+      for (let i = 0; i < fx.waveLive; i++) {
+        const age = fx.waveClock - fx.waveBirth[i];
+        if (age < 0 || age > 1.6) continue;
+        const radius = age * fx.waveSpeed[i] * Math.min(w, h) * 1.25;
+        const fade = Math.max(0, 1 - age / 1.6) * fx.wavePower[i];
+        if (fade < 0.02) continue;
+        const cx = fx.waveX[i] * w;
+        const cy = fx.waveY[i] * h;
+        ctx.beginPath();
+        for (let a = 0; a <= 64; a++) {
+          const ang = (a / 64) * TAU;
+          const rr = radius * (1 + noise1(ang * 3.1 + i * 7) * 0.055);
+          const x = cx + Math.cos(ang) * rr;
+          const y = cy + Math.sin(ang) * rr;
+          if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = 'hsla(' + hueOf(bus, 40 + i * 23) + ', 90%, 68%, ' + (fade * 0.42).toFixed(3) + ')';
+        ctx.lineWidth = 0.8 + fade * 2.2;
+        ctx.stroke();
       }
       ctx.globalCompositeOperation = 'source-over';
     }
@@ -1681,9 +2048,13 @@
       stepAgents(A, dt, bus, fx.env, fx.grid, cfg, fx.time);
       // 放电：刚兴奋过、又刚好有邻居的个体，会亮起一条连接（局部放电事件）
       const D = fx.discharge;
+      const imp = bus.impulse;
       for (let i = 0; i < A.count; i++) {
         D[i] = Math.max(0, D[i] - dt * 2.2);
         if (A.memBeat[i] > 0.55 && A.link[i] >= 0) D[i] = Math.min(1, D[i] + A.memBeat[i] * dt * 6);
+        if (imp.combined > 0.18 && (A.energy[i] > 0.62 || A.memBeat[i] > 0.45)) {
+          D[i] = Math.min(1.4, D[i] + imp.combined * (0.35 + A.audioSens[i] * 0.4));
+        }
       }
     },
     render(fx, bus) {

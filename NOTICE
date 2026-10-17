@@ -29,4 +29,14 @@ Copyright © 2026 RlonDSP. All rights reserved.
    - 用途：音频播放、音效 DSP、脉冲响应处理
    - 许可证：GPL-3.0-only
 
+5. MusicSquare
+   - 用途：在线音乐搜索——按其公开实现接入同一批第三方公开接口（网易云 / QQ 音乐 / 酷我 / JOOX）
+   - 作者：CharlesPikachu
+   - 仓库：https://github.com/CharlesPikachu/musicsquare
+   - 站点：https://charlespikachu.github.io/musicsquare/
+   - 许可证：Apache-2.0
+   - 修改说明：未复制其前端代码。RlonDSP 依据其公开源码中的真实接口调用，
+     以自身的资源模型、错误处理与安全边界重新实现（见 online-source-layer.js 的 MusicSquare 适配器），
+     并按其 Apache-2.0 条款在此保留署名。
+
 完整许可证信息见 LICENSE 和各依赖包内 LICENSE 文件。

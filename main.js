@@ -3,7 +3,7 @@
  * Copyright © 2026 RlonDSP. All rights reserved.
  * Based on Echomusic open-source project, modified and extended for RlonDSP.
  */
-const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, nativeTheme, nativeImage, screen, shell, net } = require('electron');
+const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, nativeTheme, nativeImage, screen, shell, net, safeStorage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
@@ -11,6 +11,9 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 
 const updateCore = require('./update-core');
+const { createOnlineSourceManager } = require('./online-source-layer');
+const { createOnlineDownloader } = require('./online-download');
+const { createQueueStore } = require('./queue-store');
 
 app.setName('RlonDSP');
 
@@ -20,6 +23,8 @@ let mainWindow = null;
 let lyricsWindow = null;
 let tray = null;
 let isQuitting = false;
+let onlineSourceManager = null;
+let onlineDownloader = null;
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -33,6 +38,8 @@ const settingsFile = path.join(userDataDir, 'settings.json');
 const favoritesFile = path.join(userDataDir, 'favorites.json');
 const historyFile = path.join(userDataDir, 'history.json');
 const presetsFile = path.join(userDataDir, 'presets.json');
+/** 播放队列持久化：只保存队列上下文与歌曲身份（结构校验 / 版本校验 / 容量裁剪 / 串行原子写都在 queue-store 内） */
+const queueStore = createQueueStore({ userDataDir });
 
 const defaultSettings = {
   language: 'zh',
@@ -44,7 +51,8 @@ const defaultSettings = {
   outputDeviceId: '',
   playbackMode: 'list',
   autoCheckUpdate: true,
-  alwaysOnTop: false
+  alwaysOnTop: false,
+  effectsMasterEnabled: true
 };
 
 async function ensureFiles() {
@@ -338,8 +346,95 @@ function registerShortcuts() {
   }
 }
 
+function registerOnlineHandlers() {
+  const wrap = (fn) => async (_event, payload) => {
+    try {
+      if (!onlineSourceManager) throw new Error('SOURCE_NETWORK_ERROR: online source manager unavailable');
+      return await fn(payload || {});
+    } catch (error) {
+      const code = error && error.code ? error.code : 'SOURCE_NETWORK_ERROR';
+      const safeMessage = error && error.safeMessage ? error.safeMessage : 'request failed';
+      throw new Error(`${code}: ${safeMessage}`);
+    }
+  };
+  ipcMain.handle('online:sources:list', wrap(() => onlineSourceManager.listSources()));
+  ipcMain.handle('online:sources:save', wrap((payload) => onlineSourceManager.saveSource(payload)));
+  ipcMain.handle('online:sources:delete', wrap((payload) => onlineSourceManager.deleteSource(String(payload.id || ''))));
+  ipcMain.handle('online:sources:enable', wrap((payload) => onlineSourceManager.setEnabled(String(payload.id || ''), !!payload.enabled)));
+  ipcMain.handle('online:sources:reorder', wrap((payload) => onlineSourceManager.reorder(payload.ids || [])));
+  ipcMain.handle('online:sources:test', wrap((payload) => onlineSourceManager.testConnection(payload.source || payload)));
+  ipcMain.handle('online:auth:state', wrap((payload) => onlineSourceManager.getAuthState(String(payload.sourceId || ''))));
+  ipcMain.handle('online:auth:login', wrap((payload) => onlineSourceManager.login(String(payload.sourceId || ''), payload.credentials || {})));
+  ipcMain.handle('online:auth:logout', wrap((payload) => onlineSourceManager.logout(String(payload.sourceId || ''))));
+  // Spotify 登录：OAuth(PKCE) 全程在主进程完成，浏览器由主进程打开，Token 不外泄
+  ipcMain.handle('online:auth:spotify:login', wrap((payload) => onlineSourceManager.spotifyLogin(String(payload.sourceId || ''))));
+  // 只允许打开 Spotify 官方链接（用于内容归属回链）
+  ipcMain.handle('online:open-external', wrap(async (payload) => {
+    const url = String((payload && payload.url) || '');
+    if (!/^https:\/\/(open\.spotify\.com|music\.apple\.com)\//i.test(url)) return false;
+    await shell.openExternal(url);
+    return true;
+  }));
+  ipcMain.handle('online:search', wrap((payload) => onlineSourceManager.search(String(payload.sourceId || ''), payload)));
+  ipcMain.handle('online:browse', wrap((payload) => onlineSourceManager.search(String(payload.sourceId || ''), payload)));
+  ipcMain.handle('online:discovery', wrap((payload) => onlineSourceManager.getDiscovery(String(payload.sourceId || ''), payload)));
+  ipcMain.handle('online:detail', wrap((payload) => onlineSourceManager.getDetail(String(payload.sourceId || ''), payload)));
+  ipcMain.handle('online:resolve', wrap((payload) => onlineSourceManager.resolvePlayUrl(String(payload.sourceId || ''), payload)));
+  // 下载：地址由来源层现场解析（渲染层传来的字符串不被信任），流式落盘 + 真实进度 / 取消 / 失败
+  ipcMain.handle('online:download:start', wrap(async (payload) => {
+    const result = await onlineDownloader.start({
+      sourceId: String(payload.sourceId || ''),
+      id: String(payload.id || ''),
+      type: String(payload.type || 'song'),
+      title: String(payload.title || '').slice(0, 300),
+      artist: String(payload.artist || '').slice(0, 300),
+      provider: String(payload.provider || '').slice(0, 32),
+      query: String(payload.query || '').slice(0, 120),
+      playUrl: String(payload.playUrl || '')
+    });
+    return result;
+  }));
+  ipcMain.handle('online:download:cancel', wrap((payload) => onlineDownloader.cancel(String(payload.id || ''))));
+  ipcMain.handle('online:download:reveal', wrap(async (payload) => {
+    const filePath = String(payload.filePath || '');
+    if (!filePath || path.dirname(path.resolve(filePath)) !== path.resolve(onlineDownloader.downloadsDir)) return false;
+    shell.showItemInFolder(path.resolve(filePath));
+    return true;
+  }));
+  ipcMain.handle('online:download:folder', wrap(async () => {
+    await fsp.mkdir(onlineDownloader.downloadsDir, { recursive: true });
+    await shell.openPath(onlineDownloader.downloadsDir);
+    return onlineDownloader.downloadsDir;
+  }));
+}
+
 app.whenReady().then(async () => {
   await ensureFiles();
+  onlineSourceManager = createOnlineSourceManager({
+    userDataDir,
+    fetchImpl: net.fetch.bind(net),
+    safeStorage,
+    // Spotify OAuth 用系统默认浏览器打开授权页（主进程内调用，渲染进程拿不到）
+    openExternal: (url) => shell.openExternal(url)
+  });
+  await onlineSourceManager.init();
+  // 下载服务：目录固定在系统「下载」目录，文件名由主进程生成，渲染层给不了路径
+  onlineDownloader = createOnlineDownloader({
+    fetchImpl: net.fetch.bind(net),
+    downloadsDir: app.getPath('downloads'),
+    // 地址解析复用来源层的同一套逻辑与安全校验（含凭据不外发、跨源拦截）
+    resolveUrl: (task) => onlineSourceManager.resolvePlayUrl(task.sourceId, {
+      id: task.id,
+      type: task.type,
+      title: task.title,
+      artist: task.artist,
+      provider: task.provider,
+      query: task.query,
+      playUrl: task.playUrl
+    }),
+    onProgress: (state) => mainWindow?.webContents.send('online:download:progress', state)
+  });
+  registerOnlineHandlers();
   const savedSettings = await readJSON(settingsFile, defaultSettings);
   if (savedSettings.theme) nativeTheme.themeSource = savedSettings.theme;
   createMainWindow();
@@ -352,6 +447,8 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  // 退出前中断所有下载：不能留下半截文件，也不能让后台流阻塞退出
+  try { onlineDownloader?.cancelAll(); } catch { /* ignore */ }
 });
 
 app.on('window-all-closed', () => {
@@ -592,6 +689,10 @@ ipcMain.handle('favorites:set', async (_event, favorites) => {
   await writeJSON(favoritesFile, Array.isArray(favorites) ? favorites : []);
   return favorites;
 });
+
+/* 播放队列：主进程侧只做校验 + 裁剪 + 串行原子写；渲染进程拿不到任何文件路径能力 */
+ipcMain.handle('queues:get', async () => queueStore.read());
+ipcMain.handle('queues:set', async (_event, snapshot) => queueStore.write(snapshot));
 
 ipcMain.handle('history:get', async () => readJSON(historyFile, []));
 ipcMain.handle('history:add', async (_event, item) => {

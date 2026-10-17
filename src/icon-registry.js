@@ -31,6 +31,7 @@
    *   view       视图 / 页面
    *   audio      音频与 DSP 语义
    *   window     窗口级控制（保持系统原生行为，只登记不改行为）
+   *   brand      第三方品牌归属标识（只用于来源标注，不改主题色）
    */
   const ICONS = {
     /* ---------------------------------------------------------- 播放控制 */
@@ -49,6 +50,8 @@
     note: { cat: 'library', zh: '歌词', en: 'Lyrics', semantics: '打开桌面歌词', optical: 0.7 },
     list: { cat: 'library', zh: '列表', en: 'List', semantics: '播放列表', optical: 0.68 },
     sort: { cat: 'library', zh: '排序', en: 'Sort', semantics: '播放列表排序方式', optical: 0.66 },
+    filter: { cat: 'library', zh: '筛选', en: 'Filter', semantics: '按快速视图、质量或文件夹筛选播放列表', optical: 0.66 },
+    clock: { cat: 'library', zh: '最近播放', en: 'Recently played', semantics: '查看最近播放过的歌曲', optical: 0.7 },
     trash: { cat: 'library', zh: '清空 / 删除', en: 'Clear / Delete', semantics: '清空播放列表或删除该条目', optical: 0.62 },
     plus: { cat: 'library', zh: '添加', en: 'Add', semantics: '新增一条（预设等）', optical: 0.56 },
 
@@ -57,6 +60,7 @@
     folder: { cat: 'file', zh: '文件夹', en: 'Folder', semantics: '文件夹', optical: 0.66 },
     'import-file': { cat: 'file', zh: '导入文件', en: 'Import file', semantics: '把音频文件导入播放列表', optical: 0.66 },
     'import-folder': { cat: 'file', zh: '导入文件夹', en: 'Import folder', semantics: '把整个文件夹的音乐导入播放列表', optical: 0.68 },
+    download: { cat: 'file', zh: '下载', en: 'Download', semantics: '把在线歌曲下载到本地（真实下载，不可用时明确标注）', optical: 0.66 },
 
     /* ---------------------------------------------------------- 编辑类 */
     save: { cat: 'edit', zh: '保存', en: 'Save', semantics: '保存当前设置 / 预设', optical: 0.62 },
@@ -95,7 +99,14 @@
     'win-max': { cat: 'window', zh: '最大化', en: 'Maximize', semantics: '最大化窗口', optical: 0.48 },
     'win-restore': { cat: 'window', zh: '还原', en: 'Restore', semantics: '还原窗口大小', optical: 0.5, pair: 'win-max' },
     'win-mini': { cat: 'window', zh: '迷你模式', en: 'Mini mode', semantics: '切换到迷你窗口', optical: 0.62, toggle: true },
-    brand: { cat: 'window', zh: 'RlonDSP 标志', en: 'RlonDSP mark', semantics: '软件标识（纯矢量，不是图片）', optical: 1 }
+    brand: { cat: 'window', zh: 'RlonDSP 标志', en: 'RlonDSP mark', semantics: '软件标识（纯矢量，不是图片）', optical: 1 },
+
+    /* ---------------------------------------------------------- 第三方品牌归属 */
+    spotify: { cat: 'brand', zh: 'Spotify 标志', en: 'Spotify mark', semantics: 'Spotify 内容归属标识（官方标志，只用于来源标注）', optical: 1, weight: 'solid' },
+
+    /* ---------------------------------------------------------- 播放队列 */
+    'current-location': { cat: 'library', zh: '定位当前歌曲', en: 'Locate current track', semantics: '把正在播放的歌曲滚动到列表中部', optical: 0.66 },
+    'queue-add': { cat: 'library', zh: '新建队列', en: 'New queue', semantics: '创建一个新的播放队列', optical: 0.64 }
   };
 
   /** 登记表里键名 → 真正的 symbol id（统一加前缀，避免和业务 id 撞名） */

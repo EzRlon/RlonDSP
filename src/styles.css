@@ -360,12 +360,14 @@ select option {
   padding: 0 0 14px;
   overflow-y: auto;
   flex: 1;
-  /* 这一层不要再铺自己的白底（原先跟着 .lg-content 叠了第二层白色）。
-     播列表本来就挂在左栏那层毛玻璃上，多叠一层白会把整个左栏洗白，
-     背后的专辑封面颜色就透不过来，并且列表区和上方工具栏之间会出现
-     一条深浅分界。去掉白底和描边后，左栏上下一致，封面颜色正常透出。 */
-  background: transparent;
-  border-color: transparent;
+  /* 空状态也要跟随主题：统一使用全局内容层令牌，不再写死白色。
+     深色主题下该令牌会解析为深色玻璃内容层，列表不会再出现白块。 */
+  background: var(--lg-bg-content);
+  border-color: var(--lg-content-border);
+}
+
+.track-list:empty {
+  background: var(--lg-bg-content);
 }
 
 .track-item {
@@ -395,8 +397,8 @@ select option {
 
 .modal-card.effects-card {
   width: 620px;
-  max-width: calc(100vw - 60px);
-  max-height: 90vh;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 158px);
   display: flex;
   flex-direction: column;
 }
@@ -432,11 +434,17 @@ select option {
   border-radius: 12px;
   background: transparent;
 }
+/* 「脉冲反馈」弹窗与「实时音效」弹窗使用完全同一套尺寸规则。
+   这两页是同一个弹窗的两个标签页，宽度 / 最大宽高 / 居中 / 圆角 / 毛玻璃 /
+   Header / X / 滚动都必须在同一个盒子里，切换标签时外框不会跳动。
+   旧的 1180px + 88vh 复古机架尺寸（比实时音效宽一倍）已废弃。
+   高度写成等于 max-height 的确定值：内部 iframe 需要确定高度才能正确分页滚动，
+   视觉结果与实时音效相同（实时音效的内容同样总是占满 max-height）。 */
 .modal-card.effects-card.pulse-mode {
-  width: 1180px;
-  max-width: calc(100vw - 40px);
-  height: 88vh;
-  max-height: 88vh;
+  width: 620px;
+  max-width: calc(100vw - 32px);
+  height: calc(100vh - 158px);
+  max-height: calc(100vh - 158px);
 }
 #lyricsLine { color: var(--text); }
 
@@ -777,6 +785,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
 }
 
 /* 预设条目：每一行都是一张卡片 —— 名称 + 保存/重命名/删除 + 最右侧开关 */
+.preset-list-viewport {
+  max-height: clamp(120px, 30vh, 300px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
 .preset-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .preset-row {
   display: flex;
@@ -931,7 +946,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
   font-weight: 700;
   color: var(--accent);
   white-space: nowrap;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
+
+.preset-new-tag:hover { color: var(--text); }
 
 .preset-new-tag .icon { width: 14px; height: 14px; }
 .preset-name-input {
@@ -982,7 +1002,59 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
 .progress-row { display: flex; align-items: center; gap: 9px; width: 100%; font-size: 11px; color: var(--muted); }
 .progress-row input { flex: 1; height: 4px; cursor: pointer; }
 
-#volume { width: 90px; }
+/* ===== 音量：滑杆集成在静音按钮上 =====
+   点按钮向上弹出竖向滑杆（向上 = 音量大），再点 / Esc / 点空白处收起。
+   底栏里不再有独立的横向音量滑杆，所以右侧只剩按钮本身。 */
+.volume-wrap { position: relative; display: inline-flex; }
+
+.volume-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 10px;
+  border-radius: 14px;
+  background: var(--lg-control-bg);
+  border: 1px solid var(--lg-control-border);
+  box-shadow: var(--lg-control-shadow);
+  backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-control-blur)) saturate(var(--lg-control-saturate));
+  animation: volumePop var(--motion-normal, 160ms) var(--ease);
+}
+
+/* 收起时必须真的不渲染：上面的 display:flex 会盖过 [hidden] 的 display:none */
+.volume-popover[hidden] { display: none; }
+
+@keyframes volumePop {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* 竖向滑杆：writing-mode 决定方向，direction:rtl 让「上=大、下=小」符合直觉 */
+.volume-popover input[type="range"] {
+  width: 10px;
+  height: 112px;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  margin: 0;
+  cursor: pointer;
+}
+
+.volume-value {
+  min-width: 26px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 音量到零：按钮本身就是「静音态」，给一点视觉反馈（图标已切成静音） */
+#muteBtn.is-muted { color: var(--muted); }
 #deviceSelect { max-width: 150px; }
 
 .toast {
@@ -1007,8 +1079,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); background: tran
      因为 fixed 层不受 body 圆角裁剪，这里把遮罩自身也做成同样的圆角，
      它的弧线正好和窗口四角重合，就不会把圆角盖成直角。 */
   position: fixed;
-  inset: 0;
-  border-radius: 12px;
+  top: 44px;
+  right: 0;
+  bottom: 82px;
+  left: 0;
+  border-radius: 0;
   overflow: hidden;
   /* 弹窗底层遮罩：半透明 + 高斯模糊，让背后内容虚化以突出弹窗本身。
      底色跟随主题（浅色用白色薄雾，深色用黑色压暗），不影响主题切换。 */
@@ -1039,6 +1114,25 @@ html.is-maximized .settings-modal { border-radius: 0; }
   width: 400px;
   border-radius: 22px;
   overflow: hidden;
+}
+
+/* 设置弹窗：Header/Footer 固定，Body 唯一滚动区域 */
+#settingsModal .modal-card {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 158px);
+  display: flex;
+  flex-direction: column;
+}
+
+#settingsModal .modal-head,
+#settingsModal .modal-foot {
+  flex: none;
+}
+
+#settingsModal .modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 17px 19px 12px; }
 .modal-head h3 { margin: 0; font-size: 16px; }
@@ -1097,7 +1191,7 @@ html.is-maximized .settings-modal { border-radius: 0; }
 ::-webkit-scrollbar-track { background: transparent; }
 
 @media (max-width: 1120px) {
-  .app-shell { grid-template-columns: 240px minmax(0, 1fr); }
+  .app-shell { --playlist-w: 240px; grid-template-columns: var(--playlist-w) minmax(0, 1fr); }
 }
 
 /* ===== Unified icon system ===== */
@@ -1287,11 +1381,16 @@ body.mini-mode .titlebar { display: none; }
 body.mini-mode .player-bar {
   position: relative;
   flex: 1;
+  /* 覆盖基准规则 .player-bar{min-height:82px}：mini 窗口只有 64px，
+     不覆盖会把底栏撑到 82px，导致内容分两行、按钮整体偏上、关闭键跑出窗口。 */
+  min-height: 0;
   height: 64px;
   margin: 0;
   border-radius: 0;
   display: flex;
   flex-direction: row;
+  flex-wrap: nowrap;
+  overflow: hidden;
   align-items: center;
   gap: 8px;
   padding: 0 8px 0 6px;
@@ -1324,6 +1423,18 @@ body.mini-mode .player-left {
   gap: 8px;
   justify-content: flex-start;
 }
+
+/* 基准 .player-main 是「左信息 / 中控制 / 右音量」三列 grid；mini 下退出与关闭按钮
+   也是它的子项，会掉到第二行把主行撑到 76px（按钮整体偏上、关闭键掉出窗口）。
+   mini 只保留单行：改成 flex 行、与底栏等高、垂直居中。 */
+body.mini-mode .player-main {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  min-height: 0;
+  gap: 8px;
+  padding: 0 8px 0 6px;
+}
 body.mini-mode .mini-cover {
   width: 40px;
   height: 40px;
@@ -1353,6 +1464,41 @@ body.mini-mode .progress-row {
   gap: 0;
 }
 body.mini-mode .progress-row span { display: none; }
+
+/* 迷你模式底栏只有 64px 高：把手会压到播放键，因此迷你模式不显示把手，
+   沿用原来的「细进度线贴底」表现（进度条主体仍留在底栏、功能不变）。 */
+body.mini-mode .player-progress {
+  position: absolute;
+  left: 84px;
+  right: 8px;
+  top: auto;
+  bottom: 4px;
+  min-height: 0;
+  transform: none;
+}
+
+body.mini-mode .progress-toggle { display: none; }
+
+body.mini-mode .progress-panel {
+  position: static;
+  width: 100%;
+  max-height: none;
+  padding: 0;
+  gap: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+body.mini-mode .progress-panel::after { display: none; }
+body.mini-mode .progress-panel span { display: none; }
+body.mini-mode .progress-panel input[type="range"] { height: 10px; }
 body.mini-mode #progress {
   flex: 1;
   height: 10px;
@@ -1459,19 +1605,21 @@ body.mini-mode .toast { bottom: 6px; }
 /* 左侧播放列表：右侧留一条分隔线，其余三边贴边 */
 .app-shell > .sidebar {
   border-width: 0 1px 0 0;
-  /* 与中间频谱展示区保持同样的材质观感：
-     两边底色其实相同，但展示区内部有一层很淡的紫蓝渐变，
-     播放列表原先只有纯色底，看起来就是一块死白。这里补上同样的渐变。 */
-  background-image:
-    radial-gradient(900px 320px at 6% -10%, rgba(76, 125, 255, 0.10), transparent 62%),
-    radial-gradient(720px 300px at 100% 4%, rgba(122, 92, 255, 0.10), transparent 60%);
-  background-repeat: no-repeat;
+  /* 与右侧主内容使用同一块表面：不再额外铺蓝紫径向渐变，
+     否则空播放列表时那块蓝底会明显跳出来，两边看起来不像一体。
+     两个区域仍然靠上面这条 1px 右侧分割线区分。 */
+  background-image: none;
+}
+
+/* 空播放列表：不再铺一块更实的内容底，也不用方框圈住空区域 */
+#trackList:empty {
+  background: transparent;
+  border-color: transparent;
 }
 
 [data-theme="dark"] .app-shell > .sidebar {
-  background-image:
-    radial-gradient(900px 320px at 6% -10%, rgba(76, 125, 255, 0.14), transparent 62%),
-    radial-gradient(720px 300px at 100% 4%, rgba(122, 92, 255, 0.14), transparent 60%);
+  /* 深色主题同样不铺蓝紫渐变：左右两块区域保持同一表面 */
+  background-image: none;
 }
 
 /* 中间频谱展示区：四边都不需要描边 */
@@ -1554,6 +1702,1380 @@ body.mini-mode .toast { bottom: 6px; }
   /* 三行：主视觉画布 / 预设条 / 效果卡片 */
   grid-template-rows: minmax(150px, 1.15fr) auto minmax(0, 1fr);
   gap: 10px;
+}
+
+/* 参数控制面板折叠后，主视觉行拿到剩余空间 */
+.visual-workspace.params-collapsed {
+  grid-template-rows: minmax(150px, 1fr) auto auto;
+}
+
+.visual-params-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.visual-params-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+}
+
+.visual-params-head .mini-btn {
+  height: 24px;
+  padding: 0 10px;
+  gap: 5px;
+}
+
+.visual-params-head .mini-btn .icon {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.18s var(--ease);
+}
+
+.visual-params-panel.collapsed .visual-params-head .mini-btn .icon {
+  transform: rotate(-90deg);
+}
+
+.visual-params-panel.collapsed .visual-cards {
+  display: none;
+}
+
+.visual-params-panel .visual-cards {
+  flex: 1;
+}
+
+/* ===== Online Resource Layer ===== */
+.online-page {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  /* 顶部标题 / 说明已移除：现在只有 源标签行 → 搜索 → 分类 → 内容 */
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 9px;
+}
+
+.online-source-bar,
+.online-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+/* 刷新跟在最后一个在线源标签右侧：不缩放、不换行，随标签一起横向滚动 */
+.online-refresh-btn { flex: none; }
+
+.online-search-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--lg-border);
+  border-radius: 12px;
+  background: var(--lg-micro-bg);
+}
+
+.online-search-row input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.online-results {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  align-content: start;
+  gap: 8px;
+}
+
+.online-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 13px;
+  border: 1px solid var(--lg-border);
+  background: var(--lg-bg-panel);
+  color: var(--text);
+  text-align: left;
+}
+
+.online-item img,
+.online-item .online-cover-fallback {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--accent-soft);
+}
+
+.online-item-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.online-item-main strong,
+.online-item-main span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.online-item-main strong { font-size: 12px; }
+.online-item-main span { color: var(--muted); font-size: 10px; }
+
+.online-detail {
+  padding: 12px;
+  border: 1px solid var(--lg-border);
+  border-radius: 14px;
+  background: var(--lg-bg-content);
+}
+
+.online-source-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--lg-border);
+  border-radius: 12px;
+  background: var(--lg-micro-bg);
+  margin-bottom: 7px;
+}
+
+.online-source-row-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.online-source-row-main strong,
+.online-source-row-main span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.online-source-row-main span { color: var(--muted); font-size: 10px; }
+.online-source-actions { display: flex; align-items: center; gap: 5px; }
+
+.online-source-form {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--lg-border);
+  border-radius: 13px;
+  background: var(--lg-bg-content);
+  margin-bottom: 8px;
+}
+
+.online-source-form label { display: grid; gap: 4px; color: var(--muted); font-size: 10px; }
+.online-source-form input,
+.online-source-form textarea,
+.online-source-form select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--lg-micro-bg);
+  color: var(--text);
+  font: inherit;
+  padding: 7px 8px;
+}
+
+.online-source-form textarea { min-height: 68px; resize: vertical; font-family: "Consolas", monospace; font-size: 10px; }
+.online-source-form-actions { display: flex; justify-content: flex-end; gap: 6px; }
+
+.viz-page--online { display: none; }
+.viz-page--online.is-active { display: flex; flex-direction: column; }
+
+/* 自定义源：左侧功能导航 + 右侧编辑区 */
+.online-source-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.online-source-nav {
+  width: 178px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid var(--lg-border);
+  border-radius: 13px;
+  background: var(--lg-micro-bg);
+  transition: width 0.18s var(--ease);
+}
+
+.online-source-nav.collapsed {
+  width: 44px;
+}
+
+.online-source-nav-toggle {
+  width: 100%;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.online-source-nav.collapsed .online-source-nav-toggle .icon {
+  transform: rotate(-90deg);
+}
+
+.online-source-nav-item {
+  width: 100%;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.online-source-nav-item:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.online-source-nav-item.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.online-source-nav.collapsed .online-source-nav-item {
+  justify-content: center;
+  padding: 5px 0;
+}
+
+.online-source-nav.collapsed .online-source-nav-item span {
+  display: none;
+}
+
+.online-source-editor {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.online-source-list {
+  display: grid;
+  gap: 7px;
+}
+
+.online-source-fields {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.online-source-field {
+  display: grid;
+  grid-template-columns: minmax(120px, 170px) minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.online-source-field > label {
+  min-width: 0;
+  padding-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.online-source-field input,
+.online-source-field select,
+.online-source-field textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--lg-micro-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+}
+
+.online-source-field input,
+.online-source-field select {
+  height: 32px;
+  padding: 0 9px;
+}
+
+.online-source-field textarea {
+  min-height: 150px;
+  padding: 9px;
+  resize: vertical;
+  font-family: "Consolas", "SFMono-Regular", monospace;
+  font-size: 10.5px;
+  line-height: 1.45;
+  overflow-wrap: normal;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.online-source-field .switch {
+  margin-top: 6px;
+  justify-self: start;
+}
+
+.online-source-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.online-source-field .online-source-form-actions,
+.online-source-fields > .online-source-form-actions {
+  grid-column: 1 / -1;
+}
+
+/* Online Resources final density / layout */
+.online-source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.online-source-chip .icon { width: 14px; height: 14px; }
+.online-source-chip.is-empty { color: var(--muted); }
+
+.online-search-row {
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease), background 0.18s var(--ease);
+}
+
+.online-search-row:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.online-search-row.is-error {
+  border-color: #ff5b6e;
+}
+
+.online-search-row.is-loading {
+  border-color: var(--accent);
+}
+
+.online-search-row.is-success {
+  border-color: var(--accent);
+}
+
+.online-search-row .primary-btn {
+  min-width: 72px;
+  height: 30px;
+}
+
+.online-results {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.online-song-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.online-song-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 12px;
+  background: var(--lg-micro-bg);
+  transition: background 0.16s var(--ease), transform 0.16s var(--ease);
+}
+
+.online-song-row:hover {
+  background: var(--hover);
+}
+
+.online-song-cover,
+.online-card-cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.online-song-cover { width: 44px; height: 44px; }
+.online-song-cover img,
+.online-card-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.online-song-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.online-song-main strong,
+.online-song-main span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.online-song-main strong { font-size: 12px; }
+.online-song-main span { color: var(--muted); font-size: 10px; }
+.online-song-duration { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+
+.online-action-primary {
+  color: #fff;
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.online-action-primary:hover {
+  background: var(--accent);
+  filter: brightness(1.06);
+}
+
+.online-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+}
+
+.online-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid var(--lg-border);
+  border-radius: 14px;
+  background: var(--lg-bg-panel);
+  transition: background 0.16s var(--ease), transform 0.16s var(--ease), border-color 0.16s var(--ease);
+}
+
+.online-card:hover {
+  background: var(--lg-bg-content);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.online-card-cover {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+.online-card strong,
+.online-card > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.online-card strong { font-size: 12px; }
+.online-card > span { font-size: 10px; }
+
+/* 卡片尺寸统一：标题固定两行高度、副标题固定一行，
+   长专辑名 / 长艺人名不再把卡片撑高，整行卡片始终等高对齐 */
+.online-card strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  min-height: 30px;
+  line-height: 1.25;
+}
+
+.online-card > span { min-height: 13px; }
+
+/* 保留上一次有效数据时的轻量错误提示 */
+.online-home-warn {
+  font-size: 10.5px;
+  color: var(--lg-bad);
+  padding: 2px 2px 0;
+}
+
+.online-state {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.online-state-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.online-state strong { color: var(--text); font-size: 13px; }
+
+.online-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.online-skeleton-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 120px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+}
+
+.online-skeleton {
+  display: block;
+  border-radius: 8px;
+  background: var(--lg-micro-bg);
+  animation: onlinePulse 1.15s ease-in-out infinite;
+}
+
+.online-skeleton-cover { width: 44px; height: 44px; }
+.online-skeleton-line { height: 10px; }
+.online-skeleton-line.short { width: 68%; }
+
+/* ===== 在线资源首页（无需搜索的自动发现） =====
+   全部沿用上面的卡片 / 列表 / 芯片 / 骨架令牌，只补“分区标题 + 名次 + 更多热门”这几块。 */
+.online-home {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.online-home-head {
+  display: flex;
+  align-items: center;
+  /* 「热门推荐」标题与图标已移除：这里只剩右上角的更新时间状态 */
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.online-home-meta { font-size: 10px; white-space: nowrap; }
+
+.online-home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.online-home-section-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+}
+
+.online-home-section-head strong {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+/* 榜单真实名次：只做展示，不参与任何排序计算 */
+.online-rank {
+  flex: none;
+  min-width: 34px;
+  text-align: right;
+  font-family: "Consolas", "SFMono-Regular", monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* 首页歌曲行比搜索结果多一列名次：列模板跟着补一列，保持封面/标题/操作原对齐 */
+.online-home .online-song-row {
+  grid-template-columns: 34px 44px minmax(0, 1fr) auto;
+}
+
+.online-more-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.online-more-chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.online-more-again { flex: none; margin-left: auto; }
+
+/* ===== MusicSquare（第三个内置在线源）与单曲下载 =====
+   MusicSquare 的多平台结果、归属说明、下载控件全部沿用上面的在线资源体系，
+   只新增两类元素：平台归属芯片 + 每首歌独立的下载控件。 */
+.online-attribution {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--lg-border);
+  border-radius: 12px;
+  background: var(--lg-bg-panel);
+}
+
+.online-attribution > .online-home-section-head { min-width: 0; }
+
+.online-attribution > .online-home-section-head > .muted {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.online-platform-row { gap: 5px; }
+
+/* 平台芯片是只读展示：不做出可点击的假象 */
+.online-platform-chip { cursor: default; }
+
+.online-musicsquare-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.online-musicsquare-platform {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* 单曲下载控件：图标 + 操作名称 + 真实状态（进行中 / 完成 / 失败 / 不可下载） */
+.online-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.online-download-btn { flex: none; gap: 5px; font-size: 12px; }
+.online-download-btn.is-busy { color: var(--accent); border-color: var(--accent); }
+.online-download-btn.is-done { color: var(--accent); }
+.online-download-btn.is-error { color: #ff5b6e; border-color: #ff5b6e; }
+.online-download-btn:disabled { opacity: 0.62; cursor: not-allowed; }
+
+.online-download-status {
+  max-width: 170px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.online-download-status.is-error { color: #ff5b6e; }
+
+.online-tabs .vfx-chip.is-disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ===== Spotify 内容区（第二个内置在线源） =====
+   只有「内容归属 / 品牌标识 / 该源的登录按钮」用官方 Spotify Green，
+   其余布局、圆角、阴影、毛玻璃、字号、间距全部沿用上面的 RlonDSP 在线资源体系。
+   RlonDSP 全局 Accent Color 不受影响。 */
+.spotify-attribution {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--lg-border);
+  border-radius: 12px;
+  background: var(--lg-bg-panel);
+}
+
+.spotify-mark {
+  width: 16px;
+  height: 16px;
+  color: #1db954; /* Spotify 官方品牌绿：只用于 Spotify 归属标识 */
+}
+
+.spotify-wordmark {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--text);
+}
+
+.spotify-attribution > .muted {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.spotify-auth-btn {
+  flex: none;
+  margin-left: auto;
+  color: #1db954;
+  border-color: rgba(29, 185, 84, 0.55);
+}
+
+.spotify-auth-btn:hover {
+  color: #1ed760;
+  border-color: #1ed760;
+  background: rgba(29, 185, 84, 0.12);
+}
+
+.online-home--spotify .online-home-section-head .spotify-mark {
+  width: 12px;
+  height: 12px;
+}
+
+.online-source-hint { margin: -2px 0 0; }
+
+/* ===== 播放中心（左侧卡片内部）：Queue 选择器 / 行操作 / 拖拽 / 空态 =====
+   全部沿用 RlonDSP 既有 Liquid Glass 令牌，不新增第二套设计语言。 */
+.queue-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.queue-selector::-webkit-scrollbar { height: 0; }
+
+.queue-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 25px;
+  padding: 0 9px;
+  border: 1px solid var(--lg-border);
+  border-radius: 999px;
+  background: var(--lg-micro-bg);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.16s var(--ease), color 0.16s var(--ease), border-color 0.16s var(--ease);
+}
+
+.queue-chip:hover { background: var(--hover); color: var(--text); }
+.queue-chip:focus-visible { outline: none; box-shadow: var(--tl-focus-ring); }
+.queue-chip.is-active {
+  color: #fff;
+  background: var(--accent);
+  border-color: transparent;
+}
+.queue-chip.is-preview { border-color: var(--accent); color: var(--accent); }
+.queue-chip-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
+.queue-chip--add { padding: 0 7px; }
+.queue-chip-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-right: -3px;
+  border-radius: 50%;
+  color: inherit;
+  opacity: 0.55;
+}
+.queue-chip-del:hover { opacity: 1; background: rgba(128, 128, 128, 0.25); }
+.queue-chip-del .icon { width: 11px; height: 11px; }
+
+/* 本地音乐快速导航与智能筛选：复用 queue-chip / lg-button 语言，不新建设计体系 */
+.queue-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 8px;
+}
+
+.queue-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.queue-filter-chips::-webkit-scrollbar { height: 0; }
+
+.queue-filter-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 23px;
+  padding: 0 8px;
+  border: 1px solid var(--lg-border);
+  border-radius: 999px;
+  background: var(--lg-micro-bg);
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.16s var(--ease), color 0.16s var(--ease), border-color 0.16s var(--ease);
+}
+
+.queue-filter-chip:hover { background: var(--hover); color: var(--text); }
+.queue-filter-chip:focus-visible { outline: none; box-shadow: var(--tl-focus-ring); }
+.queue-filter-chip.is-active {
+  color: #fff;
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.queue-filter-toggle {
+  flex: none;
+  height: 23px;
+  padding: 0 8px;
+  gap: 4px;
+}
+
+.queue-filter-toggle.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.queue-filter-panel {
+  margin: 0 12px 8px;
+  padding: 8px;
+  border: 1px solid var(--lg-border);
+  border-radius: 10px;
+  background: var(--lg-micro-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.queue-filter-panel[hidden] { display: none; }
+
+.queue-filter-section { display: flex; flex-direction: column; gap: 5px; }
+
+.queue-filter-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.queue-quality-chips { flex-wrap: wrap; overflow: visible; }
+
+.queue-filter-clear,
+.queue-filter-clear-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--lg-border);
+  border-radius: 8px;
+  background: var(--lg-micro-bg);
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.queue-filter-clear:hover,
+.queue-filter-clear-inline:hover { background: var(--hover); color: var(--text); }
+.queue-filter-clear:focus-visible,
+.queue-filter-clear-inline:focus-visible { outline: none; box-shadow: var(--tl-focus-ring); }
+
+.queue-folder-tree {
+  max-height: 150px;
+  overflow: auto;
+  padding-left: 2px;
+  scrollbar-width: thin;
+}
+
+.queue-folder-node { margin: 1px 0; }
+.queue-folder-node summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  padding: 2px 5px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.queue-folder-node summary::-webkit-details-marker { display: none; }
+.queue-folder-node summary:hover { background: var(--hover); }
+.queue-folder-node summary.is-active { background: var(--accent-soft); color: var(--accent); }
+.queue-folder-node summary .icon { width: 12px; height: 12px; color: var(--muted); }
+.queue-folder-node summary.is-active .icon { color: var(--accent); }
+.queue-folder-node .queue-folder-children { margin-left: 10px; border-left: 1px solid var(--line); padding-left: 5px; }
+
+.queue-selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 12px 6px;
+  padding: 5px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  background: var(--accent-soft);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.queue-selection-bar[hidden] { display: none; }
+.queue-selection-bar::-webkit-scrollbar { height: 0; }
+
+.queue-selection-count {
+  flex: none;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.queue-selection-bar .mini-btn {
+  flex: none;
+  height: 22px;
+  padding: 0 7px;
+  gap: 4px;
+  font-size: 10px;
+}
+
+.queue-selection-bar .mini-btn:hover { color: var(--text); }
+
+.queue-view-hint {
+  margin: 0 12px 6px;
+  padding: 5px 8px;
+  border: 1px dashed var(--lg-border);
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* 行高由 JS 的 TRACK_ROW_HEIGHT 决定：窗口化渲染依赖固定行高 */
+.track-item {
+  position: relative;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.track-item.is-dragging { opacity: 0.45; }
+.track-item.is-drop-before::before,
+.track-item.is-drop-after::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.track-item.is-drop-before::before { top: -1px; }
+.track-item.is-drop-after::after { bottom: -1px; }
+.track-item.is-located { animation: queueLocated 0.9s var(--ease); }
+.track-item.is-selected { background: var(--accent-soft); }
+.track-item.is-selected .track-title { color: var(--accent); }
+
+@keyframes queueLocated {
+  0% { background: var(--accent-soft); }
+  100% { background: transparent; }
+}
+
+.track-spacer { margin: 0; padding: 0; list-style: none; }
+
+.track-actions {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 6px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, transparent, var(--lg-bg-panel) 22%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s var(--ease);
+}
+
+.track-item:hover .track-actions,
+.track-item:focus-within .track-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.track-item:hover .track-time { visibility: hidden; }
+
+.track-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.14s var(--ease), color 0.14s var(--ease);
+}
+
+.track-act:hover { background: var(--hover); color: var(--text); }
+.track-act:focus-visible { outline: none; box-shadow: var(--tl-focus-ring); }
+.track-act.fav { color: #ff5b7f; }
+.track-act.track-remove:hover { color: var(--lg-bad); }
+
+/* 只读预览：整列不可拖拽，行内不提供删除入口 */
+.track-list.is-readonly .track-item { cursor: pointer; }
+
+.queue-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 14px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.queue-empty[hidden] { display: none; }
+
+.queue-empty-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.queue-empty strong { color: var(--text); font-size: 12px; }
+.queue-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+
+/* ===== 播放列表卡片：右边缘居中的展开/收起把手 =====
+   播放列表是一张「窄而高」的卡片（高约为宽的 2~3 倍），
+   把手依附在整张卡片右侧边缘的**竖直正中**，点击即展开 / 收起整张播放列表。
+   收起后卡片只剩这条 16px 把手，主内容按 Grid 自动补位。 */
+.app-shell {
+  /* 播放列表展开宽度：收起动画按它整体左移，保证内容一定完全移出可视区 */
+  --playlist-w: 260px;
+  transition: grid-template-columns var(--motion-normal, 160ms) var(--ease);
+}
+
+.app-shell.playlist-collapsed {
+  grid-template-columns: 16px minmax(0, 1fr);
+}
+
+.app-shell > .sidebar { position: relative; }
+
+/* 把手有专属的右侧 16px 区域：列表 / 工具按钮 / 搜索框都不再被把手压住
+   （实测之前 .sidebar-tools 与 #trackList 与把手横向重叠 16px）。 */
+.app-shell > .sidebar { padding-right: 16px; }
+
+.playlist-handle {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 56px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px 0 0 8px;
+  background: var(--lg-micro-bg);
+  border: 1px solid var(--lg-micro-border);
+  border-right: 0;
+  box-shadow: var(--lg-highlight);
+  color: var(--muted);
+  cursor: pointer;
+  z-index: 3;
+  transition: background var(--motion-normal, 160ms) var(--ease),
+              color var(--motion-normal, 160ms) var(--ease);
+}
+
+.playlist-handle:hover { background: var(--lg-light-bg); color: var(--text); }
+.playlist-handle:focus-visible { outline: none; box-shadow: var(--tl-focus-ring), var(--lg-highlight); }
+
+.playlist-handle-icon {
+  width: 13px;
+  height: 13px;
+  transform: rotate(90deg);
+  transition: transform var(--motion-normal, 160ms) var(--ease);
+}
+
+/* 展开：箭头指向左侧（点击向左收起）；收起：箭头指向右侧（点击向右展开） */
+.app-shell.playlist-collapsed .playlist-handle-icon { transform: rotate(-90deg); }
+
+/* 收起 / 展开：内容整体向左滑出、滑回（不用 display/visibility 瞬移），
+   与列宽变化同步，动画复用现有曲线与时长。 */
+.app-shell > .sidebar > *:not(.playlist-handle) {
+  transition: transform var(--motion-normal, 160ms) var(--ease),
+              opacity var(--motion-normal, 160ms) var(--ease);
+}
+
+.app-shell.playlist-collapsed > .sidebar > *:not(.playlist-handle) {
+  transform: translateX(calc(-1 * var(--playlist-w)));
+  opacity: 0;
+}
+
+/* ===== 底栏播放进度条：把手基准 + 向上撑开（真实布局补位） =====
+   - 把手以「自身最下底边」为基准停靠在底栏最外边；
+   - 收起：进度条区高度为 0，只留贴在底栏上边缘的把手，底栏仍是 82px；
+   - 展开：进度条在布局里向上撑开，底栏变高 → 上方功能区（主内容）自动补位；
+     不是浮层、不再置于最顶层。
+   播放栏放开裁剪并抬到内容之上：.lg-player-bar 自带 overflow:hidden，
+   会把手把露在栏外的那一段裁掉；抬高层级只是为了让这截把手可见。 */
+.player-bar {
+  z-index: 44;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  /* 旧规则里的 align-items:center 会让主行与进度条区收缩成内容宽度再居中：
+     实测主行只有 701px（应为整条底栏 1320px），左右信息被挤向中间，
+     进度条面板也不是按卡片整幅宽度居中。这里改回拉伸。 */
+  align-items: stretch;
+  height: auto;
+  min-height: 82px;
+  padding: 0;
+}
+
+/* 底栏主行：左侧信息 / 中央控制组 / 右侧音量，中央单独占一格保证水平正中 */
+.player-main {
+  /* 固定主行高度：底栏展开进度面板时只允许底栏向上长高（上方功能区自动补位），
+     不允许把主行从 64px 压到 50px——那会让控制组/音量被挤占、按钮错位。 */
+  flex: 0 0 64px;
+  height: 64px;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 0 18px;
+}
+
+.player-progress {
+  position: relative;
+  flex: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  min-height: 0;
+}
+
+/* 把手只保留 ^ 图标与可点区域：底栏本身是随专辑变色的玻璃层，
+   这里必须彻底关掉 .lg-button 带来的白底 / 描边 / 阴影 / 背景模糊，
+   否则会在按钮位置留下一块白色小方块。 */
+.player-progress > .progress-toggle,
+.player-progress > .progress-toggle:hover,
+.player-progress > .progress-toggle:focus {
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-radius: 0;
+}
+
+.player-progress > .progress-toggle {
+  /* 基准：把手的下底边永远贴在「进度条区下沿」——
+     收起时这条线就是底栏最外边的上边缘，展开时就是进度条内容的下边缘。 */
+  position: absolute;
+  left: 50%;
+  /* 收起时整条把手必须落在底栏内部：原先 bottom:0 会让它以底栏上沿为中线
+     向上探出 13px，压住上方内容。这里改成贴「进度条区上沿」，展开时再回到下沿。 */
+  top: 0;
+  bottom: auto;
+  transform: translateX(-50%);
+  /* 与播放列表把手同一套尺寸，只是横过来放：
+     播放列表把手 16(厚) × 56(长)，这里就是 56(长) × 16(厚)，
+     圆角同样取 8px，贴边一侧不描边。 */
+  width: 56px;
+  height: 16px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 依附上边缘：向下贴边，圆角只留在上方两侧 */
+  border-radius: 8px 8px 0 0;
+  /* 沉浸：把手不再有任何白色底/边框/内高光，只保留 ^ 图标与可点区域；
+     底栏本身是随专辑变化的玻璃层，静止与 hover 都不再浮出白色块。 */
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--motion-normal, 160ms) var(--ease),
+              color var(--motion-normal, 160ms) var(--ease),
+              border-color var(--motion-normal, 160ms) var(--ease);
+}
+
+/* lg-button 的玻璃底是画在伪元素上的：只改 background 挡不住它，
+   这里把把手的两个伪元素一并关掉，只留 ^ 图标与可点区域。 */
+.player-progress > .progress-toggle::before,
+.player-progress > .progress-toggle::after {
+  display: none;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.player-progress > .progress-toggle:hover { background: none; color: var(--text); }
+.player-progress > .progress-toggle:focus-visible { outline: none; box-shadow: var(--tl-focus-ring); }
+.progress-toggle-icon {
+  width: 13px;
+  height: 13px;
+  transform: rotate(180deg);
+  transition: transform var(--motion-normal, 160ms) var(--ease);
+}
+
+.player-progress.is-expanded .progress-toggle-icon { transform: rotate(0deg); }
+
+/* 展开：把手回到面板下沿（面板已用 padding-bottom 为它留位） */
+.player-progress.is-expanded .progress-toggle { top: auto; bottom: 0; }
+
+.progress-panel {
+  /* 展开时在布局里向上撑开：底栏变高 → 上方功能区自动补位 */
+  position: relative;
+  width: min(720px, calc(100vw - 96px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-height: 0;
+  padding: 0 14px;
+  border-radius: 16px;
+  /* 收起态本来就不可见（max-height:0 + opacity:0 + overflow:hidden），
+     所以面板不再自带旧版的白色玻璃底：它只在收起动画的第一帧被整体画出来
+     （那一帧 opacity 还接近 1），于是「展开后关闭」时会闪出一条白色低栏。
+     边框保持 1px 只改颜色，几何与展开态完全一致；玻璃由底栏本身提供。 */
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--muted);
+  font-size: 11px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transition: max-height var(--motion-normal, 160ms) var(--ease),
+              padding var(--motion-normal, 160ms) var(--ease),
+              opacity var(--motion-normal, 160ms) var(--ease);
+}
+
+/* 底部高斯模糊保护层：底缘再压一层更实的模糊，向下渐隐，避免硬边 */
+.progress-panel::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -14px;
+  height: 22px;
+  border-radius: 0 0 16px 16px;
+  background: linear-gradient(to bottom, var(--lg-control-bg), transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
+  mask-image: linear-gradient(to bottom, #000, transparent);
+  pointer-events: none;
+  opacity: 1;
+  /* 同样是「收起态才显示」的实色模糊层：进入收起态时延迟到动画结束才回来，
+     否则收起的第一帧就会在面板底部补出一条白色低栏。展开态直接隐藏（见下一条规则）。 */
+  transition: opacity 0s linear var(--motion-normal, 160ms);
+}
+
+.player-progress.is-expanded .progress-panel {
+  max-height: 120px;
+  /* 下内距留出把手那一行：把手落在面板下沿、不压住进度条内容 */
+  padding: 10px 14px 24px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 展开态：底部保护层立即隐藏（不碰 display，迷你模式的 display:none 不会被抢走） */
+.player-progress.is-expanded .progress-panel::after {
+  opacity: 0;
+  transition: opacity 0s linear 0s;
+}
+
+.progress-panel > span {
+  flex: none;
+  min-width: 44px;
+  font-variant-numeric: tabular-nums;
+  font-family: "Consolas", "SFMono-Regular", monospace;
+}
+
+#currentTime { text-align: right; }
+
+.progress-panel input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  cursor: pointer;
+}
+
+@keyframes onlinePulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.9; }
+}
+
+@media (max-width: 980px) {
+  .online-card-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .online-song-row { grid-template-columns: 40px minmax(0, 1fr) auto; }
+  .online-song-duration { display: none; }
 }
 
 .visual-main {

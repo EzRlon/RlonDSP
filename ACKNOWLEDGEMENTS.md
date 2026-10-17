@@ -39,6 +39,20 @@ RlonDSP 是 Echomusic 的分支作品，非官方修改版。上游的版权声�
 | 用途 | 脉冲反馈模块的 13 级 DSP 处理链参考实现（9 段 EQ / 压缩器 / 超级低音 / 3D 环绕 / 耳机环绕 / 清晰度 / 超声波滤波 / 胆机模拟 / FDN 混响 / 峰值归一化 / WAV 导出） |
 | 引用形式 | 依据上游许可证迁移 DSP 处理逻辑并集成至 `src/ir-generator.js` 与 `src/ir-studio.html` |
 
+#### MusicSquare
+
+| 项目 | 内容 |
+| :--- | :--- |
+| 名称 | MusicSquare |
+| 作者 | CharlesPikachu |
+| 仓库 | https://github.com/CharlesPikachu/musicsquare |
+| 站点 | https://charlespikachu.github.io/musicsquare/ |
+| 许可证 | **Apache-2.0** |
+| 用途 | 在线音乐搜索能力的来源参考：按其公开源码中的真实调用，接入网易云 / QQ 音乐 / 酷我 / JOOX 的公开搜索与详情接口 |
+| 引用形式 | **未复制其前端代码或页面资源**。RlonDSP 在 `online-source-layer.js` 中按自身架构重写了适配器（统一的资源模型、错误码、跨源与响应大小限制、凭据不外发），仅复用其公开的接口调用方式；来源与许可署名见本表与 [NOTICE](NOTICE) |
+
+Apache-2.0 与 RlonDSP 的 GPL-3.0-only 兼容（Apache-2.0 允许并入 GPLv3 作品），因此该参考不引入许可冲突。
+
 ### 2. 运行时与框架
 
 #### Electron
@@ -152,6 +166,10 @@ RlonDSP 的界面层**未使用任何第三方前端框架、UI 组件库或 CSS
 2. 上游项目的版权声明、作者信息与许可证文件在任何分发形式中均完整保留。
 3. 本项目未修改上游源码中的版权声明与许可证条款。
 4. 若您再分发本项目，请遵守 GPL-3.0-only 的相关条款，并同样保留上游署名。
+5. 在线资源（Apple Music / Spotify / MusicSquare）只获取第三方公开返回的搜索与试听信息，
+   不绕过 DRM、付费、登录或访问控制；下载功能由用户逐首显式发起，仅适用于您有权下载的内容，
+   音频版权归各平台与权利人所有。
+6. RlonDSP 的音频链路（解码 / DSP / 可视化）与上述在线请求相互独立，所有音频处理仍在本地完成。
 
 <div align="center">
 

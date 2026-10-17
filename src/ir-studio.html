@@ -212,39 +212,53 @@ input[type=text]{
 }
 input[type=text]:focus{outline:1px solid var(--amber)}
 
-/* 推子（水平） */
-.slider{appearance:none;-webkit-appearance:none;flex:1;height:18px;background:transparent;cursor:pointer}
-.slider::-webkit-slider-runnable-track{
-  height:4px;border-radius:2px;background:linear-gradient(180deg,#0a0b0d,#262a30);
-  border:1px solid #000;box-shadow:inset 0 1px 2px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.06)}
-.slider::-webkit-slider-thumb{
-  -webkit-appearance:none;width:12px;height:16px;margin-top:-7px;border-radius:2px;
-  background:linear-gradient(180deg,#5b6068,#2f3238 60%,#26292e);
-  border:1px solid #0a0b0d;box-shadow:0 1px 2px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.25)}
-.slider::-moz-range-track{height:4px;border-radius:2px;background:linear-gradient(180deg,#0a0b0d,#262a30);border:1px solid #000}
-.slider::-moz-range-thumb{width:12px;height:16px;border-radius:2px;background:linear-gradient(180deg,#5b6068,#2f3238 60%,#26292e);border:1px solid #0a0b0d}
-
-/* 垂直推子（EQ） */
-.fader-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:0}
-.fader-v{
-  appearance:none;-webkit-appearance:none;position:relative;
-  /* 旋转 90° 的推子：宽度是旋转后的视觉高度，高度是旋转后的视觉宽度。
-     这里把高度压到 24px，让「可点击区域」与「看得见的推子」一样宽；
-     若仍用 132px 正方形，相邻推子的点击区会互相重叠一倍多，
-     点下去会落到旁边的推子上，导致无法准确选中。 */
-  width:132px;height:24px;margin:54px 0;
-  background:transparent;cursor:pointer;transform:rotate(-90deg);
+/* 推子（水平）——与「实时音效」面板里的滑块同源：
+   原生轨道 + accent-color 着色，滑块为 14px 圆形（同一套数值见 src/styles.css）。 */
+.slider{
+  appearance:auto;-webkit-appearance:auto;
+  flex:none;width:100%;height:18px;margin:0;
+  background:transparent;accent-color:var(--accent);cursor:pointer;
 }
-.fader-v::-webkit-slider-runnable-track{height:5px;border-radius:2px;
-  background:linear-gradient(180deg,#08090a,#2a2e34);border:1px solid #000;
-  box-shadow:inset 0 1px 3px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.05)}
+.slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:14px;height:14px;border-radius:50%;
+  background:var(--accent);border:2px solid rgba(255,255,255,.85);
+  box-shadow:0 1px 5px rgba(0,0,0,.28);cursor:pointer;
+}
+.slider::-moz-range-thumb{
+  width:14px;height:14px;border-radius:50%;
+  background:var(--accent);border:2px solid rgba(255,255,255,.85);
+  box-shadow:0 1px 5px rgba(0,0,0,.28);cursor:pointer;
+}
+
+/* 垂直推子（EQ）——与「实时音效」面板的 10 段均衡器完全同一套画法：
+   用 writing-mode 让原生 range 立起来，4px 竖轨由输入框自身背景绘制，
+   轨道透明、滑块 14px 圆形，保证滑块与竖轨严格同心。 */
+.fader-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0}
+.fader-v{
+  -webkit-appearance:none;appearance:none;
+  writing-mode:vertical-lr;direction:rtl;
+  width:20px;height:138px;padding:0;
+  /* 必须显式清掉底色：这里只画了 background-image（那根 4px 竖轨），
+     浏览器给表单控件的默认底色是纯白，深色模式下就会在每根推子后面
+     留出一块白色底框。实时音效的 10 段均衡用的是 background:transparent 简写，
+     所以那边没有这个问题；这里用 background-color 单独清掉，保留竖轨图。 */
+  background-color:transparent;
+  background-image:linear-gradient(rgba(0,0,0,.14),rgba(0,0,0,.14));
+  background-size:4px 100%;background-position:center;background-repeat:no-repeat;
+  accent-color:var(--accent);cursor:pointer;
+}
+.fader-v::-webkit-slider-runnable-track{width:14px;border-radius:999px;background:transparent;}
 .fader-v::-webkit-slider-thumb{
-  -webkit-appearance:none;width:22px;height:13px;margin-top:-5px;border-radius:2px;
-  background:linear-gradient(180deg,#666c75,#3a3e45 55%,#2c2f34);
-  border:1px solid #0a0b0d;box-shadow:0 1px 3px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.3);
-  position:relative}
-.fader-v::-moz-range-track{height:5px;border-radius:2px;background:linear-gradient(180deg,#08090a,#2a2e34);border:1px solid #000}
-.fader-v::-moz-range-thumb{width:22px;height:13px;border-radius:2px;background:linear-gradient(180deg,#666c75,#3a3e45 55%,#2c2f34);border:1px solid #0a0b0d}
+  -webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--accent);border:2px solid rgba(255,255,255,.85);
+  box-shadow:0 1px 5px rgba(0,0,0,.28);cursor:pointer;
+}
+.fader-v::-moz-range-track{width:14px;border-radius:999px;background:transparent;}
+.fader-v::-moz-range-thumb{
+  width:14px;height:14px;border-radius:50%;
+  background:var(--accent);border:2px solid rgba(255,255,255,.85);
+}
 .fv-label{font-family:"Share Tech Mono",monospace;font-size:8px;letter-spacing:.02em;color:var(--dim);text-align:center;line-height:1.1}
 .fv-val{font-family:"Share Tech Mono",monospace;font-size:10px;color:var(--green);text-shadow:0 0 4px rgba(168,255,96,.4);text-align:center}
 .eq-row{display:flex;gap:2px;margin-top:2px}
@@ -337,9 +351,11 @@ canvas{width:100%;height:118px;display:block;background:#07090a;border-radius:3p
 }
 :focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 </style>
-<style id="rlondsp-skin">
+<style id="rlondsp-skin-legacy" media="not all">
 /* ============================================================
-   RlonDSP Liquid Glass skin — UI only, no functional changes
+   旧版脉冲皮肤 —— 已整块停用（media="not all"）。
+   新的统一皮肤在同文件末尾的 #rlondsp-pulse-ui：
+   规格与「实时音效」标签页逐项对齐，本块只作历史留档，不参与渲染。
    ============================================================ */
 :root{
   --lg-glass:rgba(255,255,255,0.24);
@@ -529,54 +545,610 @@ canvas{background:transparent !important;}
 ::-webkit-scrollbar-thumb{background:rgba(130,138,152,0.35);border-radius:8px;}
 ::-webkit-scrollbar-track{background:transparent;}
 </style>
+<style id="rlondsp-pulse-ui">
+/* ============================================================================
+   RlonDSP · 脉冲反馈（IR Studio）统一皮肤 —— 只改表现层
+   ---------------------------------------------------------------------------
+   目标：与同一弹窗里的「实时音效」标签页逐项一致 —— 尺寸、比例、居中、圆角、
+   背景、描边、字体、字号、字重、层级、内距、控件尺寸、开关、滑块、按钮、下拉、
+   芯片、图标、Hover / Active / Pressed / Focus / Disabled、动画曲线与时长、
+   滚动方式、浅色与深色主题、主题色、中英文、视觉密度。
+
+   对应关系（左侧 = 实时音效面板，右侧 = 本页）：
+     .fx-section          →  .header .chain .panel .renderbar .graph .r-actions-card
+     .fx-section-title    →  .phead
+     .param               →  .ctl（74px 标签 + 1fr 控件 + 82px 数值芯片）
+     .switch              →  .rock（34×19 胶囊 / 13px 圆钮）
+     .mini-btn            →  .btn.small（27px / 圆角 9）
+     .primary-btn         →  .btn.primary（35px / 圆角 10）
+     .full-select         →  select（27px / 圆角 9 / 玻璃微面）
+     .pulse-name-input    →  input[type=text]（27px / 圆角 9）
+     .vfx-chip            →  .chip（24px / 999 圆角）
+     .icon（图标登记表）    →  .pulse-icon（15px / 1.7 描边 / 圆端点）
+
+   功能层（dsp-core、渲染 Worker、AudioBuffer、WAV 编码、采样率、试听 / 保存 /
+   导入 / 导出 / 预设数据、postMessage、事件绑定、canvas 绘制算法）一行未改。
+   ============================================================================ */
+
+/* ---------- Design Token：与主界面 glass-theme.css / styles.css 同值 ---------- */
+:root{
+  --bg:#f5f5f7;
+  --panel-glass:rgba(255,255,255,.64);
+  --panel-soft:rgba(238,241,246,.78);
+  --text:#1d222c;
+  --muted:#6d7483;
+  --line:rgba(0,0,0,.08);
+  --accent:#4c7dff;
+  --accent-2:#7a5cff;
+  --accent-soft:rgba(76,125,255,.12);
+  --hover:rgba(0,0,0,.05);
+  --ease:cubic-bezier(.22,1,.36,1);
+  --amber:var(--accent);
+  --amber-hi:var(--accent-2);
+  --amber-dim:var(--muted);
+  --green:var(--accent);
+  --red:#ff5b6e;
+  --dim:var(--muted);
+  --lg-border:rgba(255,255,255,.25);
+  --lg-highlight:inset 0 1px 0 rgba(255,255,255,.35);
+  --lg-bg-panel:rgba(255,255,255,.27);
+  --lg-bg-content:rgba(255,255,255,.52);
+  --lg-micro-bg:rgba(255,255,255,.05);
+  --lg-micro-border:rgba(255,255,255,.14);
+  --lg-content-border:rgba(0,0,0,.08);
+  --lg-inset:rgba(18,22,30,.86);
+  --lg-good:#12a37a;
+  --lg-warn:#e08a00;
+  --lg-bad:#ff5b7f;
+  --motion-fast:120ms;
+  --motion-normal:160ms;
+  --motion-ease-out:cubic-bezier(.22,1,.36,1);
+  /* 触感表面令牌（与主界面 styles.css 同名同值），开关等控件直接复用 */
+  --tl-border:rgba(16,22,36,.10);
+  --tl-border-hover:rgba(16,22,36,.16);
+  --tl-surface-active:rgba(76,125,255,.14);
+  --tl-icon-disabled:rgba(120,128,145,.55);
+  --tl-focus-ring:0 0 0 2px rgba(76,125,255,.5);
+  --tl-inset-pressed:inset 0 1.5px 3px rgba(16,22,36,.16),inset 0 -1px 0 rgba(255,255,255,.35);
+  --tl-lift:-.5px;
+  --tl-press:1px;
+}
+[data-theme="dark"]{
+  --bg:#0d0d10;
+  --panel-glass:rgba(22,25,32,.66);
+  --panel-soft:rgba(255,255,255,.06);
+  --text:#f1f4fa;
+  --muted:#9098a8;
+  --line:rgba(255,255,255,.09);
+  --accent:#6f92ff;
+  --accent-2:#9b82ff;
+  --accent-soft:rgba(111,146,255,.15);
+  --hover:rgba(255,255,255,.07);
+  --lg-border:rgba(255,255,255,.18);
+  --lg-highlight:inset 0 1px 0 rgba(255,255,255,.16);
+  --lg-bg-panel:rgba(20,20,20,.34);
+  --lg-bg-content:rgba(25,29,38,.68);
+  --lg-micro-bg:rgba(255,255,255,.05);
+  --lg-micro-border:rgba(255,255,255,.10);
+  --lg-content-border:rgba(255,255,255,.09);
+  --lg-inset:rgba(10,12,16,.72);
+  --lg-good:#3fd6a5;
+  --lg-warn:#ffb547;
+  --lg-bad:#ff6b8f;
+  --tl-border:rgba(255,255,255,.10);
+  --tl-border-hover:rgba(255,255,255,.18);
+  --tl-surface-active:rgba(111,146,255,.18);
+  --tl-icon-disabled:rgba(255,255,255,.28);
+  --tl-focus-ring:0 0 0 2px rgba(111,146,255,.55);
+  --tl-inset-pressed:inset 0 1.5px 3px rgba(0,0,0,.45),inset 0 -1px 0 rgba(255,255,255,.06);
+}
+
+/* ---------- 与主界面同样的「环境自适应」令牌覆盖 ----------
+   主界面 glass-components.css 在两种环境下会整体改写表面令牌：
+     1) 环境不支持背景模糊 → 提高不透明度撑住观感；
+     2) 系统开启「减少透明效果」→ 保留玻璃但整体更实。
+   脉冲反馈皮肤原先只写死了默认值，于是同一个按钮 / 卡片 / 芯片，
+   在实时音效那边用了实色、这边还是半透明，看起来「显示效果不一致」。
+   下面两块与主界面逐值对齐，保证任何环境下两边解析出同一套表面。 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root{
+    --lg-bg-panel:rgba(255,255,255,.90);
+    --lg-micro-bg:rgba(255,255,255,.82);
+    --lg-light-bg:rgba(255,255,255,.80);
+    --lg-bg-content:rgba(255,255,255,.84);
+  }
+  [data-theme="dark"]{
+    --lg-bg-panel:rgba(22,25,32,.94);
+    --lg-micro-bg:rgba(255,255,255,.09);
+    --lg-light-bg:rgba(255,255,255,.10);
+    --lg-bg-content:rgba(25,29,38,.88);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root{
+    --lg-bg-panel:rgba(255,255,255,.52);
+    --lg-micro-bg:rgba(255,255,255,.30);
+    --lg-light-bg:rgba(255,255,255,.34);
+    --lg-bg-content:rgba(255,255,255,.62);
+  }
+  [data-theme="dark"]{
+    --lg-bg-panel:rgba(22,25,32,.66);
+    --lg-micro-bg:rgba(255,255,255,.08);
+    --lg-light-bg:rgba(255,255,255,.10);
+    --lg-bg-content:rgba(25,29,38,.78);
+  }
+}
+
+/* ---------- 基础排版：与主界面同字体；内边距与 .fx-scroll 完全相同 ---------- */
+html{-webkit-text-size-adjust:100%;}
+html,body{background:transparent!important;}
+body{
+  margin:0;min-height:0;height:auto;
+  padding:10px 12px 16px;
+  color:var(--text);
+  font-family:"Segoe UI Variable","Microsoft YaHei UI","PingFang SC",sans-serif;
+  font-size:11px;line-height:1.45;
+  user-select:none;
+}
+.grain{display:none!important;}
+.wrap{max-width:none;margin:0;display:flex;flex-direction:column;gap:10px;}
+
+/* ---------- 图标：与主界面 .icon 同规格（15px / 1.7 描边 / 圆端点） ---------- */
+.pulse-sprite{position:absolute;width:0;height:0;overflow:hidden;}
+.pulse-icon{
+  width:15px;height:15px;display:block;flex:none;
+  fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+
+/* ---------- 卡片：与 .fx-section 完全同规格 ---------- */
+.header,.chain,.panel,.renderbar,.graph,.r-actions-card{
+  position:relative;
+  min-width:0;
+  background:var(--lg-bg-panel);
+  border:1px solid var(--lg-border);
+  border-radius:14px;
+  padding:10px 12px 12px;
+  margin:0;
+  /* 干净表面：清掉旧机架卡片残留的「内嵌底栏 + 重投影」，
+     与实时音效的 .fx-section 一样只有一层底色 + 一圈描边。 */
+  box-shadow:none;
+}
+.panel::before,.panel::after{display:none!important;}
+/* 头部与信号链卡片：竖排卡片（基础样式表里的 flex-wrap 机架排版不再参与） */
+.header,.chain{display:block;}
+
+/* 相邻功能区之间一条分割线 —— 与实时音效 .fx-section + .fx-section::before
+   完全同一手法：卡片之间靠这条细线区分，卡片自身不再带底栏 / 投影。 */
+:is(.header,.chain,.panel,.renderbar,.graph,.r-actions-card)
+  + :is(.header,.chain,.panel,.renderbar,.graph,.r-actions-card)::before,
+.r-actions-card + .r-graphs::before,
+.r-graphs + .r-stats::before{
+  content:"";
+  position:absolute;
+  left:6px;
+  right:6px;
+  top:-5px;
+  height:1px;
+  background:var(--lg-content-border);
+  pointer-events:none;
+}
+
+/* ---------- 卡片标题栏：与 .fx-section-title 完全同规格 ---------- */
+.phead{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:0 0 7px;margin:0 0 9px;
+  border-bottom:1px solid var(--line);box-shadow:none;
+  font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--text);
+}
+.ptitle{
+  display:flex;align-items:center;gap:8px;min-width:0;
+  font-family:inherit;font-size:10.5px;font-weight:700;letter-spacing:.7px;
+  color:inherit;text-shadow:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ptitle .pulse-icon{width:14px;height:14px;}
+.pnum{
+  flex:none;color:var(--muted);font-size:10px;letter-spacing:.4px;
+  font-family:"Consolas","SFMono-Regular",monospace;
+}
+.head-status{display:flex;align-items:center;gap:8px;flex:none;}
+
+/* ---------- 参数行：与 .param 完全同规格 ---------- */
+.ctl{
+  display:grid;
+  grid-template-columns:74px minmax(0,1fr) 82px;
+  align-items:center;gap:10px;
+  margin:7px 0;font-size:11px;
+}
+.ctl .ctag{
+  grid-column:1;
+  font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.3px;
+  color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+/* 基础样式表在 @media (max-width:760px) 里给 .ctl .slider 写死 min-width:120px、
+   给 .ctl .ctag 写死 min-width:64px。这个弹窗本身就比 760px 窄，于是 FDN 混响
+   这种「一行两列」的排布里，滑杆被撑到 120px、顶出自己那格，
+   压到右边的数值框甚至压进隔壁一列（看起来就是滑杆重叠）。
+   参数行的宽度一律交给栅格决定，这里把旧机架的固定最小宽度清掉。 */
+.ctl .slider,.ctl .ctag{min-width:0;}
+/* 「标签 + 值」两列的信息行：值占满右侧整行 */
+.ctl > .lcd:last-child:nth-child(2),
+.ctl > input[type=text]:last-child:nth-child(2),
+.ctl > select:last-child:nth-child(2){grid-column:2 / -1;}
+.ctl .lcd{
+  display:block;flex:none;min-height:0;
+  text-align:right;
+  font-family:"Consolas","SFMono-Regular",monospace;font-variant-numeric:tabular-nums;
+  font-size:10.5px;letter-spacing:0;
+  color:var(--accent);
+  background:var(--lg-micro-bg);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:3px 7px;
+  box-shadow:none;text-shadow:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.lcd.amber{color:var(--accent);}
+/* 带开关 / 提示文字的参数行（自动增益补偿、软限幅、包络跟踪…） */
+.ctl--switch{display:flex;align-items:center;gap:8px;}
+.ctl--switch .ctag:first-child{grid-column:auto;width:74px;flex:none;}
+.ctl--switch .note{
+  margin-left:auto;min-width:0;
+  font-family:"Consolas","SFMono-Regular",monospace;font-size:9.5px;
+  color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+/* ---------- 开关：与实时音效 .switch input[type=checkbox] 逐项同值 ----------
+   之前这里只写了尺寸与圆角，没写底色 / 描边 / 内阴影，
+   基础样式表里旧机架的 inset 阴影就留在未选中状态上，
+   于是同一个「关」的开关，脉冲反馈那边看起来是脏的、陷下去的，
+   实时音效那边是平的。下面把两边用到的每一个值都对齐。 */
+.rock{
+  -webkit-appearance:none;appearance:none;
+  flex:none;width:34px;height:19px;margin:0;
+  border-radius:999px;
+  background:rgba(120,128,145,.32);
+  border:1px solid var(--tl-border);
+  box-shadow:inset 0 1px 2px rgba(16,22,36,.16);
+  position:relative;cursor:pointer;
+  transition:background-color var(--motion-normal) var(--motion-ease-out),
+             border-color var(--motion-normal) var(--motion-ease-out),
+             box-shadow var(--motion-normal) var(--motion-ease-out);
+}
+[data-theme="dark"] .rock{background:rgba(255,255,255,.12);box-shadow:inset 0 1px 2px rgba(0,0,0,.45);}
+.rock::after{
+  content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
+  background:#fff;
+  box-shadow:0 1px 2px rgba(16,22,36,.28),0 2px 5px rgba(16,22,36,.14),inset 0 1px 0 rgba(255,255,255,.9);
+  transition:transform var(--motion-normal) var(--ease),box-shadow var(--motion-fast) var(--ease);
+  transform:translateX(0);
+}
+.rock:checked{background:var(--accent);border-color:transparent;box-shadow:inset 0 1px 2px rgba(0,0,0,.18);}
+/* 打开态必须把 left / 底色 / 阴影一并写全：
+   基础样式表里「复古机架」的 .rock:checked::after 选择器权重更高，
+   只覆盖 transform 会让圆钮被顶到开关外面（多出一个圆点）。 */
+.rock:checked::after{
+  left:2px;
+  background:#fff;
+  box-shadow:0 1px 2px rgba(16,22,36,.30),0 2px 6px rgba(16,22,36,.18),inset 0 1px 0 rgba(255,255,255,.95);
+  transform:translateX(15px);
+}
+@media (hover: hover){
+  .rock:hover:not(:checked){background:rgba(120,128,145,.42);border-color:var(--tl-border-hover);}
+}
+.rock:active::after{transform:translateX(0) scale(.94);}
+.rock:checked:active::after{transform:translateX(15px) scale(.94);}
+.rock:disabled{opacity:.5;cursor:default;}
+.bp{display:flex;align-items:center;gap:8px;flex:none;user-select:none;}
+.bp label{
+  font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.7px;
+  color:var(--muted);text-transform:uppercase;
+}
+
+/* ---------- 下拉 / 输入框：与 .full-select / .pulse-name-input 同规格 ---------- */
+select{
+  -webkit-appearance:auto;appearance:auto;
+  width:100%;min-width:0;height:27px;
+  padding:0 8px;
+  border-radius:9px;
+  border:1px solid var(--lg-micro-border);
+  background:var(--lg-micro-bg);
+  color:var(--text);
+  font-family:inherit;font-size:11px;
+  cursor:pointer;outline:none;box-shadow:var(--lg-highlight);
+}
+select option{background:#fff;color:#1d222c;}
+[data-theme="dark"] select option{background:#22242b;color:#f1f4fa;}
+input[type=text]{
+  width:100%;min-width:0;height:27px;
+  padding:0 9px;
+  border-radius:9px;
+  border:1px solid var(--lg-micro-border);
+  background:var(--lg-micro-bg);
+  color:var(--text);
+  font-family:inherit;font-size:11.5px;
+  outline:none;box-shadow:var(--lg-highlight);
+}
+input[type=text]::placeholder{color:var(--muted);opacity:.85;}
+:focus-visible{outline:2px solid var(--accent)!important;outline-offset:2px;}
+
+/* ---------- 按钮：与 .mini-btn / .primary-btn 同规格 ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  flex:none;height:31px;padding:0 13px;border-radius:9px;
+  max-width:100%;
+  background:var(--lg-micro-bg);
+  border:1px solid var(--lg-micro-border);
+  box-shadow:var(--lg-highlight);
+  color:var(--text);font-family:inherit;font-size:11px;font-weight:400;letter-spacing:.2px;
+  cursor:pointer;white-space:nowrap;
+  transition:background var(--motion-fast) var(--ease),color var(--motion-fast) var(--ease),
+             border-color var(--motion-fast) var(--ease),box-shadow var(--motion-fast) var(--ease),
+             transform var(--motion-fast) var(--ease);
+}
+/* 悬停 / 按压 / 键盘焦点 / 禁用：与实时音效的 .mini-btn 同一套触感规则 */
+@media (hover: hover){
+  .btn:hover{
+    background:var(--lg-light-bg);
+    border-color:var(--tl-border-hover);
+    transform:translateY(var(--tl-lift));
+  }
+}
+.btn:active{transform:translateY(var(--tl-press)) scale(.988);box-shadow:var(--tl-inset-pressed);}
+.btn:focus-visible{outline:none;box-shadow:var(--tl-focus-ring),var(--lg-highlight);}
+.btn.small{height:27px;padding:0 10px;gap:5px;font-size:10.5px;border-radius:9px;}
+.btn .pulse-icon{width:15px;height:15px;}
+.btn.primary{
+  background:linear-gradient(180deg,var(--accent),var(--accent-2));
+  border-color:transparent;color:#fff;
+  font-weight:650;
+  box-shadow:0 6px 16px rgba(76,125,255,.30);
+}
+.btn.primary:hover{filter:brightness(1.05);}
+.btn.primary:disabled{filter:grayscale(.5) brightness(.95);box-shadow:none;cursor:default;opacity:.7;}
+.btn:disabled{transform:none;cursor:default;opacity:.5;box-shadow:none;color:var(--tl-icon-disabled);}
+.btn .led{width:7px;height:7px;}
+</style>
+<style id="rlondsp-pulse-ui-2">
+/* 统一皮肤（下）：指示灯 / 芯片 / 机架 / 均衡推子 / 渲染条 / 结果区 / 滚动条 / 自适应 */
+
+/* ---------- 指示灯 / VU：与主界面同一套状态色 ---------- */
+.led{width:8px;height:8px;border-radius:50%;background:rgba(120,128,145,.35);border:0;box-shadow:none;flex:none;}
+.led.on{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+.led.green.on{background:var(--lg-good);box-shadow:0 0 6px var(--lg-good);}
+.led.red.on{background:var(--lg-bad);box-shadow:0 0 6px var(--lg-bad);}
+.led.blink{animation:ledblink 1s steps(2) infinite;}
+@keyframes ledblink{50%{opacity:.25;}}
+.vu{display:inline-flex;align-items:flex-end;gap:2px;height:16px;}
+.vu i{display:block;width:3px;height:100%;border-radius:1px;background:rgba(120,128,145,.30);border:0;box-shadow:none;}
+.vu i.hot{background:var(--lg-warn);}
+.vu i.lit{background:var(--accent);}
+.vu i.over{background:var(--lg-bad);}
+.power{
+  /* 状态读数是「一个指示灯 + 文字」，不再给它垫一层胶囊底座：
+     深色主题下那层微玻璃底看起来像 就绪 下方多出一个圆形底座。 */
+  display:inline-flex;align-items:center;gap:6px;
+  background:transparent;border:0;padding:0;
+  font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--muted);
+  white-space:nowrap;
+}
+.power .led{width:7px;height:7px;}
+
+/* ---------- 芯片：与 .vfx-chip 同规格 ---------- */
+.chain-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;flex:none;
+  height:24px;padding:0 11px;border-radius:999px;
+  border:1px solid var(--lg-border);background:var(--lg-micro-bg);
+  color:var(--muted);font-family:inherit;font-size:10.5px;font-weight:600;letter-spacing:.3px;
+  white-space:nowrap;cursor:pointer;user-select:none;box-shadow:none;
+  transition:background var(--motion-fast) var(--ease),color var(--motion-fast) var(--ease),
+             border-color var(--motion-fast) var(--ease);
+}
+.chip:hover{color:var(--text);background:var(--hover);}
+.chip.on{color:var(--accent);background:var(--accent-soft);border-color:var(--accent);}
+.chip.off{color:var(--muted);opacity:.75;}
+.chain .led,.chain .arrow{display:none;}
+
+/* ---------- 机架：单列卡片流（与实时音效参数区同一节奏） ---------- */
+.rack{display:flex;flex-direction:column;gap:10px;margin:0;}
+.pulse-group{
+  display:flex;align-items:center;gap:8px;
+  padding:2px 2px 0;margin:0;
+  font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--muted);
+}
+.pulse-group .pulse-icon{width:14px;height:14px;}
+.pulse-group::after{content:"";flex:1;height:1px;background:var(--line);}
+.pulse-split{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.pulse-split > div{min-width:0;}
+
+/* ---------- 9 段均衡推子：与实时音效 10 段均衡同一套栅格与标签 ---------- */
+/* 每一格的宽度完全由栅格决定（min-width:0）：
+   基础样式表在窄窗口媒体查询里给 .fader-wrap 写了 min-width:60px，
+   窗口变窄时 9 个推子会顶出横向滚动条，这里必须压回 0。 */
+.eq-row{
+  display:grid;grid-template-columns:repeat(9,minmax(0,1fr));
+  gap:2px;align-items:end;margin:0;padding:6px 0 2px;overflow:visible;
+}
+.fader-wrap{flex:1 1 0;min-width:0;}
+.fv-label{font-family:inherit;font-size:9px;color:var(--muted);text-align:center;line-height:1.1;white-space:nowrap;}
+.fv-val{
+  font-family:"Consolas","SFMono-Regular",monospace;font-variant-numeric:tabular-nums;
+  font-size:9px;color:var(--accent);text-align:center;text-shadow:none;
+}
+
+/* ---------- 渲染条：按钮在上、进度在下 ---------- */
+.renderbar{display:flex;flex-direction:column;align-items:stretch;gap:10px;}
+.renderbar .btn.primary{width:100%;height:35px;border-radius:10px;font-size:12px;letter-spacing:.4px;}
+.progress{display:flex;flex-direction:column;gap:7px;min-width:0;}
+.pbar{
+  height:8px;border-radius:999px;overflow:hidden;position:relative;
+  background:var(--lg-micro-bg);border:1px solid var(--line);box-shadow:none;
+}
+.pfill{
+  height:100%;width:0%;border-radius:999px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  box-shadow:none;transition:width var(--motion-fast) linear;
+}
+.pstatus{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:10.5px;color:var(--muted);
+}
+#pmsg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pstatus .pct{
+  flex:none;color:var(--accent);
+  font-family:"Consolas","SFMono-Regular",monospace;font-variant-numeric:tabular-nums;
+}
+.pstatus .err{color:var(--lg-bad);}
+
+/* ---------- 结果区：试听/保存 → 波形 → 频谱 → 统计 ---------- */
+.result{display:none;}
+.result.show{display:flex;flex-direction:column;gap:10px;}
+.r-actions-card{display:flex;flex-direction:column;}
+.r-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0;}
+.r-actions .btn.primary{margin-left:auto;}
+.r-graphs{position:relative;display:flex;flex-direction:column;gap:10px;min-width:0;}
+.r-stats{display:flex;flex-direction:column;min-width:0;}
+.graph{display:flex;flex-direction:column;gap:8px;}
+.graph .gt{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:10.5px;font-weight:700;letter-spacing:.7px;
+  color:var(--text);margin:0;
+}
+.graph .gt > span:first-child{
+  display:inline-flex;align-items:center;gap:7px;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.graph .gt .mono{
+  font-family:"Consolas","SFMono-Regular",monospace;font-size:9.5px;font-weight:400;
+  letter-spacing:0;color:var(--muted);text-transform:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.graph canvas{
+  display:block;width:100%;height:118px;
+  background:var(--lg-inset)!important;
+  border-radius:10px;
+}
+
+/* ---------- 构建状态表 ---------- */
+.road{display:flex;flex-direction:column;gap:6px;margin:0;}
+.road .ri{display:flex;align-items:baseline;gap:10px;font-size:10.5px;color:var(--muted);}
+.road .ri > span:nth-child(2){flex:1;min-width:0;}
+.road .ri b{color:var(--text);font-weight:600;}
+.road .ri .rnum{
+  flex:none;min-width:24px;
+  font-family:"Consolas","SFMono-Regular",monospace;font-size:10px;color:var(--muted);
+}
+.road .ri .rstat{
+  flex:none;margin-left:auto;
+  font-family:"Consolas","SFMono-Regular",monospace;font-size:9.5px;letter-spacing:.4px;
+  color:var(--muted);
+}
+.road .ri.done .rstat{color:var(--lg-good);}
+.road .ri.now .rstat{color:var(--accent);}
+
+/* ---------- 滚动条：与主界面同一样式 ---------- */
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:rgba(130,138,152,.35);border-radius:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+
+/* ---------- 窄窗口 / 小尺寸自适应（弹窗变窄时自动收列，不产生横向溢出） ---------- */
+@media (max-width:520px){
+  body{padding:8px 10px 14px;}
+  .ctl{grid-template-columns:64px minmax(0,1fr) 74px;gap:8px;}
+  .ctl--switch .ctag:first-child{width:64px;}
+  .pulse-split{grid-template-columns:1fr;}
+  .head-status{gap:6px;}
+}
+@media (max-width:420px){
+  .ctl{grid-template-columns:minmax(0,1fr) 74px;}
+  .ctl .ctag{grid-column:1 / -1;}
+  .r-actions .btn.primary{margin-left:0;}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;}
+}
+</style>
 </head>
 <body>
+<!-- ============================================================================
+     图标：与主界面同一个图标登记表（src/icon-registry.js + src/index.html 的
+     sprite）里的矢量图形，逐条复制路径，viewBox / 线宽 / 端点完全一致。
+     跨 iframe 无法直接 <use> 父文档的 symbol，所以这里内联同一套 symbol。
+     ============================================================================ -->
+<svg class="pulse-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="icon-ir" viewBox="0 0 24 24"><path d="M3 13.4h3.1l1.6-7.6 2.3 13 2-6.6 1.6 3.6 1.3-2.1 1.2 1 1.2-.6 1.4.4 1.2-.2H21"/></symbol>
+  <symbol id="icon-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7L4 8"/><path d="M4 4v4h4"/></symbol>
+  <symbol id="icon-dsp" viewBox="0 0 24 24"><path d="M6 3.6v16.8M12 3.6v16.8M18 3.6v16.8"/><path d="M3.4 9h5.2M9.4 14.8h5.2M15.4 7.2h5.2"/></symbol>
+  <symbol id="icon-eq" viewBox="0 0 24 24"><path d="M4 8v8M9 4v16M14 7v10M19 10v4"/></symbol>
+  <symbol id="icon-wave" viewBox="0 0 24 24"><path d="M3 12h2l2-6 4 12 3-9 2 5 2-2h3"/></symbol>
+  <symbol id="icon-spectrum" viewBox="0 0 24 24"><path d="M4.4 20V13M8.2 20V6.4M12 20V15.6M15.8 20V9.2M19.6 20v-5.4"/></symbol>
+  <symbol id="icon-meter" viewBox="0 0 24 24"><path d="M3 8h18M3 12h18M3 16h18"/><path d="M9 5v14"/></symbol>
+  <symbol id="icon-save" viewBox="0 0 24 24"><path d="M5 3h11l4 4v14H5z"/><path d="M8 3v6h7V3M8 21v-7h8v7"/></symbol>
+  <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></symbol>
+  <symbol id="icon-export" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 15v4h16v-4"/></symbol>
+  <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M4 20l1-4 11-11 3 3-11 11-4 1z"/><path d="M14 7l3 3"/></symbol>
+  <symbol id="icon-audition" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></symbol>
+</svg>
 <div class="grain"></div>
 <div class="wrap">
 
-<!-- ================= 头部主机板 ================= -->
+<!-- ================= 头部：与「实时音效」同一张卡片 ================= -->
 <header class="header">
-  <div class="brand">
-    <div class="title-row">
-      <div class="logo"><b>Spatial&nbsp;Audio&nbsp;Studio</b></div>
-      <button class="btn small" id="btn-studio-reset">⟲&nbsp;RESET</button>
+  <div class="phead">
+    <div class="ptitle">
+      <svg class="pulse-icon"><use href="#icon-ir"></use></svg>
+      <span>PULSE FEEDBACK</span>
     </div>
-    <div class="sub">Powered&nbsp;by&nbsp;Rlon</div>
-  </div>
-  <div class="head-right">
-    <div class="head-lcd">
-      <div class="hrow"><span class="tag">PROJ&nbsp;RATE</span><div class="lcd amber" id="lcd-rate">48000 Hz</div></div>
-      <div class="hrow"><span class="tag">LENGTH</span><div class="lcd" id="lcd-len">2.00 s / 24 bit</div></div>
-      <div class="hrow"><span class="tag">CHAIN</span><div class="lcd" id="lcd-chain">13 STAGES READY</div></div>
-    </div>
-    <div class="vu" id="vu" aria-hidden="true"></div>
-    <div class="power">
-      <div class="led red on" id="pwr"></div>
-      <span id="pwr-txt">READY</span>
+    <div class="head-status">
+      <span class="vu" id="vu" aria-hidden="true"></span>
+      <span class="power"><span class="led red on" id="pwr"></span><span id="pwr-txt">READY</span></span>
+      <button class="btn small" type="button" id="btn-studio-reset"><svg class="pulse-icon"><use href="#icon-reset"></use></svg><span>RESET</span></button>
     </div>
   </div>
+  <div class="ctl"><span class="ctag">PROJ&nbsp;RATE</span><div class="lcd amber" id="lcd-rate">48000 Hz</div></div>
+  <div class="ctl"><span class="ctag">LENGTH</span><div class="lcd" id="lcd-len">2.00 s / 24 bit</div></div>
+  <div class="ctl"><span class="ctag">CHAIN</span><div class="lcd" id="lcd-chain">13 STAGES READY</div></div>
 </header>
 
-<!-- ================= 信号链图 ================= -->
+<!-- 脉冲名称：按需求「预设」子模块已整块移除（界面上不再出现）。
+     下面这个隐藏输入框是保存流程仍然需要的数据承载位：
+     主程序会把「RlonDSP_ + 升序编号」的建议名称推送到它，
+     点「保存到 RlonDSP」时按这个名字落库；没有它保存会拿不到名称。
+     它不占布局、不显示，因此不会留下空卡片或空位。 -->
+<input type="hidden" id="rlondsp-pulse-name" value="">
+
+<!-- ================= 信号链：同一张卡片 + 与实时音效同规格的芯片 ================= -->
 <nav class="chain" id="chain" aria-label="信号处理链">
-  <span class="cname">SIGNAL&nbsp;CHAIN</span>
-  <span class="chip on" data-mod="imp"><span class="led"></span>IMPULSE</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="eq"><span class="led"></span>EQ-9</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="comp"><span class="led"></span>COMP</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="bass"><span class="led"></span>BASS</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="sur"><span class="led"></span>SUR3D</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="hps"><span class="led"></span>HP-SUR</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="clar"><span class="led"></span>CLAR</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="ultra"><span class="led"></span>ULTRA</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="tube"><span class="led"></span>TUBE</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="fdn"><span class="led"></span>FDN</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="norm"><span class="led"></span>NORM</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="wmk"><span class="led"></span>WMK</span><span class="arrow">→</span>
-  <span class="chip on" data-mod="wav"><span class="led"></span>WAV</span>
+  <div class="phead">
+    <div class="ptitle">
+      <svg class="pulse-icon"><use href="#icon-dsp"></use></svg>
+      <span>SIGNAL CHAIN</span>
+    </div>
+  </div>
+  <div class="chain-chips">
+    <span class="chip on" data-mod="imp"><span class="led"></span>IMPULSE</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="eq"><span class="led"></span>EQ-9</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="comp"><span class="led"></span>COMP</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="bass"><span class="led"></span>BASS</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="sur"><span class="led"></span>SUR3D</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="hps"><span class="led"></span>HP-SUR</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="clar"><span class="led"></span>CLAR</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="ultra"><span class="led"></span>ULTRA</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="tube"><span class="led"></span>TUBE</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="fdn"><span class="led"></span>FDN</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="norm"><span class="led"></span>NORM</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="wmk"><span class="led"></span>WMK</span><span class="arrow">→</span>
+    <span class="chip on" data-mod="wav"><span class="led"></span>WAV</span>
+  </div>
 </nav>
 
-<!-- ================= 机架 ================= -->
+<!-- ================= 参数区：与实时音效同节奏的单列卡片流 ================= -->
 <main class="rack" id="rack">
+  <div class="pulse-group"><svg class="pulse-icon"><use href="#icon-eq"></use></svg><span>PARAMETERS</span></div>
 
   <!-- ─── 模块 1 · 冲激输入 ─── -->
   <section class="panel p-in" id="mod-imp">
@@ -633,9 +1205,9 @@ canvas{background:transparent !important;}
       <div class="fader-wrap"><input type="range" class="fader-v" data-band="7" min="-12" max="12" step="0.5" value="0"><div class="fv-val" id="eqv-7">0.0</div><div class="fv-label">8K</div></div>
       <div class="fader-wrap"><input type="range" class="fader-v" data-band="8" min="-12" max="12" step="0.5" value="0"><div class="fv-val" id="eqv-8">0.0</div><div class="fv-label">16.7K</div></div>
     </div>
-    <div class="ctl" style="margin-top:7px"><span class="ctag">AUTO&nbsp;TRIM</span>
-      <input type="checkbox" class="rock" id="eq-trim" checked style="margin:0 8px 0 0">
-      <span class="ctag" style="margin-left:auto">Q=1.10&nbsp;·&nbsp;SERIES</span>
+    <div class="ctl ctl--switch"><span class="ctag">AUTO&nbsp;TRIM</span>
+      <input type="checkbox" class="rock" id="eq-trim" checked>
+      <span class="note">Q=1.10&nbsp;·&nbsp;SERIES</span>
     </div>
   </section>
 
@@ -669,9 +1241,9 @@ canvas{background:transparent !important;}
       <input type="range" class="slider" id="comp-mu" min="-6" max="18" step="0.5" value="0">
       <div class="lcd" id="lcd-comp-mu">AUTO+0.0</div>
     </div>
-    <div class="ctl"><span class="ctag">SOFT&nbsp;CLIP</span>
-      <input type="checkbox" class="rock" id="comp-sc" checked style="margin:0 6px 0 0">
-      <span class="ctag" style="margin-left:auto">TANH LIMIT</span>
+    <div class="ctl ctl--switch"><span class="ctag">SOFT&nbsp;CLIP</span>
+      <input type="checkbox" class="rock" id="comp-sc" checked>
+      <span class="note">TANH LIMIT</span>
     </div>
   </section>
 
@@ -699,9 +1271,9 @@ canvas{background:transparent !important;}
       <input type="range" class="slider" id="bass-mix" min="0" max="100" step="1" value="60">
       <div class="lcd" id="lcd-bass-mix">60 %</div>
     </div>
-    <div class="ctl"><span class="ctag">ENV&nbsp;TRK</span>
-      <input type="checkbox" class="rock" id="bass-env" checked style="margin:0 6px 0 0">
-      <span class="ctag" style="margin-left:auto">2ND-ORDER X-OVER</span>
+    <div class="ctl ctl--switch"><span class="ctag">ENV&nbsp;TRK</span>
+      <input type="checkbox" class="rock" id="bass-env" checked>
+      <span class="note">2ND-ORDER X-OVER</span>
     </div>
   </section>
 
@@ -838,8 +1410,8 @@ canvas{background:transparent !important;}
       <div class="ptitle"><span class="pnum">10</span>FDN&nbsp;REVERB&nbsp;·&nbsp;8-CH&nbsp;HOUSEHOLDER</div>
       <div class="bp"><label>BYPASS</label><input type="checkbox" class="rock" id="fdn-en" checked></div>
     </div>
-    <div style="display:flex;gap:18px;flex-wrap:wrap">
-      <div style="flex:1;min-width:150px">
+    <div class="pulse-split">
+      <div>
         <div class="ctl"><span class="ctag">PREDELAY</span>
           <input type="range" class="slider" id="fdn-pre" min="0" max="250" step="1" value="35">
           <div class="lcd" id="lcd-fdn-pre">35 ms</div>
@@ -853,7 +1425,7 @@ canvas{background:transparent !important;}
           <div class="lcd" id="lcd-fdn-t60">1.6 s</div>
         </div>
       </div>
-      <div style="flex:1;min-width:150px">
+      <div>
         <div class="ctl"><span class="ctag">DAMPING</span>
           <input type="range" class="slider" id="fdn-damp" min="400" max="12000" step="50" value="4200">
           <div class="lcd" id="lcd-fdn-damp">4200 Hz</div>
@@ -884,14 +1456,14 @@ canvas{background:transparent !important;}
       <div class="ptitle"><span class="pnum">12</span>WATERMARK&nbsp;·&nbsp;SS&nbsp;LSB</div>
       <div class="bp"><label>BYPASS</label><input type="checkbox" class="rock" id="wmk-en" checked></div>
     </div>
-    <div style="display:flex;gap:18px;flex-wrap:wrap">
-      <div style="flex:1;min-width:180px">
+    <div class="pulse-split">
+      <div>
         <div class="ctl"><span class="ctag">MESSAGE</span>
           <input type="text" id="wmk-msg" value="RlonDSP" maxlength="24" spellcheck="false">
         </div>
         <div class="ctl"><span class="ctag">CHIP&nbsp;RATE</span><div class="lcd">×64 PN / BIT</div></div>
       </div>
-      <div style="flex:1;min-width:150px">
+      <div>
         <div class="ctl"><span class="ctag">DEPTH</span>
           <input type="range" class="slider" id="wmk-depth" min="1" max="3" step="1" value="1">
           <div class="lcd" id="lcd-wmk-depth">1 LSB</div>
@@ -917,9 +1489,9 @@ canvas{background:transparent !important;}
 
 </main>
 
-<!-- ================= 渲染条 ================= -->
+<!-- ================= 渲染 / 进度 ================= -->
 <div class="renderbar">
-  <button class="btn primary" id="btn-render"><span class="led red" id="led-render"></span>RENDER&nbsp;IR</button>
+  <button class="btn primary" id="btn-render"><svg class="pulse-icon"><use href="#icon-ir"></use></svg><span class="led red" id="led-render"></span><span>RENDER&nbsp;IR</span></button>
   <div class="progress">
     <div class="pbar"><div class="pfill" id="pfill"></div></div>
     <div class="pstatus">
@@ -929,25 +1501,44 @@ canvas{background:transparent !important;}
   </div>
 </div>
 
-<!-- ================= 结果区 ================= -->
+<!-- ================= 结果区：试听 / 保存 → 波形 → 频谱 → 统计 ================= -->
 <section class="result" id="result">
+  <div class="panel r-actions-card">
+    <div class="phead">
+      <div class="ptitle">
+        <svg class="pulse-icon"><use href="#icon-audition"></use></svg>
+        <span>PREVIEW &amp; SAVE</span>
+      </div>
+      <span class="led green on" id="led-ok"></span>
+    </div>
+    <div class="r-actions">
+      <button class="btn small" id="btn-dl"><svg class="pulse-icon"><use href="#icon-export"></use></svg><span>DOWNLOAD .WAV</span></button>
+      <button class="btn small" id="btn-play"><svg class="pulse-icon"><use href="#icon-play"></use></svg><span>PLAY</span></button>
+      <button class="btn primary small" id="btn-save-app"><svg class="pulse-icon"><use href="#icon-save"></use></svg><span>SAVE TO RLONDSP</span></button>
+    </div>
+  </div>
+  <div class="r-graphs">
+    <div class="graph">
+      <div class="gt"><span><svg class="pulse-icon"><use href="#icon-wave"></use></svg>IR&nbsp;WAVEFORM&nbsp;·&nbsp;L/R</span><span class="mono" id="g1-info"></span></div>
+      <canvas id="cv-wave" height="118"></canvas>
+    </div>
+    <div class="graph">
+      <div class="gt"><span><svg class="pulse-icon"><use href="#icon-spectrum"></use></svg>MAGNITUDE&nbsp;SPECTRUM&nbsp;·&nbsp;dB</span><span class="mono" id="g2-info"></span></div>
+      <canvas id="cv-spec" height="118"></canvas>
+    </div>
+  </div>
   <div class="panel r-stats">
-    <div class="phead"><div class="ptitle">OUTPUT&nbsp;FILE</div><span class="led green on" id="led-ok"></span></div>
+    <div class="phead">
+      <div class="ptitle">
+        <svg class="pulse-icon"><use href="#icon-meter"></use></svg>
+        <span>OUTPUT FILE</span>
+      </div>
+    </div>
     <div class="ctl"><span class="ctag">FILE</span><div class="lcd amber" id="st-file">-</div></div>
     <div class="ctl"><span class="ctag">FORMAT</span><div class="lcd" id="st-fmt">-</div></div>
     <div class="ctl"><span class="ctag">PEAK</span><div class="lcd" id="st-peak">-</div></div>
     <div class="ctl"><span class="ctag">RMS</span><div class="lcd" id="st-rms">-</div></div>
     <div class="ctl"><span class="ctag">DUR</span><div class="lcd" id="st-dur">-</div></div>
-    <div class="r-actions">
-      <button class="btn small" id="btn-dl">⬇ DOWNLOAD .WAV</button>
-      <button class="btn small" id="btn-play">▶ PLAY</button>
-      <input type="text" id="rlondsp-pulse-name" placeholder="脉冲名称（保存到 RlonDSP）" style="min-width:200px;padding:5px 8px;border-radius:4px;border:1px solid #08090a;background:#060b07;color:#a8ff60;font-family:'Share Tech Mono',Consolas,monospace;font-size:11px">
-      <button class="btn primary small" id="btn-save-app">＋ 保存到 RlonDSP</button>
-    </div>
-  </div>
-  <div class="r-graphs">
-    <div class="graph"><div class="gt"><span>IR&nbsp;WAVEFORM&nbsp;·&nbsp;L/R</span><span class="mono" id="g1-info"></span></div><canvas id="cv-wave" height="118"></canvas></div>
-    <div class="graph"><div class="gt"><span>MAGNITUDE&nbsp;SPECTRUM&nbsp;·&nbsp;dB</span><span class="mono" id="g2-info"></span></div><canvas id="cv-spec" height="118"></canvas></div>
   </div>
 </section>
 
@@ -1995,6 +2586,13 @@ btnRender.addEventListener('click',startRender);
 /* RlonDSP 界面文字双语化（只替换显示文字，不涉及任何功能/DSP 逻辑） */
 (function(){
   var DICT = {
+    'PULSE FEEDBACK':'脉冲反馈',
+    'RESET':'重置',
+    'PARAMETERS':'参数',
+    'PRESET':'预设',
+    'PREVIEW & SAVE':'试听与保存',
+    'ULTRA FILTER':'超声滤波',
+    'STAGES ACTIVE':'级工作',
     'Spatial Audio Studio':'空间音效制作器',
     '⟲ RESET':'⟲ 重置',
     'Powered by Rlon':'由 Rlon 音频驱动',
