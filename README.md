@@ -10,7 +10,7 @@
 
 [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-lightgrey.svg)](#-系统要求)
-[![Version](https://img.shields.io/badge/version-1.0.1-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](CHANGELOG.md)
 [![Electron](https://img.shields.io/badge/Electron-43.6.0-47848F.svg)](https://www.electronjs.org/)
 [![Web Audio](https://img.shields.io/badge/Web%20Audio-AudioWorklet-orange.svg)](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Audio_API)
 
@@ -33,11 +33,28 @@ RlonDSP 是一款纯本地的 Windows 桌面音频工作站：实时音效处理
 - 内置 10 路专业音频分析器与独立的沉浸式视觉引擎；
 - 项目以可扩展的 Provider 接口组织 DSP 来源，而不只是固定内置效果链。
 
+## v1.1.0 更新摘要
+
+v1.1.0 是一轮在线资源与底栏体验的更新，重点包括：
+
+- 新增第三个内置在线源 **MusicSquare**：并行聚合网易云 / QQ 音乐 / 酷我 / JOOX 的公开搜索，
+  结果标注真实平台归属，播放地址按平台现场解析，拿不到就如实报错；
+- 新增**每首歌曲独立下载按钮**：真实进度 / 成功 / 失败 / 取消 / 重试，文件名用「歌手 - 歌曲名」，
+  同名不覆盖；不提供下载的条目保留按钮并说明原因；
+- 修复在线歌曲「显示在播放却完全没有声音」（Web Audio 会静音非 CORS 干净的远程媒体）；
+- 修复点非首个平台的歌曲时「点了没反应 / 播成别的歌」，以及播放键在音频图先建好时不补音源；
+- 底栏音量滑杆收进静音按钮：点一下向上弹出竖向滑杆，音量到零即显示为静音；
+- 移除左侧播放列表里没有接到任何逻辑的「默认排序」下拉；
+- 修复进度条「展开后关闭」时闪出一条白色低栏。
+
+在线资源实测：MusicSquare 四个平台逐条点击均有真实音频通过 DSP 图谱（分析器能量非零）；
+酷我等上游拒绝的曲目会显示真实原因，不伪造成功。
+
 ## 核心能力
 
 ### 已实现
 
-- **本地播放器**：导入文件 / 文件夹 / 拖拽导入，搜索、排序、清空，曲目时长与封面解析。
+- **本地播放器**：导入文件 / 文件夹 / 拖拽导入，搜索、筛选、清空，曲目时长与封面解析。
 - **实时音效**：图示均衡器、压缩、低音增强、立体声增强、虚拟环绕、胆机模拟、混响、噪声门、前瞻限幅，以及动态 EQ、多段压缩、去齿音、扩展器、瞬态整形、削波 / 饱和、延迟 / 回声、合唱、镶边等。
 - **统一 DSP 图谱**：内置 DSP、原生引擎、Provider 与空间音效都是同一张图中的独立节点；节点可启用 / 旁通 / 排序，延迟与尾音如实统计。
 - **空间音效**：加载本地 WAV / AIFF 脉冲响应，实时卷积，支持干湿比、预延迟、高通、低通、A/B 对比与试听。
@@ -172,8 +189,8 @@ UI
 
 | 版本 | 文件名 | 说明 |
 | :--- | :--- | :--- |
-| 便携版 | `RlonDSP-1.0.1-portable-x64.zip` | 解压后双击 `RlonDSP.exe`，免安装 |
-| 安装版 | `RlonDSP-1.0.1-setup-x64.exe` | 可选安装目录，创建桌面与开始菜单快捷方式 |
+| 便携版 | `RlonDSP-1.1.0-portable-x64.zip` | 解压后双击 `RlonDSP.exe`，免安装 |
+| 安装版 | `RlonDSP-1.1.0-setup-x64.exe` | 可选安装目录，创建桌面与开始菜单快捷方式 |
 
 ### 源码开发
 
